@@ -1,4 +1,16 @@
-import { Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -242,16 +254,24 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={profileQuery.isRefetching}
-            onRefresh={() => void profileQuery.refetch()}
-            tintColor={theme.colors.primary}
-          />
-        }
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          refreshControl={
+            <RefreshControl
+              refreshing={profileQuery.isRefetching}
+              onRefresh={() => void profileQuery.refetch()}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
         <AppCard title="Profile" subtitle="Update your account details and personalization settings." />
 
         <AppCard
@@ -404,7 +424,8 @@ export default function ProfileScreen() {
             />
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal
         visible={showPhotoPreview}
@@ -430,7 +451,10 @@ export default function ProfileScreen() {
             {user?.profilePicture && !previewLoadFailed ? (
               <Image
                 source={{ uri: user.profilePicture }}
-                style={styles.previewImage}
+                style={[
+                  styles.previewImage,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                ]}
                 onError={() => setPreviewLoadFailed(true)}
               />
             ) : (
@@ -446,6 +470,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  keyboardWrap: { flex: 1 },
   content: { padding: 16, paddingBottom: 110, gap: 12 },
   center: { paddingTop: 40, alignItems: "center" },
   errorCard: { gap: 10 },
@@ -486,8 +511,6 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 110,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
   },
   previewHint: { fontSize: 13, textAlign: "center" },
 });

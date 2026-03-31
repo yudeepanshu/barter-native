@@ -161,6 +161,10 @@ export function useCreateListingForm() {
     }
   };
 
+  const removeImageAt = (index: number) => {
+    setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+  };
+
   return {
     rules: CREATE_LISTING_RULES,
     state: {
@@ -191,6 +195,7 @@ export function useCreateListingForm() {
       setRequestByMoney,
       submit,
       pickImages,
+      removeImageAt,
       cancel: () => {
         // Reset all fields before navigating back
         setTitle("");

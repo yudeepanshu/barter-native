@@ -1,13 +1,24 @@
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
@@ -64,12 +75,57 @@ export default function RequestsScreen() {
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const ownOfferableProducts = ownProducts.items;
+  const [activeTab, setActiveTab] = useState<"received" | "sent">("received");
+  const [hasAutoSelectedTab, setHasAutoSelectedTab] = useState(false);
+
+  const tabOptions = useMemo(
+    () => [
+      { value: "received" as const, label: `Received (${receivedItems.length})` },
+      { value: "sent" as const, label: `Sent (${sentItems.length})` },
+    ],
+    [receivedItems.length, sentItems.length],
+  );
+
+  useEffect(() => {
+    if (hasAutoSelectedTab || receivedQuery.isPending || sentQuery.isPending) {
+      return;
+    }
+
+    if (receivedItems.length > 0) {
+      setActiveTab("received");
+    } else if (sentItems.length > 0) {
+      setActiveTab("sent");
+    }
+
+    setHasAutoSelectedTab(true);
+  }, [
+    hasAutoSelectedTab,
+    receivedQuery.isPending,
+    sentQuery.isPending,
+    receivedItems.length,
+    sentItems.length,
+  ]);
+
+  const isEverythingEmpty =
+    !sentQuery.isPending &&
+    !receivedQuery.isPending &&
+    !sentQuery.error &&
+    !receivedQuery.error &&
+    sentItems.length === 0 &&
+    receivedItems.length === 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      >
       <ScrollView
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={
@@ -86,52 +142,71 @@ export default function RequestsScreen() {
         }
       >
         <View style={styles.headerCard}>
-          <Text style={styles.title}>Requests</Text>
-          <Text style={styles.subtitle}>Manage incoming and outgoing negotiations.</Text>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Requests</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Manage incoming and outgoing negotiations.</Text>
         </View>
 
-        <RequestSection
-          title="Received"
-          actorTurn="SELLER"
-          router={router}
-          items={receivedItems}
-          isPending={receivedQuery.isPending}
-          isError={Boolean(receivedQuery.error)}
-          onRetry={() => void receivedQuery.refetch()}
-          hasNextPage={Boolean(receivedQuery.hasNextPage)}
-          loadingNext={receivedQuery.isFetchingNextPage}
-          onLoadMore={() => void receivedQuery.fetchNextPage()}
-          acceptMutation={acceptMutation}
-          rejectMutation={rejectMutation}
-          cancelMutation={cancelMutation}
-          counterOfferMutation={counterOfferMutation}
-          requestContactRevealMutation={requestContactRevealMutation}
-          respondContactRevealMutation={respondContactRevealMutation}
-          sessionUserId={session?.user.id ?? ""}
-          ownOfferableProducts={ownOfferableProducts}
-        />
+        <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <SegmentedControl
+            value={activeTab}
+            options={tabOptions}
+            onChange={setActiveTab}
+          />
+        </View>
 
-        <RequestSection
-          title="Sent"
-          actorTurn="BUYER"
-          router={router}
-          items={sentItems}
-          isPending={sentQuery.isPending}
-          isError={Boolean(sentQuery.error)}
-          onRetry={() => void sentQuery.refetch()}
-          hasNextPage={Boolean(sentQuery.hasNextPage)}
-          loadingNext={sentQuery.isFetchingNextPage}
-          onLoadMore={() => void sentQuery.fetchNextPage()}
-          acceptMutation={acceptMutation}
-          rejectMutation={rejectMutation}
-          cancelMutation={cancelMutation}
-          counterOfferMutation={counterOfferMutation}
-          requestContactRevealMutation={requestContactRevealMutation}
-          respondContactRevealMutation={respondContactRevealMutation}
-          sessionUserId={session?.user.id ?? ""}
-          ownOfferableProducts={ownOfferableProducts}
-        />
+        {isEverythingEmpty ? (
+          <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Feather name="inbox" size={20} color={theme.colors.textMuted} />
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No requests right now</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Once someone sends or receives an offer, it will appear here.</Text>
+          </View>
+        ) : null}
+
+        {activeTab === "received" ? (
+          <RequestSection
+            title="Received"
+            actorTurn="SELLER"
+            router={router}
+            items={receivedItems}
+            isPending={receivedQuery.isPending}
+            isError={Boolean(receivedQuery.error)}
+            onRetry={() => void receivedQuery.refetch()}
+            hasNextPage={Boolean(receivedQuery.hasNextPage)}
+            loadingNext={receivedQuery.isFetchingNextPage}
+            onLoadMore={() => void receivedQuery.fetchNextPage()}
+            acceptMutation={acceptMutation}
+            rejectMutation={rejectMutation}
+            cancelMutation={cancelMutation}
+            counterOfferMutation={counterOfferMutation}
+            requestContactRevealMutation={requestContactRevealMutation}
+            respondContactRevealMutation={respondContactRevealMutation}
+            sessionUserId={session?.user.id ?? ""}
+            ownOfferableProducts={ownOfferableProducts}
+          />
+        ) : (
+          <RequestSection
+            title="Sent"
+            actorTurn="BUYER"
+            router={router}
+            items={sentItems}
+            isPending={sentQuery.isPending}
+            isError={Boolean(sentQuery.error)}
+            onRetry={() => void sentQuery.refetch()}
+            hasNextPage={Boolean(sentQuery.hasNextPage)}
+            loadingNext={sentQuery.isFetchingNextPage}
+            onLoadMore={() => void sentQuery.fetchNextPage()}
+            acceptMutation={acceptMutation}
+            rejectMutation={rejectMutation}
+            cancelMutation={cancelMutation}
+            counterOfferMutation={counterOfferMutation}
+            requestContactRevealMutation={requestContactRevealMutation}
+            respondContactRevealMutation={respondContactRevealMutation}
+            sessionUserId={session?.user.id ?? ""}
+            ownOfferableProducts={ownOfferableProducts}
+          />
+        )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -175,9 +250,11 @@ function RequestSection({
   sessionUserId: string;
   ownOfferableProducts: ProductSummary[];
 }) {
+  const { theme } = useAppTheme();
+
   return (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{title}</Text>
 
       {isPending ? (
         <View style={styles.loadingWrap}>
@@ -193,8 +270,8 @@ function RequestSection({
       ) : null}
 
       {!isPending && !isError && items.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No requests yet.</Text>
+        <View style={[styles.emptyCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No requests yet.</Text>
         </View>
       ) : null}
 
@@ -251,6 +328,7 @@ function RequestItem({
   sessionUserId: string;
   ownOfferableProducts: ProductSummary[];
 }) {
+  const { theme } = useAppTheme();
   const activeTransactionQuery = useActiveTransactionQuery(
     item.id,
     item.status === "ACCEPTED" && item.product.status !== "EXCHANGED",
@@ -294,6 +372,8 @@ function RequestItem({
   const showPhone = item.contactPreference === "PHONE" || item.contactPreference === "BOTH";
   const showEmail = item.contactPreference === "EMAIL" || item.contactPreference === "BOTH";
   const tx = activeTransactionQuery.data;
+  const hasInlineInputOpen =
+    showCounterForm || (isSeller && tx?.status === "IN_PROGRESS");
   const selectableOwnProducts = ownOfferableProducts.filter(
     (product) => product.id !== item.productId,
   );
@@ -427,11 +507,12 @@ function RequestItem({
   return (
     <Pressable
       style={styles.itemCardPressable}
+      disabled={hasInlineInputOpen}
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
-      <View style={styles.itemCard}>
+      <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}> 
         <View style={styles.itemHeader}>
-          <Text style={styles.itemTitle} numberOfLines={2}>
+          <Text style={[styles.itemTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
             {item.product.title}
           </Text>
           <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(item.status).bg }]}>
@@ -441,32 +522,35 @@ function RequestItem({
           </View>
         </View>
         <View style={styles.metaRow}>
-          <Text style={styles.metaPill}>
+          <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>
             {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
           </Text>
-          <Text style={styles.metaDot}>·</Text>
-          <Text style={styles.metaPill}>{activeOffer?.type ?? "NONE"}</Text>
+          <Text style={[styles.metaDot, { color: theme.colors.textMuted }]}>·</Text>
+          <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>{activeOffer?.type ?? "NONE"}</Text>
           {activeOffer?.offeredAmount != null ? (
             <>
-              <Text style={styles.metaDot}>·</Text>
-              <Text style={styles.metaPill}>₹{activeOffer.offeredAmount}</Text>
+              <Text style={[styles.metaDot, { color: theme.colors.textMuted }]}>·</Text>
+              <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>₹{activeOffer.offeredAmount}</Text>
             </>
           ) : null}
         </View>
-        {item.message ? <Text style={styles.messageText}>{item.message}</Text> : null}
+        {item.message ? <Text style={[styles.messageText, { color: theme.colors.textSecondary }]}>{item.message}</Text> : null}
 
         {showContactRevealSection ? (
           <>
-            <View style={styles.contactCardRow}>
+            <View style={[styles.contactCardRow, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
               {showPhone ? (
-                <Text style={styles.metaText}>Phone: {counterparty.mobileNumber ?? "Not available"}</Text>
+                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Phone: {counterparty.mobileNumber ?? "Not available"}</Text>
               ) : null}
               {showEmail ? (
-                <Text style={styles.metaText}>Email: {counterparty.email ?? "Not available"}</Text>
+                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Email: {counterparty.email ?? "Not available"}</Text>
               ) : null}
               {revealState?.canRequestReveal ? (
-                <Pressable style={styles.eyeButton} onPress={onRequestContactReveal}>
-                  <Feather name="eye" size={14} color="#0f172a" />
+                <Pressable
+                  style={[styles.eyeButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                  onPress={onRequestContactReveal}
+                >
+                  <Feather name="eye" size={14} color={theme.colors.textPrimary} />
                 </Pressable>
               ) : null}
             </View>
@@ -492,11 +576,11 @@ function RequestItem({
             ) : null}
 
             {revealState?.viewerRequestStatus === "PENDING" ? (
-              <Text style={styles.metaText}>Contact reveal request pending.</Text>
+              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Contact reveal request pending.</Text>
             ) : null}
 
             {revealState?.viewerRequestStatus === "REJECTED" ? (
-              <Text style={styles.metaText}>Your reveal request was rejected.</Text>
+              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Your reveal request was rejected.</Text>
             ) : null}
           </>
         ) : null}
@@ -545,8 +629,8 @@ function RequestItem({
         </View>
 
       {showCounterForm && canCounter ? (
-        <View style={styles.counterCard}>
-          <Text style={styles.transactionTitle}>Create Counter Offer</Text>
+        <View style={[styles.counterCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+          <Text style={[styles.transactionTitle, { color: theme.colors.textPrimary }]}>Create Counter Offer</Text>
 
           {!item.product.isFree ? (
             <View style={styles.modeRow}>
@@ -569,7 +653,7 @@ function RequestItem({
                   />
                 </>
               ) : (
-                <Text style={styles.metaText}>This request accepts product-only offers.</Text>
+                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>This request accepts product-only offers.</Text>
               )}
             </View>
           ) : null}
@@ -587,7 +671,7 @@ function RequestItem({
           {(counterOfferType === "PRODUCT" || counterOfferType === "MIXED") &&
           !item.product.isFree ? (
             <View style={styles.offerWrap}>
-              <Text style={styles.metaText}>Select offered listing</Text>
+              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Select offered listing</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -599,16 +683,18 @@ function RequestItem({
                     onPress={() => toggleCounterProduct(product.id)}
                     style={[
                       styles.offerChip,
+                      { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
                       counterOfferedProductIds.includes(product.id)
-                        ? styles.offerChipActive
+                        ? [styles.offerChipActive, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }]
                         : undefined,
                     ]}
                   >
                     <Text
                       style={[
                         styles.offerChipText,
+                        { color: theme.colors.textSecondary },
                         counterOfferedProductIds.includes(product.id)
-                          ? styles.offerChipTextActive
+                          ? [styles.offerChipTextActive, { color: theme.colors.onPrimary }]
                           : undefined,
                       ]}
                     >
@@ -618,7 +704,7 @@ function RequestItem({
                 ))}
               </ScrollView>
               {counterOfferedProductIds.length > 0 ? (
-                <Text style={styles.metaText}>
+                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>
                   {counterOfferedProductIds.length} listing(s) selected.
                 </Text>
               ) : null}
@@ -640,20 +726,20 @@ function RequestItem({
       ) : null}
 
       {showTransactionSection ? (
-        <View style={styles.transactionCard}>
-          <Text style={styles.transactionTitle}>Transaction</Text>
+        <View style={[styles.transactionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+          <Text style={[styles.transactionTitle, { color: theme.colors.textPrimary }]}>Transaction</Text>
 
           {activeTransactionQuery.isPending ? (
-            <Text style={styles.metaText}>Checking active transaction...</Text>
+            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Checking active transaction...</Text>
           ) : null}
 
           {activeTransactionQuery.error ? (
-            <Text style={styles.metaText}>No active transaction found for this request.</Text>
+            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>No active transaction found for this request.</Text>
           ) : null}
 
           {tx ? (
             <>
-              <Text style={styles.metaText}>Status: {tx.status}</Text>
+              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Status: {tx.status}</Text>
 
               {isBuyer ? (
                 <Button
@@ -663,7 +749,7 @@ function RequestItem({
                 />
               ) : null}
 
-              {generatedOtp ? <Text style={styles.otpText}>OTP: {generatedOtp}</Text> : null}
+              {generatedOtp ? <Text style={[styles.otpText, { color: theme.colors.textPrimary }]}>OTP: {generatedOtp}</Text> : null}
 
               {isSeller && tx.status === "IN_PROGRESS" ? (
                 <>
@@ -681,12 +767,12 @@ function RequestItem({
                   />
                 </>
               ) : isSeller ? (
-                <Text style={styles.metaText}>Waiting for the buyer to generate the OTP.</Text>
+                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
               ) : null}
             </>
           ) : null}
 
-          {txFeedback ? <Text style={styles.metaText}>{txFeedback}</Text> : null}
+          {txFeedback ? <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>{txFeedback}</Text> : null}
         </View>
       ) : null}
       </View>
@@ -695,27 +781,37 @@ function RequestItem({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8fafc" },
+  safeArea: { flex: 1 },
+  keyboardWrap: { flex: 1 },
   content: { padding: 16, paddingBottom: 36, gap: 12 },
   headerCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 16,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 6,
   },
-  title: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
-  subtitle: { fontSize: 14, color: "#475569" },
+  title: { fontSize: 24, fontWeight: "800" },
+  subtitle: { fontSize: 14 },
+  tabsCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 10,
+  },
+  emptyCardGlobal: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    gap: 6,
+  },
+  emptyTitle: { fontSize: 15, fontWeight: "700" },
   sectionCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 12,
     gap: 10,
   },
-  sectionTitle: { fontSize: 17, fontWeight: "700", color: "#0f172a" },
+  sectionTitle: { fontSize: 17, fontWeight: "700" },
   loadingWrap: { paddingVertical: 6 },
   errorCard: {
     borderWidth: 1,
@@ -728,18 +824,14 @@ const styles = StyleSheet.create({
   errorText: { color: "#b91c1c", fontSize: 13 },
   emptyCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
     padding: 12,
   },
-  emptyText: { color: "#475569", fontSize: 13, textAlign: "center" },
+  emptyText: { fontSize: 13, textAlign: "center" },
   listWrap: { gap: 8 },
   itemCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
     padding: 12,
     gap: 6,
   },
@@ -747,7 +839,7 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
-  itemTitle: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  itemTitle: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: "700" },
   badgeWrap: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -757,15 +849,13 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: "700" },
   metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
-  metaPill: { fontSize: 12, color: "#64748b", fontWeight: "500" },
-  metaDot: { fontSize: 11, color: "#94a3b8" },
-  metaText: { fontSize: 12, color: "#475569" },
+  metaPill: { fontSize: 12, fontWeight: "500" },
+  metaDot: { fontSize: 11 },
+  metaText: { fontSize: 12 },
   contactCardRow: {
     marginTop: 4,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 8,
-    backgroundColor: "#ffffff",
     padding: 8,
     gap: 3,
     position: "relative",
@@ -778,12 +868,10 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f8fafc",
   },
-  messageText: { marginTop: 2, fontSize: 13, color: "#334155", fontStyle: "italic" },
+  messageText: { marginTop: 2, fontSize: 13, fontStyle: "italic" },
   actions: { marginTop: 8, gap: 8 },
   actionRow: {
     flexDirection: "row",
@@ -812,9 +900,7 @@ const styles = StyleSheet.create({
   counterCard: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 10,
-    backgroundColor: "#ffffff",
     padding: 10,
     gap: 8,
   },
@@ -823,27 +909,20 @@ const styles = StyleSheet.create({
   offerList: { gap: 8, paddingRight: 8 },
   offerChip: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     borderRadius: 999,
-    backgroundColor: "#ffffff",
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  offerChipActive: {
-    borderColor: "#0f172a",
-    backgroundColor: "#0f172a",
-  },
-  offerChipText: { fontSize: 12, color: "#334155", fontWeight: "600" },
-  offerChipTextActive: { color: "#ffffff" },
+  offerChipActive: {},
+  offerChipText: { fontSize: 12, fontWeight: "600" },
+  offerChipTextActive: {},
   transactionCard: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 10,
-    backgroundColor: "#ffffff",
     padding: 10,
     gap: 8,
   },
-  transactionTitle: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
-  otpText: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  transactionTitle: { fontSize: 13, fontWeight: "700" },
+  otpText: { fontSize: 15, fontWeight: "700" },
 });

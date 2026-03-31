@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "scheme": "barter",
     "orientation": "portrait",
+    "softwareKeyboardLayoutMode": "resize",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {

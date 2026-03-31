@@ -44,7 +44,7 @@ export function ProductCard({
       ]}
     >
       {primaryImage ? (
-        <View style={styles.thumbnailContainer}>
+        <View style={[styles.thumbnailContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
           <Image
             source={{ uri: primaryImage.url }}
             style={styles.thumbnail}
@@ -122,7 +122,6 @@ const styles = StyleSheet.create({
     height: 166,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#e7ebe2",
     marginBottom: 4,
   },
   thumbnail: {
@@ -135,7 +134,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
   },
-  cardTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "800", color: "#1f2a24" },
+  cardTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "800" },
   badge: {
     maxWidth: 96,
     fontSize: 11,

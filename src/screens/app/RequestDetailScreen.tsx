@@ -97,9 +97,9 @@ export default function RequestDetailScreen() {
   if (requestQuery.error || !requestQuery.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={styles.errorCard}>
-          <Text style={styles.title}>Request not found</Text>
-          <Text style={styles.description}>We could not load this request.</Text>
+        <View style={[styles.errorCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Request not found</Text>
+          <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this request.</Text>
           <View style={styles.actions}>
             <Button label="Retry" onPress={() => void requestQuery.refetch()} />
             <Button label="Back" variant="ghost" onPress={() => router.back()} />
@@ -215,9 +215,9 @@ export default function RequestDetailScreen() {
         }
       >
         {/* Request Header */}
-        <View style={styles.headerCard}>
+        <View style={[styles.headerCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.headerRow}>
-            <Text style={styles.title} numberOfLines={3}>{request.product.title}</Text>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={3}>{request.product.title}</Text>
             <View style={[styles.badge, { backgroundColor: getStatusBadgeStyle(request.status).bg }]}>
               <Text style={[styles.badgeText, { color: getStatusBadgeStyle(request.status).text }]}>
                 {request.status}
@@ -227,12 +227,12 @@ export default function RequestDetailScreen() {
         </View>
 
         {/* Request Details */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Details</Text>
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Details</Text>
           
           <View style={styles.detailRow}>
-            <Text style={styles.label}>Turn</Text>
-            <Text style={styles.value}>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
+            <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
               {request.currentTurn === actorTurn ? "Your turn" : "Their turn"}
             </Text>
           </View>
@@ -240,14 +240,14 @@ export default function RequestDetailScreen() {
           {activeOffer && (
             <>
               <View style={styles.detailRow}>
-                <Text style={styles.label}>Latest Offer</Text>
-                <Text style={styles.value}>{activeOffer.type}</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Latest Offer</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{activeOffer.type}</Text>
               </View>
 
               {activeOffer.offeredAmount && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.label}>Amount</Text>
-                  <Text style={styles.value}>₹{activeOffer.offeredAmount}</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
+                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>₹{activeOffer.offeredAmount}</Text>
                 </View>
               )}
             </>
@@ -255,15 +255,15 @@ export default function RequestDetailScreen() {
 
           {request.message && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Message</Text>
-              <Text style={[styles.value, { flex: 1 }]}>{request.message}</Text>
+              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Message</Text>
+              <Text style={[styles.value, { flex: 1, color: theme.colors.textPrimary }]}>{request.message}</Text>
             </View>
           )}
         </View>
 
         {/* Product Card */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Product</Text>
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Product</Text>
           <ProductCard
             product={request.product}
             showMeta={false}
@@ -272,25 +272,25 @@ export default function RequestDetailScreen() {
         </View>
 
         {showContactRevealSection ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Contact Info</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Contact Info</Text>
 
             <View style={styles.contactRow}>
-              <Text style={styles.label}>Name</Text>
-              <Text style={styles.value}>{counterparty.userName}</Text>
+              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Name</Text>
+              <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.userName}</Text>
             </View>
 
             {showPhone ? (
               <View style={styles.contactRow}>
-                <Text style={styles.label}>Phone</Text>
-                <Text style={styles.value}>{counterparty.mobileNumber ?? "Not available"}</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Phone</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.mobileNumber ?? "Not available"}</Text>
               </View>
             ) : null}
 
             {showEmail ? (
               <View style={styles.contactRow}>
-                <Text style={styles.label}>Email</Text>
-                <Text style={styles.value}>{counterparty.email ?? "Not available"}</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Email</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.email ?? "Not available"}</Text>
               </View>
             ) : null}
 
@@ -331,21 +331,21 @@ export default function RequestDetailScreen() {
 
             {revealState?.viewerRequestStatus === "PENDING" ? (
               <View style={styles.revealInfoRow}>
-                <Feather name="eye" size={14} color="#475569" />
-                <Text style={styles.feedbackText}>Reveal request pending approval.</Text>
+                <Feather name="eye" size={14} color={theme.colors.textMuted} />
+                <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Reveal request pending approval.</Text>
               </View>
             ) : null}
 
             {revealState?.viewerRequestStatus === "REJECTED" ? (
-              <Text style={styles.feedbackText}>Your reveal request was rejected.</Text>
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Your reveal request was rejected.</Text>
             ) : null}
           </View>
         ) : null}
 
         {/* Action Buttons */}
         {(canActByTurn || canCancel) && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Actions</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Actions</Text>
             {canActByTurn && (
               <>
                 <Button
@@ -388,20 +388,20 @@ export default function RequestDetailScreen() {
 
         {/* Offer History */}
         {offersQuery.data?.offers && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Offer History</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Offer History</Text>
             {offersQuery.data.offers.length === 0 ? (
-              <Text style={styles.emptyText}>No offers yet.</Text>
+              <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No offers yet.</Text>
             ) : (
               <View style={styles.offersList}>
                 {offersQuery.data.offers.map((offer, index) => (
-                  <View key={offer.id} style={styles.offerCard}>
+                  <View key={offer.id} style={[styles.offerCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
                     <View style={styles.offerHeader}>
                       <View>
-                        <Text style={styles.offerBy}>
+                        <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>
                           Offer #{index + 1}
                         </Text>
-                        <Text style={styles.offerBy}>By: {offer.offeredBy?.userName || "Unknown"}</Text>
+                        <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>By: {offer.offeredBy?.userName || "Unknown"}</Text>
                       </View>
                       <View
                         style={[
@@ -420,10 +420,10 @@ export default function RequestDetailScreen() {
                       </View>
                     </View>
 
-                    <Text style={styles.offerType}>Type: {offer.type}</Text>
+                    <Text style={[styles.offerType, { color: theme.colors.textPrimary }]}>Type: {offer.type}</Text>
 
                     {offer.offeredAmount && (
-                      <Text style={styles.offerAmount}>Amount: ₹{offer.offeredAmount}</Text>
+                      <Text style={[styles.offerAmount, { color: theme.colors.textPrimary }]}>Amount: ₹{offer.offeredAmount}</Text>
                     )}
 
                     {offer.offeredProducts.length > 0 && (
@@ -448,8 +448,8 @@ export default function RequestDetailScreen() {
 
         {/* Transaction / OTP Section */}
         {showTransactionSection && tx && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Finalize Exchange</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
 
             {isBuyer ? (
               <>
@@ -481,11 +481,11 @@ export default function RequestDetailScreen() {
                 />
               </>
             ) : (
-              <Text style={styles.feedbackText}>Waiting for the buyer to generate the OTP.</Text>
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
             )}
 
             {txFeedback && (
-              <Text style={styles.feedbackText}>{txFeedback}</Text>
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>{txFeedback}</Text>
             )}
           </View>
         )}
@@ -498,34 +498,28 @@ export default function RequestDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8fafc" },
+  safeArea: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorCard: {
     margin: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 8,
   },
-  title: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: "800", color: "#0f172a" },
-  description: { fontSize: 14, color: "#475569" },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a", marginBottom: 6 },
+  title: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: "800" },
+  description: { fontSize: 14 },
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 6 },
   card: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 10,
   },
   headerCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 16,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 8,
   },
@@ -562,30 +556,28 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
-  label: { fontSize: 12, fontWeight: "600", color: "#94a3b8" },
-  value: { fontSize: 14, fontWeight: "500", color: "#0f172a" },
+  label: { fontSize: 12, fontWeight: "600" },
+  value: { fontSize: 14, fontWeight: "500" },
   actions: { flexDirection: "row", gap: 10, marginTop: 6 },
   offersList: { gap: 10 },
   offerCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 10,
     padding: 10,
-    backgroundColor: "#f8fafc",
     gap: 6,
   },
   offerHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  offerBy: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  offerBy: { fontSize: 12, fontWeight: "600" },
   offerStatus: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
   offerStatusText: { fontSize: 10, fontWeight: "600" },
-  offerType: { fontSize: 13, fontWeight: "500", color: "#0f172a" },
-  offerAmount: { fontSize: 13, fontWeight: "600", color: "#0f172a" },
+  offerType: { fontSize: 13, fontWeight: "500" },
+  offerAmount: { fontSize: 13, fontWeight: "600" },
   offeredProducts: { marginTop: 10, gap: 12 },
-  emptyText: { fontSize: 14, color: "#64748b", textAlign: "center", marginVertical: 16 },
+  emptyText: { fontSize: 14, textAlign: "center", marginVertical: 16 },
   otpBox: {
     backgroundColor: "#dbeafe",
     borderRadius: 8,
@@ -593,5 +585,5 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   otpLabel: { fontSize: 14, fontWeight: "600", color: "#1e40af" },
-  feedbackText: { fontSize: 13, color: "#64748b", marginTop: 8 },
+  feedbackText: { fontSize: 13, marginTop: 8 },
 });

@@ -1,4 +1,15 @@
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMemo, useState } from "react";
 import type { ProductSummary } from "@barter/types";
@@ -47,8 +58,8 @@ export default function ProductDetailScreen() {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
         <View style={styles.errorWrap}>
-          <Text style={styles.title}>Product not found</Text>
-          <Text style={styles.description}>We could not load this listing.</Text>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Product not found</Text>
+          <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this listing.</Text>
           <View style={styles.actions}>
             <Button label="Retry" onPress={() => void query.refetch()} />
             <Button label="Back" variant="ghost" onPress={() => router.back()} />
@@ -65,22 +76,30 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
-        }
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          refreshControl={
+            <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
+          }
+        >
         <View style={styles.backRow}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={[styles.backButtonText, { color: theme.colors.textPrimary }]}>← Back</Text>
           </Pressable>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>LISTING</Text>
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>LISTING</Text>
           <View style={styles.headerRow}>
-            <Text style={styles.title} numberOfLines={2}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
               {product.title}
             </Text>
             <View style={[styles.badgeWrap, { backgroundColor: badgeStyle.bg }]}>
@@ -93,22 +112,22 @@ export default function ProductDetailScreen() {
           {product.owner ? (
             <View style={styles.ownerRow}>
               {product.owner.profilePicture ? (
-                <Image source={{ uri: product.owner.profilePicture }} style={styles.ownerAvatar} />
+                <Image source={{ uri: product.owner.profilePicture }} style={[styles.ownerAvatar, { backgroundColor: theme.colors.surfaceMuted }]} />
               ) : (
-                <View style={styles.ownerAvatarFallback}>
-                  <Text style={styles.ownerAvatarInitial}>
+                <View style={[styles.ownerAvatarFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
+                  <Text style={[styles.ownerAvatarInitial, { color: theme.colors.primary }]}>
                     {product.owner.userName.slice(0, 1).toUpperCase()}
                   </Text>
                 </View>
               )}
               <View style={styles.ownerMeta}>
-                <Text style={styles.ownerLabel}>Listed by</Text>
-                <Text style={styles.ownerName}>{product.owner.userName}</Text>
+                <Text style={[styles.ownerLabel, { color: theme.colors.textMuted }]}>Listed by</Text>
+                <Text style={[styles.ownerName, { color: theme.colors.textPrimary }]}>{product.owner.userName}</Text>
               </View>
             </View>
           ) : null}
 
-          <Text style={styles.description}>
+          <Text style={[styles.description, { color: theme.colors.textMuted }]}>
             {product.description || "No description provided."}
           </Text>
 
@@ -123,10 +142,13 @@ export default function ProductDetailScreen() {
                   const nextIndex = Math.round(event.nativeEvent.contentOffset.x / imageFrameSize);
                   setActiveImageIndex(Math.max(0, Math.min(nextIndex, product.productImages.length - 1)));
                 }}
-                style={[styles.imageCarousel, { width: imageFrameSize }]}
+                style={[styles.imageCarousel, { width: imageFrameSize, backgroundColor: theme.colors.surfaceMuted }]}
               >
                 {product.productImages.map((image) => (
-                  <View key={image.id} style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize }]}>
+                  <View
+                    key={image.id}
+                    style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted }]}
+                  >
                     <Image
                       source={{ uri: image.url }}
                       style={styles.productImage}
@@ -139,14 +161,20 @@ export default function ProductDetailScreen() {
 
               {product.productImages.length > 1 ? (
                 <View style={styles.imagePagerWrap}>
-                  <Text style={styles.imagePagerText}>
+                  <Text style={[styles.imagePagerText, { color: theme.colors.textMuted }]}>
                     Image {activeImageIndex + 1} of {product.productImages.length}
                   </Text>
                   <View style={styles.imageDotsRow}>
                     {product.productImages.map((image, index) => (
                       <View
                         key={image.id}
-                        style={[styles.imageDot, index === activeImageIndex ? styles.imageDotActive : undefined]}
+                        style={[
+                          styles.imageDot,
+                          { backgroundColor: theme.colors.border },
+                          index === activeImageIndex
+                            ? [styles.imageDotActive, { backgroundColor: theme.colors.primary }]
+                            : undefined,
+                        ]}
                       />
                     ))}
                   </View>
@@ -155,7 +183,7 @@ export default function ProductDetailScreen() {
             </View>
           ) : null}
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
           <View style={styles.metaWrap}>
             <View style={[styles.metaChip, styles.metaChipCategory]}>
@@ -203,8 +231,9 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
-        {session ? <RequestComposer product={product} sessionUserId={session.user.id} /> : null}
-      </ScrollView>
+          {session ? <RequestComposer product={product} sessionUserId={session.user.id} /> : null}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -229,8 +258,9 @@ function RequestComposer({
     [ownProductsQuery.items, product.id],
   );
 
-  const [includeMoney, setIncludeMoney] = useState(product.requestByMoney);
-  const [includeProduct, setIncludeProduct] = useState(product.isFree || !product.requestByMoney);
+  const { theme } = useAppTheme();
+  const [includeMoney, setIncludeMoney] = useState(!product.isFree && product.requestByMoney);
+  const [includeProduct, setIncludeProduct] = useState(!product.isFree && !product.requestByMoney);
   const [offeredProductIds, setOfferedProductIds] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
@@ -242,6 +272,7 @@ function RequestComposer({
   const supportsMixedOffers = product.requestByMoney || product.isFree;
   const wantsMoney = supportsMixedOffers ? includeMoney : false;
   const wantsProduct = supportsMixedOffers ? includeProduct : true;
+  const requiresExchangeOffer = !product.isFree;
 
   if (isOwner) {
     return null;
@@ -251,7 +282,7 @@ function RequestComposer({
     setFeedback(null);
 
     try {
-      if (!wantsMoney && !wantsProduct) {
+      if (requiresExchangeOffer && !wantsMoney && !wantsProduct) {
         setFeedback("Select at least one offer type.");
         return;
       }
@@ -273,7 +304,9 @@ function RequestComposer({
         ? "MIXED"
         : wantsMoney
           ? "MONEY"
-          : "PRODUCT";
+          : wantsProduct
+            ? "PRODUCT"
+            : "NONE";
 
       await createRequestMutation.mutateAsync({
         productId: product.id,
@@ -298,120 +331,144 @@ function RequestComposer({
   };
 
   return (
-    <View style={styles.requestCard}>
-      <Text style={styles.requestTitle}>Send Request</Text>
-      <Text style={styles.requestSubtitle}>Start a negotiation for this listing.</Text>
+    <View
+      style={[
+        styles.requestCard,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
+      <Text style={[styles.requestSubtitle, { color: theme.colors.textMuted }]}>Start a negotiation for this listing.</Text>
 
       {!requestable ? (
         <Text style={styles.warnText}>This listing is not currently requestable.</Text>
       ) : null}
 
-      <View style={styles.modeRow}>
-        {supportsMixedOffers ? (
-          <>
-            <Button
-              label="Include money"
-              variant={includeMoney ? "primary" : "ghost"}
-              onPress={() => setIncludeMoney((prev) => !prev)}
-            />
-            <Button
-              label="Include product"
-              variant={includeProduct ? "primary" : "ghost"}
-              onPress={() => setIncludeProduct((prev) => !prev)}
-            />
-          </>
-        ) : (
-          <Text style={styles.modeInfo}>This listing accepts product offers only.</Text>
-        )}
-      </View>
+      {requestable ? (
+        <>
+          <View style={styles.modeRow}>
+            {supportsMixedOffers ? (
+              <>
+                <Button
+                  label="Include money"
+                  variant={includeMoney ? "primary" : "ghost"}
+                  onPress={() => setIncludeMoney((prev) => !prev)}
+                />
+                <Button
+                  label="Include product"
+                  variant={includeProduct ? "primary" : "ghost"}
+                  onPress={() => setIncludeProduct((prev) => !prev)}
+                />
+              </>
+            ) : (
+              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts product offers only.</Text>
+            )}
+          </View>
 
-      {requestable && wantsMoney ? (
-        <Input
-          label="Offer amount"
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="numeric"
-        />
-      ) : null}
-
-      {requestable && wantsProduct ? (
-        <View style={styles.offerWrap}>
-          <Text style={styles.offerLabel}>Your listing to offer</Text>
-          {ownOfferableProducts.length > 0 ? (
-            <>
-              <View style={styles.offerList}>
-                {ownOfferableProducts.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => toggleOfferedProduct(item.id)}
-                    style={[
-                      styles.offerChip,
-                      offeredProductIds.includes(item.id) ? styles.offerChipActive : undefined,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.offerChipText,
-                        offeredProductIds.includes(item.id) ? styles.offerChipTextActive : undefined,
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              {offeredProductIds.length > 0 ? (
-                <Text style={styles.offerHint}>{offeredProductIds.length} listing(s) selected.</Text>
-              ) : null}
-            </>
-          ) : ownProductsQuery.query.isPending ? null : (
-            <View style={styles.emptyOfferCard}>
-              <Text style={styles.emptyOfferTitle}>No listing to offer yet.</Text>
-              <Text style={styles.emptyOfferText}>
-                Create one first, then come back and include it in this request.
-              </Text>
-              <Button
-                label="Create listing"
-                variant="ghost"
-                onPress={() => router.push("/(app)/(tabs)/create")}
-              />
-            </View>
-          )}
-          {ownProductsQuery.query.isPending ? (
-            <Text style={styles.offerHint}>Loading your listings...</Text>
+          {wantsMoney ? (
+            <Input
+              label="Offer amount"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+            />
           ) : null}
-        </View>
+
+          {wantsProduct ? (
+            <View style={styles.offerWrap}>
+              <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>Your listing to offer</Text>
+              {ownOfferableProducts.length > 0 ? (
+                <>
+                  <View style={styles.offerList}>
+                    {ownOfferableProducts.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => toggleOfferedProduct(item.id)}
+                        style={[
+                          styles.offerChip,
+                          {
+                            borderColor: theme.colors.border,
+                            backgroundColor: theme.colors.surfaceMuted,
+                          },
+                          offeredProductIds.includes(item.id)
+                            ? [styles.offerChipActive, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }]
+                            : undefined,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.offerChipText,
+                            { color: theme.colors.textSecondary },
+                            offeredProductIds.includes(item.id)
+                              ? [styles.offerChipTextActive, { color: theme.colors.onPrimary }]
+                              : undefined,
+                          ]}
+                        >
+                          {item.title}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {offeredProductIds.length > 0 ? (
+                    <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{offeredProductIds.length} listing(s) selected.</Text>
+                  ) : null}
+                </>
+              ) : ownProductsQuery.query.isPending ? null : (
+                <View
+                  style={[
+                    styles.emptyOfferCard,
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                  ]}
+                >
+                  <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>No listing to offer yet.</Text>
+                  <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
+                    Create one first, then come back and include it in this request.
+                  </Text>
+                  <Button
+                    label="Create listing"
+                    variant="ghost"
+                    onPress={() => router.push("/(app)/(tabs)/create")}
+                  />
+                </View>
+              )}
+              {ownProductsQuery.query.isPending ? (
+                <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>Loading your listings...</Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          <Input
+            label="Message (optional)"
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Add details for the seller"
+          />
+
+          {feedback ? <Text style={[styles.feedback, { color: theme.colors.textSecondary }]}>{feedback}</Text> : null}
+
+          <Button
+            label="Send request"
+            loading={createRequestMutation.isPending}
+            onPress={() => void submit()}
+          />
+        </>
       ) : null}
-
-      <Input
-        label="Message (optional)"
-        value={message}
-        onChangeText={setMessage}
-        placeholder="Add details for the seller"
-      />
-
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-
-      <Button
-        label="Send request"
-        loading={createRequestMutation.isPending}
-        onPress={() => void submit()}
-        disabled={!requestable}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8fafc" },
+  safeArea: { flex: 1 },
+  keyboardWrap: { flex: 1 },
   content: { padding: 16, paddingBottom: 110, gap: 12 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorWrap: {
     margin: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 8,
   },
@@ -424,13 +481,10 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#0f172a",
   },
   card: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 18,
-    backgroundColor: "#ffffff",
     padding: 18,
     gap: 12,
   },
@@ -438,7 +492,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1,
-    color: "#94a3b8",
   },
   headerRow: {
     flexDirection: "row",
@@ -446,7 +499,7 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: "flex-start",
   },
-  title: { flex: 1, minWidth: 0, fontSize: 28, fontWeight: "800", color: "#0f172a", lineHeight: 32 },
+  title: { flex: 1, minWidth: 0, fontSize: 28, fontWeight: "800", lineHeight: 32 },
   badgeWrap: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -455,7 +508,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   badgeText: { fontSize: 12, fontWeight: "800" },
-  description: { fontSize: 15, color: "#475569", lineHeight: 22 },
+  description: { fontSize: 15, lineHeight: 22 },
   ownerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -466,24 +519,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#e2e8f0",
   },
   ownerAvatarFallback: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#dbeafe",
     alignItems: "center",
     justifyContent: "center",
   },
   ownerAvatarInitial: {
-    color: "#1d4ed8",
     fontWeight: "700",
     fontSize: 14,
   },
   ownerMeta: { flex: 1, minWidth: 0 },
-  ownerLabel: { fontSize: 11, color: "#64748b", fontWeight: "600" },
-  ownerName: { fontSize: 14, color: "#0f172a", fontWeight: "700" },
+  ownerLabel: { fontSize: 11, fontWeight: "600" },
+  ownerName: { fontSize: 14, fontWeight: "700" },
   imageSection: {
     marginVertical: 8,
     alignItems: "center",
@@ -491,7 +541,6 @@ const styles = StyleSheet.create({
   imageCarousel: {
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#f1f5f9",
   },
   imageScrollContent: {
     alignItems: "center",
@@ -499,7 +548,6 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: "relative",
     overflow: "hidden",
-    backgroundColor: "#f1f5f9",
   },
   productImage: {
     width: "100%",
@@ -524,7 +572,6 @@ const styles = StyleSheet.create({
   },
   imagePagerText: {
     fontSize: 12,
-    color: "#64748b",
     fontWeight: "600",
   },
   imageDotsRow: {
@@ -535,15 +582,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 999,
-    backgroundColor: "#cbd5e1",
   },
   imageDotActive: {
     width: 18,
-    backgroundColor: "#0f172a",
   },
   divider: {
     height: 1,
-    backgroundColor: "#f1f5f9",
   },
   metaWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   metaChip: {
@@ -572,14 +616,12 @@ const styles = StyleSheet.create({
   metaChipTextExchanged: { color: "#9a3412" },
   requestCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 12,
   },
-  requestTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  requestSubtitle: { fontSize: 13, color: "#64748b" },
+  requestTitle: { fontSize: 16, fontWeight: "700" },
+  requestSubtitle: { fontSize: 13 },
   warnText: {
     fontSize: 13,
     color: "#b45309",
@@ -588,35 +630,28 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  modeInfo: { fontSize: 13, color: "#475569" },
+  modeInfo: { fontSize: 13 },
   offerWrap: { gap: 8 },
-  offerLabel: { fontSize: 13, fontWeight: "600", color: "#334155" },
+  offerLabel: { fontSize: 13, fontWeight: "600" },
   offerList: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   offerChip: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     borderRadius: 999,
-    backgroundColor: "#f8fafc",
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  offerChipActive: {
-    borderColor: "#0f172a",
-    backgroundColor: "#0f172a",
-  },
-  offerChipText: { fontSize: 12, color: "#334155", fontWeight: "600" },
-  offerChipTextActive: { color: "#ffffff" },
-  offerHint: { fontSize: 12, color: "#64748b" },
+  offerChipActive: {},
+  offerChipText: { fontSize: 12, fontWeight: "600" },
+  offerChipTextActive: {},
+  offerHint: { fontSize: 12 },
   emptyOfferCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
     padding: 12,
     gap: 8,
   },
-  emptyOfferTitle: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
-  emptyOfferText: { fontSize: 12, color: "#64748b", lineHeight: 18 },
-  feedback: { fontSize: 13, color: "#334155", fontStyle: "italic" },
+  emptyOfferTitle: { fontSize: 13, fontWeight: "700" },
+  emptyOfferText: { fontSize: 12, lineHeight: 18 },
+  feedback: { fontSize: 13, fontStyle: "italic" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
 });

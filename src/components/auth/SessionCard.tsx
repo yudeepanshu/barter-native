@@ -55,12 +55,12 @@ export function SessionCard({
           {user.profilePicture && !imageFailed ? (
             <Image
               source={{ uri: user.profilePicture }}
-              style={styles.avatarImage}
+              style={[styles.avatarImage, { borderColor: theme.colors.border }]}
               onError={() => setImageFailed(true)}
             />
           ) : (
             <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}> 
-              <Text style={styles.avatarText}>{initials}</Text>
+              <Text style={[styles.avatarText, { color: theme.colors.onPrimary }]}>{initials}</Text>
             </View>
           )}
         </Pressable>
@@ -118,7 +118,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#0f172a",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -127,9 +126,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
   },
-  avatarText: { fontSize: 20, fontWeight: "800", color: "#ffffff" },
+  avatarText: { fontSize: 20, fontWeight: "800" },
   nameBlock: { flex: 1, gap: 2 },
   nameRow: {
     flexDirection: "row",
@@ -148,7 +146,6 @@ const styles = StyleSheet.create({
   },
   editIconText: {
     fontSize: 14,
-    color: "#0f172a",
     fontWeight: "700",
   },
   subtext: { fontSize: 13 },

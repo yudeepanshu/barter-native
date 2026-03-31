@@ -1,4 +1,15 @@
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View, Alert, Image } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -44,9 +55,9 @@ export default function EditListingScreen() {
   if (productQuery.error || !productQuery.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={styles.errorCard}>
-          <Text style={styles.title}>Listing not found</Text>
-          <Text style={styles.description}>We could not load this listing.</Text>
+        <View style={[styles.errorCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Listing not found</Text>
+          <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this listing.</Text>
           <View style={styles.actions}>
             <Button label="Retry" onPress={() => void productQuery.refetch()} />
             <Button label="Back" variant="ghost" onPress={() => router.back()} />
@@ -59,9 +70,9 @@ export default function EditListingScreen() {
   if (productQuery.data.currentOwnerId !== session.user.id) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={styles.errorCard}>
-          <Text style={styles.title}>Not allowed</Text>
-          <Text style={styles.description}>You can only edit your own listings.</Text>
+        <View style={[styles.errorCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Not allowed</Text>
+          <Text style={[styles.description, { color: theme.colors.textMuted }]}>You can only edit your own listings.</Text>
           <View style={styles.actions}>
             <Button label="Back" variant="ghost" onPress={() => router.back()} />
           </View>
@@ -124,13 +135,23 @@ function EditListingFormSection({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerCard}>
-          <Text style={styles.title}>Edit Listing</Text>
-          <Text style={styles.subtitle}>Update your listing details.</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+      >
+        <View style={[styles.headerCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Edit Listing</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Update your listing details.</Text>
         </View>
 
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <Input
             label="Title"
             placeholder="e.g., Mountain bike in good condition"
@@ -157,13 +178,13 @@ function EditListingFormSection({
         </View>
 
         {product.productImages.length > 0 ? (
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
             <View style={styles.imageBlock}>
-              <Text style={styles.label}>Images</Text>
+              <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Images</Text>
               <View style={styles.imagesGrid}>
                 {product.productImages.map((image) => (
                   <View key={image.id} style={styles.imageCard}>
-                    <Image source={{ uri: image.url }} style={styles.productImage} />
+                    <Image source={{ uri: image.url }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
                     {image.isPrimary && (
                       <View style={styles.primaryBadge}>
                         <Text style={styles.primaryBadgeText}>Primary</Text>
@@ -188,9 +209,9 @@ function EditListingFormSection({
           </View>
         ) : null}
 
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <View style={styles.categoryBlock}>
-            <Text style={styles.label}>Category</Text>
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Category</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -212,23 +233,22 @@ function EditListingFormSection({
             </ScrollView>
           </View>
 
-          <View style={styles.switchBlock}>
+          <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Mark as free</Text>
+              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Mark as free</Text>
               <Switch value={form.state.isFree} onValueChange={form.actions.setIsFree} />
             </View>
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Open to money offers</Text>
+              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Open to money offers</Text>
               <Switch
                 value={form.state.requestByMoney}
                 onValueChange={form.actions.setRequestByMoney}
-                disabled={form.state.isFree}
               />
             </View>
           </View>
         </View>
 
-        {form.state.formError ? <Text style={styles.errorText}>{form.state.formError}</Text> : null}
+        {form.state.formError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.formError}</Text> : null}
 
         <View style={styles.actionsCol}>
           <Button
@@ -239,6 +259,7 @@ function EditListingFormSection({
           <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -252,81 +273,87 @@ function CategoryChip({
   active: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useAppTheme();
+
   return (
     <Pressable onPress={onPress}>
-      <Text style={[styles.chip, active ? styles.chipActive : undefined]}>{label}</Text>
+      <Text
+        style={[
+          styles.chip,
+          {
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surfaceMuted,
+            color: theme.colors.textSecondary,
+          },
+          active
+            ? {
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.onPrimary,
+              }
+            : undefined,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8fafc" },
+  safeArea: { flex: 1 },
+  keyboardWrap: { flex: 1 },
   content: { padding: 16, paddingBottom: 110, gap: 12 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorCard: {
     margin: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 14,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 8,
   },
   headerCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 16,
-    backgroundColor: "#ffffff",
     padding: 16,
     gap: 4,
   },
-  title: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
-  subtitle: { fontSize: 13, color: "#64748b" },
-  description: { fontSize: 14, color: "#475569" },
+  title: { fontSize: 24, fontWeight: "800" },
+  subtitle: { fontSize: 13 },
+  description: { fontSize: 14 },
   sectionCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 16,
-    backgroundColor: "#ffffff",
     padding: 12,
     gap: 10,
   },
-  label: { fontSize: 13, fontWeight: "600", color: "#334155" },
+  label: { fontSize: 13, fontWeight: "600" },
   categoryBlock: { gap: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
   chip: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#f8fafc",
-    color: "#334155",
     fontWeight: "600",
     fontSize: 12,
   },
-  chipActive: {
-    borderColor: "#0f172a",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
-  },
+  chipActive: {},
   switchBlock: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 12,
-    backgroundColor: "#f8fafc",
     gap: 8,
   },
   switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  switchLabel: { color: "#334155", fontSize: 14, fontWeight: "500" },
+  switchLabel: { fontSize: 14, fontWeight: "500" },
   actions: { flexDirection: "row", gap: 10, marginTop: 6 },
   actionsCol: { gap: 10, marginTop: 4 },
-  errorText: { color: "#b91c1c", fontSize: 13 },
+  errorText: { fontSize: 13 },
   imageBlock: { gap: 8 },
   imagesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   imageCard: { position: "relative", width: "32%" },
-  productImage: { width: "100%", height: 120, borderRadius: 8, backgroundColor: "#e2e8f0" },
+  productImage: { width: "100%", height: 120, borderRadius: 8 },
   primaryBadge: {
     position: "absolute",
     top: 6,

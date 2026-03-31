@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface LoadingStateProps {
   spinnerSize?: number;
@@ -24,18 +25,22 @@ export function ProductListLoadingState({ spinnerSize = 30 }: LoadingStateProps)
 }
 
 export function ProductListErrorState({ message, onRetry }: ErrorStateProps) {
+  const { theme } = useAppTheme();
+
   return (
-    <View style={styles.errorCard}>
-      <Text style={styles.errorText}>{message}</Text>
+    <View style={[styles.errorCard, { borderColor: theme.colors.dangerSoft, backgroundColor: theme.colors.dangerSoft }]}> 
+      <Text style={[styles.errorText, { color: theme.colors.danger }]}>{message}</Text>
       <Button label="Retry" onPress={onRetry} />
     </View>
   );
 }
 
 export function ProductListEmptyState({ message }: EmptyStateProps) {
+  const { theme } = useAppTheme();
+
   return (
-    <View style={styles.emptyCard}>
-      <Text style={styles.emptyText}>{message}</Text>
+    <View style={[styles.emptyCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}> 
+      <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>{message}</Text>
     </View>
   );
 }
@@ -52,20 +57,16 @@ const styles = StyleSheet.create({
   centerState: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorCard: {
     borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fef2f2",
     borderRadius: 12,
     padding: 14,
     gap: 10,
   },
-  errorText: { color: "#b91c1c", fontSize: 13 },
+  errorText: { fontSize: 13 },
   emptyCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
     padding: 14,
   },
-  emptyText: { color: "#475569", fontSize: 13, textAlign: "center" },
+  emptyText: { fontSize: 13, textAlign: "center" },
   footerLoading: { paddingVertical: 12 },
 });

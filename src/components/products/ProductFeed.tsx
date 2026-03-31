@@ -212,9 +212,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   greetingContent: { flexGrow: 1, flexShrink: 1, minWidth: 180, paddingRight: 2 },
-  greeting: { fontSize: 24, lineHeight: 29, fontWeight: "800", color: "#0f172a" },
-  subtitle: { fontSize: 14, color: "#64748b", marginTop: 3 },
-  searchHint: { fontSize: 12, color: "#64748b", marginTop: -4 },
+  greeting: { fontSize: 24, lineHeight: 29, fontWeight: "800" },
+  subtitle: { fontSize: 14, marginTop: 3 },
+  searchHint: { fontSize: 12, marginTop: -4 },
   sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
   chip: {

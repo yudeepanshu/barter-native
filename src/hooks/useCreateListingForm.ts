@@ -19,7 +19,11 @@ import {
   uploadImageAssetToPresignedUrl,
 } from "@/lib/uploads/presignedImageUpload";
 
-export function useCreateListingForm() {
+interface UseCreateListingFormOptions {
+  returnToProductId?: string;
+}
+
+export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const router = useRouter();
   const createMutation = useCreateProductMutation();
 
@@ -100,7 +104,14 @@ export function useCreateListingForm() {
       setFieldErrors({});
       setFormError(null);
 
-      router.push(`/(app)/products/${created.id}`);
+      if (options?.returnToProductId) {
+        router.replace({
+          pathname: "/(app)/products/[id]",
+          params: { id: options.returnToProductId, offeredProductId: created.id },
+        });
+      } else {
+        router.replace(`/(app)/(tabs)/my-listings`);
+      }
     } catch (error) {
       setFormError(toUploadErrorMessage(error, toErrorMessage));
     } finally {

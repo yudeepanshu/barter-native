@@ -83,55 +83,57 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
       onEndReachedThreshold={0.35}
       onEndReached={products.loadMore}
       ListHeaderComponent={
-        <AppCard>
-          <View style={styles.greetingRow}>
-            <View style={styles.greetingContent}>
-              <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                Hello, {userName}
-              </Text>
-              <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                Discover high-value listings near you
-              </Text>
+        <View style={styles.listHeaderWrap}>
+          <AppCard>
+            <View style={styles.greetingRow}>
+              <View style={styles.greetingContent}>
+                <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                  Hello, {userName}
+                </Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                  Discover high-value listings near you
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <Input
-            label="Search listings"
-            placeholder="Try bicycle, books, guitar..."
-            value={filterState.search}
-            onChangeText={filterState.setSearch}
-          />
-          {filterState.isSearchDebouncing ? (
-            <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
-          ) : null}
+            <Input
+              label="Search listings"
+              placeholder="Try bicycle, books, guitar..."
+              value={filterState.search}
+              onChangeText={filterState.setSearch}
+            />
+            {filterState.isSearchDebouncing ? (
+              <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
+            ) : null}
 
-          <View>
-            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Categories</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chips}
-            >
-              <CategoryChip
-                active={filterState.categoryId === ""}
-                label="All"
-                onPress={() => filterState.setCategoryId("")}
-              />
-              {categories.map((category) => (
+            <View>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Categories</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chips}
+              >
                 <CategoryChip
-                  key={category.id}
-                  active={filterState.categoryId === category.id}
-                  label={category.name}
-                  onPress={() => filterState.setCategoryId(category.id)}
+                  active={filterState.categoryId === ""}
+                  label="All"
+                  onPress={() => filterState.setCategoryId("")}
                 />
-              ))}
-            </ScrollView>
-          </View>
+                {categories.map((category) => (
+                  <CategoryChip
+                    key={category.id}
+                    active={filterState.categoryId === category.id}
+                    label={category.name}
+                    onPress={() => filterState.setCategoryId(category.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
 
-          {products.isEmpty && !showInitialLoading && !showInitialError ? (
-            <ProductListEmptyState message="No listings found for the current filters." />
-          ) : null}
-        </AppCard>
+            {products.isEmpty && !showInitialLoading && !showInitialError ? (
+              <ProductListEmptyState message="No listings found for the current filters." />
+            ) : null}
+          </AppCard>
+        </View>
       }
       ListEmptyComponent={
         showInitialLoading ? (
@@ -200,6 +202,7 @@ function CategoryChip({
 
 const styles = StyleSheet.create({
   listContent: { padding: 16, paddingBottom: 108, gap: 2 },
+  listHeaderWrap: { marginBottom: 10 },
   headerSection: {
     gap: 14,
     marginBottom: 12,

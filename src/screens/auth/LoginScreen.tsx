@@ -1,9 +1,10 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { OtpLoginForm } from "@/components/auth/OtpLoginForm";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AppCard } from "@/components/ui/AppCard";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 export default function LoginScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -11,16 +12,10 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
-      >
-      <ScrollView
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={16}
         contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
       >
         <View
           style={[
@@ -45,8 +40,7 @@ export default function LoginScreen() {
         >
           <OtpLoginForm />
         </AppCard>
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -54,7 +48,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: "center", padding: 20, gap: 16 },
+  scroll: { flexGrow: 1, justifyContent: "flex-start", padding: 20, paddingTop: 28, paddingBottom: 28, gap: 16 },
   hero: {
     borderWidth: 1,
     padding: 20,

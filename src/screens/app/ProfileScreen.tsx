@@ -1,9 +1,7 @@
 import {
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -36,9 +34,9 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ThemePreference } from "@/theme/appTheme";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AppCard } from "@/components/ui/AppCard";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 const THEME_OPTIONS: { label: string; value: ThemePreference }[] = [
-  { label: "System", value: "system" },
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
 ];
@@ -254,29 +252,23 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={12}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={profileQuery.isRefetching}
+            onRefresh={() => void profileQuery.refetch()}
+            tintColor={theme.colors.primary}
+          />
+        }
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-          refreshControl={
-            <RefreshControl
-              refreshing={profileQuery.isRefetching}
-              onRefresh={() => void profileQuery.refetch()}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
         <AppCard title="Profile" subtitle="Update your account details and personalization settings." />
 
         <AppCard
           title="Appearance"
-          subtitle={`Following ${resolvedMode} mode. System is the default behavior.`}
+          subtitle={`Currently using ${resolvedMode} mode.`}
         >
           <SegmentedControl value={preference} options={THEME_OPTIONS} onChange={setPreference} />
         </AppCard>
@@ -424,8 +416,7 @@ export default function ProfileScreen() {
             />
           </View>
         )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
 
       <Modal
         visible={showPhotoPreview}
@@ -449,17 +440,27 @@ export default function ProfileScreen() {
           >
             <Text style={[styles.previewTitle, { color: theme.colors.textPrimary }]}>Profile picture</Text>
             {user?.profilePicture && !previewLoadFailed ? (
-              <Image
-                source={{ uri: user.profilePicture }}
-                style={[
-                  styles.previewImage,
-                  { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
-                ]}
-                onError={() => setPreviewLoadFailed(true)}
-              />
+              <Pressable
+                onPress={() => {
+                  setShowPhotoPreview(false);
+                  void onSelectProfilePicture();
+                }}
+                hitSlop={8}
+                style={styles.previewImageButton}
+              >
+                <Image
+                  source={{ uri: user.profilePicture }}
+                  style={[
+                    styles.previewImage,
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                  ]}
+                  onError={() => setPreviewLoadFailed(true)}
+                />
+              </Pressable>
             ) : (
               <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Image not accessible from this URL.</Text>
             )}
+            <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Tap the image to update profile picture.</Text>
             <Button label="Close" variant="ghost" onPress={() => setShowPhotoPreview(false)} />
           </View>
         </Pressable>
@@ -511,6 +512,9 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 110,
     borderWidth: 1,
+  },
+  previewImageButton: {
+    borderRadius: 110,
   },
   previewHint: { fontSize: 13, textAlign: "center" },
 });

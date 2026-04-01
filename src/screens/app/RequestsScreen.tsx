@@ -1,7 +1,5 @@
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -19,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { ToggleChip } from "@/components/ui/ToggleChip";
 import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
@@ -38,6 +37,7 @@ import { useProductsListController } from "@/hooks/queries/useProductsListContro
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 
@@ -117,14 +117,10 @@ export default function RequestsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
-      >
-      <ScrollView
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={12}
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
@@ -205,8 +201,7 @@ export default function RequestsScreen() {
             ownOfferableProducts={ownOfferableProducts}
           />
         )}
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -636,19 +631,22 @@ function RequestItem({
             <View style={styles.modeRow}>
               {item.product.requestByMoney ? (
                 <>
-                  <Button
+                  <ToggleChip
                     label="MONEY"
-                    variant={counterOfferType === "MONEY" ? "primary" : "ghost"}
+                    selected={counterOfferType === "MONEY"}
+                    style={styles.modeChip}
                     onPress={() => setCounterOfferType("MONEY")}
                   />
-                  <Button
+                  <ToggleChip
                     label="PRODUCT"
-                    variant={counterOfferType === "PRODUCT" ? "primary" : "ghost"}
+                    selected={counterOfferType === "PRODUCT"}
+                    style={styles.modeChip}
                     onPress={() => setCounterOfferType("PRODUCT")}
                   />
-                  <Button
+                  <ToggleChip
                     label="MIXED"
-                    variant={counterOfferType === "MIXED" ? "primary" : "ghost"}
+                    selected={counterOfferType === "MIXED"}
+                    style={styles.modeChip}
                     onPress={() => setCounterOfferType("MIXED")}
                   />
                 </>
@@ -905,6 +903,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  modeChip: { flex: 1, minWidth: 0 },
   offerWrap: { gap: 6 },
   offerList: { gap: 8, paddingRight: 8 },
   offerChip: {

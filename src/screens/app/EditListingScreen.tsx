@@ -7,12 +7,10 @@ import {
   View,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
 import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Input } from "@/components/ui/Input";
@@ -23,10 +21,7 @@ import { useProductQuery } from "@/hooks/queries/useProductQuery";
 import { useEditListingForm } from "@/hooks/useEditListingForm";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import {
-  toErrorMessage as toImageErrorMessage,
-  useDeleteProductImageMutation,
-} from "@/hooks/mutations/useDeleteProductImageMutation";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -95,8 +90,6 @@ function EditListingFormSection({
 }) {
   const { theme, statusBarStyle } = useAppTheme();
   const form = useEditListingForm(product);
-  const deleteImageMutation = useDeleteProductImageMutation(product.id);
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
 
   if (!form.state.hasInitialized) {
     return (
@@ -108,26 +101,16 @@ function EditListingFormSection({
     );
   }
 
-  const onDeleteImage = (imageId: string) => {
-    Alert.alert("Delete image", "Delete this image? This action cannot be undone.", [
+  const onRemoveExistingImage = (imageId: string) => {
+    Alert.alert("Remove image", "Remove this image from the listing draft?", [
       {
         text: "Cancel",
         style: "cancel",
       },
       {
-        text: "Delete",
+        text: "Remove",
         style: "destructive",
-        onPress: () => {
-          setDeletingImageId(imageId);
-          deleteImageMutation
-            .mutateAsync(imageId)
-            .catch((error) => {
-              Alert.alert("Delete failed", toImageErrorMessage(error));
-            })
-            .finally(() => {
-              setDeletingImageId(null);
-            });
-        },
+        onPress: () => form.actions.removeExistingImage(imageId),
       },
     ]);
   };
@@ -135,16 +118,10 @@ function EditListingFormSection({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
-      >
-      <ScrollView
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
       >
         <View style={[styles.headerCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Edit Listing</Text>
@@ -177,37 +154,57 @@ function EditListingFormSection({
           />
         </View>
 
-        {product.productImages.length > 0 ? (
-          <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-            <View style={styles.imageBlock}>
-              <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Images</Text>
-              <View style={styles.imagesGrid}>
-                {product.productImages.map((image) => (
-                  <View key={image.id} style={styles.imageCard}>
-                    <Image source={{ uri: image.url }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
-                    {image.isPrimary && (
-                      <View style={styles.primaryBadge}>
-                        <Text style={styles.primaryBadgeText}>Primary</Text>
+        <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <View style={styles.imageBlock}>
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Images (up to {form.rules.MAX_IMAGES})</Text>
+            <Button label="Choose images" variant="ghost" onPress={() => void form.actions.pickImages()} />
+
+            {form.state.existingImages.length + form.state.newImages.length > 0 ? (
+              <>
+                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>
+                  {form.state.existingImages.length + form.state.newImages.length} image(s).
+                </Text>
+                <View style={styles.imagesGrid}>
+                  {form.state.existingImages.map((image) => (
+                    <View key={image.id} style={styles.imageCard}>
+                      <Image source={{ uri: image.url }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      {image.isPrimary && (
+                        <View style={styles.primaryBadge}>
+                          <Text style={styles.primaryBadgeText}>Primary</Text>
+                        </View>
+                      )}
+                      <Pressable onPress={() => onRemoveExistingImage(image.id)} style={styles.deleteImageButton}>
+                        <Text style={styles.deleteImageButtonText}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+
+                  {form.state.newImages.map((asset, index) => (
+                    <View key={`${asset.uri}-${index}`} style={styles.imageCard}>
+                      <Image source={{ uri: asset.uri }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      <View style={styles.newBadge}>
+                        <Text style={styles.newBadgeText}>New</Text>
                       </View>
-                    )}
-                    <Pressable
-                      onPress={() => onDeleteImage(image.id)}
-                      disabled={deletingImageId === image.id}
-                      style={[
-                        styles.deleteImageButton,
-                        deletingImageId === image.id && styles.deleteImageButtonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.deleteImageButtonText}>
-                        {deletingImageId === image.id ? "Deleting..." : "Delete"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
+                      <Pressable onPress={() => form.actions.removeNewImageAt(index)} style={styles.deleteImageButton}>
+                        <Text style={styles.deleteImageButtonText}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>Changes apply only after you save.</Text>
+              </>
+            ) : (
+              <View style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+                <Feather name="image" size={16} color={theme.colors.textMuted} />
+                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>No images in draft. Add one or more before saving.</Text>
               </View>
-            </View>
+            )}
+
+            {form.state.fieldErrors.images ? (
+              <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.fieldErrors.images}</Text>
+            ) : null}
           </View>
-        ) : null}
+        </View>
 
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <View style={styles.categoryBlock}>
@@ -258,8 +255,7 @@ function EditListingFormSection({
           />
           <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
         </View>
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -351,9 +347,19 @@ const styles = StyleSheet.create({
   actionsCol: { gap: 10, marginTop: 4 },
   errorText: { fontSize: 13 },
   imageBlock: { gap: 8 },
+  imageHint: { fontSize: 12 },
   imagesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   imageCard: { position: "relative", width: "32%" },
   productImage: { width: "100%", height: 120, borderRadius: 8 },
+  emptyImagesCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   primaryBadge: {
     position: "absolute",
     top: 6,
@@ -364,6 +370,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   primaryBadgeText: { color: "#ffffff", fontSize: 10, fontWeight: "600" },
+  newBadge: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    backgroundColor: "#0ea5e9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  newBadgeText: { color: "#ffffff", fontSize: 10, fontWeight: "600" },
   deleteImageButton: {
     position: "absolute",
     bottom: 6,
@@ -373,6 +389,5 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
   },
-  deleteImageButtonDisabled: { opacity: 0.5 },
   deleteImageButtonText: { color: "#ffffff", fontSize: 10, fontWeight: "600" },
 });

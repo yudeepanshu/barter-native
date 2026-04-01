@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 export function OtpLoginForm() {
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
-  const { step, busy, error, requestOtp, verifyOtp, resetError } = useOtpAuth();
+  const { step, busy, error, requestOtp, verifyOtp, goToIdentifierStep, resetError } = useOtpAuth();
 
   return (
     <View style={styles.container}>
@@ -63,7 +63,7 @@ export function OtpLoginForm() {
             variant="ghost"
             onPress={() => {
               setCode("");
-              resetError();
+              goToIdentifierStep();
             }}
             disabled={busy}
           />

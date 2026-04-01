@@ -1,4 +1,4 @@
-export type ThemePreference = "system" | "light" | "dark";
+export type ThemePreference = "light" | "dark";
 export type ResolvedThemeMode = "light" | "dark";
 
 export interface AppTheme {
@@ -117,10 +117,6 @@ export function resolveThemeMode(
   preference: ThemePreference,
   systemScheme: "light" | "dark" | null,
 ): ResolvedThemeMode {
-  if (preference === "system") {
-    return systemScheme === "dark" ? "dark" : "light";
-  }
-
   return preference;
 }
 

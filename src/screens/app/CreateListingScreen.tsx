@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,17 +14,21 @@ import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useLocalSearchParams } from "expo-router";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useCreateListingForm } from "@/hooks/useCreateListingForm";
 import { ensureGeocodingPermission } from "@/hooks/useDeviceLocation";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
+  const params = useLocalSearchParams<{ returnToProductId?: string }>();
+  const returnToProductId = typeof params.returnToProductId === "string" ? params.returnToProductId : undefined;
   const categoriesQuery = useCategoriesQuery();
-  const form = useCreateListingForm();
+  const form = useCreateListingForm({ returnToProductId });
   const [showAddressSearch, setShowAddressSearch] = useState(false);
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [addressQuery, setAddressQuery] = useState("");
@@ -76,16 +79,10 @@ export default function CreateListingScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
-      >
-      <ScrollView
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
       >
         <View style={styles.headerCard}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Create Listing</Text>
@@ -232,8 +229,7 @@ export default function CreateListingScreen() {
           />
           <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
         </View>
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
 
       <Modal
         visible={showAddressSearch}
@@ -245,7 +241,7 @@ export default function CreateListingScreen() {
           <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Set location manually</Text>
             <Text style={[styles.modalHint, { color: theme.colors.textMuted }]}>
-              Type a city, area, or full address. We\'ll look up its coordinates automatically.
+              Type a city, area, or full address. We'll look up its coordinates automatically.
             </Text>
 
             <Input

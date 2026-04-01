@@ -6,12 +6,12 @@ import { mobileApiClient } from "@/lib/api/client";
 
 type ProductPage = { items: ProductSummary[]; nextCursor: string | null; hasMore: boolean };
 
-export function useRelistProductMutation() {
+export function useUnlistProductMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (productId: string) => {
-      const result = await mobileApiClient.relistProduct(productId);
+      const result = await mobileApiClient.updateProduct(productId, { isListed: false });
       return result.data ?? null;
     },
     onSuccess: async (updated) => {
@@ -31,7 +31,9 @@ export function useRelistProductMutation() {
             ...old,
             pages: old.pages.map((page) => ({
               ...page,
-              items: page.items.map((item) => (item.id === updated.id ? updated : item)),
+              items: page.items.map((item) =>
+                item.id === updated.id ? updated : item,
+              ) as ProductSummary[],
             })),
           };
         },

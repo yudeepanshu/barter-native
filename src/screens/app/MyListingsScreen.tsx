@@ -15,11 +15,17 @@ import {
   useRelistProductMutation,
 } from "@/hooks/mutations/useRelistProductMutation";
 import {
+  toErrorMessage as toUnlistErrorMessage,
+  useUnlistProductMutation,
+} from "@/hooks/mutations/useUnlistProductMutation";
+import {
   ProductListEmptyState,
   ProductListErrorState,
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
+import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
+import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 export default function MyListingsScreen() {
@@ -28,8 +34,10 @@ export default function MyListingsScreen() {
   const session = useSession();
   const deleteMutation = useDeleteProductMutation();
   const relistMutation = useRelistProductMutation();
+  const unlistMutation = useUnlistProductMutation();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [relistingId, setRelistingId] = useState<string | null>(null);
+  const [unlistingId, setUnlistingId] = useState<string | null>(null);
   const products = useProductsListController({ ownerId: session?.user.id, limit: 20 });
   const visibleItems = useMemo(
     () => products.items.filter((item) => item.status !== "REMOVED"),
@@ -54,6 +62,30 @@ export default function MyListingsScreen() {
             })
             .finally(() => {
               setDeletingId(null);
+            });
+        },
+      },
+    ]);
+  };
+
+  const onUnlist = (productId: string) => {
+    Alert.alert("Unlist product", "Remove this listing from the marketplace? You can relist it later.", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Unlist",
+        style: "destructive",
+        onPress: () => {
+          setUnlistingId(productId);
+          unlistMutation
+            .mutateAsync(productId)
+            .catch((error) => {
+              Alert.alert("Unlist failed", toUnlistErrorMessage(error));
+            })
+            .finally(() => {
+              setUnlistingId(null);
             });
         },
       },
@@ -129,11 +161,12 @@ export default function MyListingsScreen() {
                 style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.95 : 1 }]}
               >
                 <ListingPreview product={item} />
-                {(item.status === "ACTIVE" || item.status === "EXCHANGED") ? (
+                {(item.status === "ACTIVE" || item.status === "EXCHANGED" || item.status === "INACTIVE") ? (
                   <Pressable
                     style={[
                       styles.editIconButton,
                       { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+                      hasExchangeHistory(item) && styles.editIconButtonBelowBadge,
                     ]}
                     onPress={() => router.push(`/(app)/listings/${item.id}/edit`)}
                     hitSlop={8}
@@ -143,7 +176,22 @@ export default function MyListingsScreen() {
                 ) : null}
               </Pressable>
               <View style={[styles.actionBar, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-                {(item.status === "EXCHANGED" || item.status === "REMOVED") && (
+                {item.status === "ACTIVE" && (
+                  <Pressable
+                    style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
+                    onPress={() => onUnlist(item.id)}
+                    disabled={Boolean(unlistingId) && unlistingId !== item.id}
+                  >
+                    <Text style={[
+                      styles.actionBtnText,
+                      { color: theme.colors.textSecondary },
+                      unlistingId === item.id && unlistMutation.isPending && styles.actionBtnLoading,
+                    ]}>
+                      {unlistingId === item.id && unlistMutation.isPending ? "Unlisting…" : "Unlist"}
+                    </Text>
+                  </Pressable>
+                )}
+                {(item.status === "EXCHANGED" || item.status === "REMOVED" || item.status === "INACTIVE") && (
                   <Pressable
                     style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
                     onPress={() => onRelist(item.id)}
@@ -194,10 +242,14 @@ function ListingPreview({ product }: { product: ProductSummary }) {
     <View style={styles.previewWrap}>
       <View style={styles.imageWrap}>
         {primaryImage ? (
-          <Image source={{ uri: primaryImage.url }} style={styles.image} resizeMode="cover" />
+          <>
+            <Image source={{ uri: primaryImage.url }} style={styles.image} resizeMode="cover" />
+            {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
+          </>
         ) : (
           <View style={[styles.imageFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Feather name="image" size={18} color={theme.colors.textMuted} />
+            {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
           </View>
         )}
       </View>
@@ -227,13 +279,16 @@ function ListingPreview({ product }: { product: ProductSummary }) {
           </View>
         </View>
 
-        <Text style={[styles.previewSub, { color: theme.colors.textMuted }]} numberOfLines={1}>
-          {product.category?.name ?? "Uncategorized"} · {product.isFree ? "Free" : "Barter"}
-        </Text>
-
         <Text style={[styles.previewDesc, { color: theme.colors.textSecondary }]} numberOfLines={2}>
           {product.description || "No description added yet."}
         </Text>
+
+        <ProductMetadata
+          product={product}
+          variant="compact"
+          showCategory={false}
+          showLocation={false}
+        />
       </View>
     </View>
   );
@@ -305,14 +360,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  previewSub: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
   previewDesc: {
     fontSize: 14,
     lineHeight: 19,
   },
+
   editIconButton: {
     position: "absolute",
     top: 20,
@@ -323,6 +375,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  editIconButtonBelowBadge: {
+    // badge is top:8, ~26px tall + 8px gap = clear at top:42
+    top: 50,
   },
   actionBar: {
     flexDirection: "row",

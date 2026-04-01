@@ -1,25 +1,5 @@
 import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
-
-// Silence ExpoKeepAwake's internal dev-mode promise rejection.
-// This fires harmlessly during hot-reload when the Android activity briefly
-// pauses; it is not user-visible in production builds.
-if (__DEV__) {
-  const _originalHandler = globalThis.onunhandledrejection;
-  globalThis.onunhandledrejection = (event: PromiseRejectionEvent) => {
-    if (
-      typeof event?.reason?.message === "string" &&
-      event.reason.message.includes("ExpoKeepAwake.activate")
-    ) {
-      event.preventDefault?.();
-      return;
-    }
-    if (_originalHandler) {
-      (_originalHandler as unknown as (event: PromiseRejectionEvent) => void)(event);
-    }
-  };
-}
-
 import { Providers } from "@/providers/Providers";
 import { useAuthStatus } from "@/hooks/useSession";
 import { useAuthStore } from "@/lib/auth/authStore";

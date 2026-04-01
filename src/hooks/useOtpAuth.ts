@@ -13,6 +13,7 @@ interface UseOtpAuthReturn {
   requestOtp: (identifier: string) => Promise<void>;
   verifyOtp: (identifier: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
+  goToIdentifierStep: () => void;
   resetError: () => void;
 }
 
@@ -66,7 +67,12 @@ export function useOtpAuth(): UseOtpAuthReturn {
     setError(null);
   }, [clearSession]);
 
-  return { step, busy, error, requestOtp, verifyOtp, signOut, resetError };
+  const goToIdentifierStep = useCallback(() => {
+    setStep("identifier");
+    setError(null);
+  }, []);
+
+  return { step, busy, error, requestOtp, verifyOtp, signOut, goToIdentifierStep, resetError };
 }
 
 function toMessage(err: unknown): string {

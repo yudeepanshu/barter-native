@@ -86,7 +86,6 @@ export function SessionCard({
       <View style={styles.rows}>
         <Row label="Email" value={user.email ?? "—"} />
         <Row label="Phone" value={user.mobileNumber ?? "—"} />
-        <Row label="ID" value={`${user.id.slice(0, 12)}…`} />
       </View>
 
       <Button label="Sign out" variant="ghost" onPress={onSignOut} loading={signingOut} />

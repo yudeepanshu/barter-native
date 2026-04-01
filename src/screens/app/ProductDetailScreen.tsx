@@ -1,7 +1,5 @@
 import {
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,7 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -19,10 +17,15 @@ import { useProductQuery } from "@/hooks/queries/useProductQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
+import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
+import { ProductMetadata, hasExchangeHistory, getInactiveExpiryWarning } from "@/components/products/ProductMetadata";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
+import { ToggleChip } from "@/components/ui/ToggleChip";
 import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { Feather } from "@expo/vector-icons";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 function getStatusBadgeStyle(status: string): { bg: string; text: string } {
   switch (status) {
@@ -39,8 +42,9 @@ export default function ProductDetailScreen() {
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
   const { width } = useWindowDimensions();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; offeredProductId?: string }>();
   const productId = typeof params.id === "string" ? params.id : "";
+  const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const query = useProductQuery(productId);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
@@ -70,26 +74,24 @@ export default function ProductDetailScreen() {
   }
 
   const product = query.data;
+  const isOwner = session?.user.id === product.currentOwnerId;
+  const canEditListing =
+    isOwner &&
+    (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
   const badgeStyle = getStatusBadgeStyle(product.status);
   const imageFrameSize = Math.max(220, Math.round(width - 68));
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={12}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
+        }
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-          refreshControl={
-            <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
-          }
-        >
         <View style={styles.backRow}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={[styles.backButtonText, { color: theme.colors.textPrimary }]}>← Back</Text>
@@ -124,12 +126,61 @@ export default function ProductDetailScreen() {
                 <Text style={[styles.ownerLabel, { color: theme.colors.textMuted }]}>Listed by</Text>
                 <Text style={[styles.ownerName, { color: theme.colors.textPrimary }]}>{product.owner.userName}</Text>
               </View>
+              {canEditListing ? (
+                <Pressable
+                  style={[
+                    styles.ownerEditButton,
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                  ]}
+                  onPress={() => router.push(`/(app)/listings/${product.id}/edit`)}
+                  hitSlop={8}
+                >
+                  <Feather name="edit-2" size={16} color={theme.colors.textPrimary} />
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
           <Text style={[styles.description, { color: theme.colors.textMuted }]}>
             {product.description || "No description provided."}
           </Text>
+
+          {isOwner && getInactiveExpiryWarning(product) ? (
+            <View
+              style={[
+                styles.inactiveWarningBanner,
+                {
+                  backgroundColor: theme.colors.warningSoft,
+                  borderColor: theme.mode === "dark" ? "#92400e" : "#fcd34d",
+                },
+              ]}
+            >
+              <Feather
+                name="alert-triangle"
+                size={14}
+                color={theme.mode === "dark" ? "#fbbf24" : "#92400e"}
+                style={{ marginTop: 1 }}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text
+                  style={[
+                    styles.inactiveWarningText,
+                    { color: theme.mode === "dark" ? "#fbbf24" : "#92400e" },
+                  ]}
+                >
+                  {getInactiveExpiryWarning(product)}
+                </Text>
+                <Text
+                  style={[
+                    styles.inactiveWarningSubtext,
+                    { color: theme.mode === "dark" ? "#d97706" : "#b45309" },
+                  ]}
+                >
+                  Once removed, this listing cannot be relisted.
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           {product.productImages && product.productImages.length > 0 ? (
             <View style={styles.imageSection}>
@@ -154,6 +205,7 @@ export default function ProductDetailScreen() {
                       style={styles.productImage}
                       resizeMode="cover"
                     />
+                    {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
                     {image.isPrimary && <Text style={styles.imagePrimaryBadge}>Primary</Text>}
                   </View>
                 ))}
@@ -185,55 +237,17 @@ export default function ProductDetailScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
-          <View style={styles.metaWrap}>
-            <View style={[styles.metaChip, styles.metaChipCategory]}>
-              <Text style={[styles.metaChipText, styles.metaChipTextCategory]}>
-                {product.category?.name ?? "Uncategorized"}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.metaChip,
-                product.isFree
-                  ? styles.metaChipFree
-                  : product.requestByMoney
-                    ? styles.metaChipMoney
-                    : styles.metaChipBarter,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.metaChipText,
-                  product.isFree
-                    ? styles.metaChipTextFree
-                    : product.requestByMoney
-                      ? styles.metaChipTextMoney
-                      : styles.metaChipTextBarter,
-                ]}
-              >
-                {product.isFree ? "Free" : product.requestByMoney ? "Open to offers" : "Barter"}
-              </Text>
-            </View>
-            {product.locationName ? (
-              <View style={[styles.metaChip, styles.metaChipLocation]}>
-                <Text style={[styles.metaChipText, styles.metaChipTextLocation]}>
-                  {product.locationName}
-                </Text>
-              </View>
-            ) : null}
-            {product.isPreOwned && product.exchangeCount > 0 ? (
-              <View style={[styles.metaChip, styles.metaChipExchanged]}>
-                <Text style={[styles.metaChipText, styles.metaChipTextExchanged]}>
-                  Previously exchanged
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          <ProductMetadata product={product} variant="detail" />
         </View>
 
-          {session ? <RequestComposer product={product} sessionUserId={session.user.id} /> : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          {session ? (
+            <RequestComposer
+              product={product}
+              sessionUserId={session.user.id}
+              initialOfferedProductId={offeredProductId}
+            />
+          ) : null}
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -241,9 +255,11 @@ export default function ProductDetailScreen() {
 function RequestComposer({
   product,
   sessionUserId,
+  initialOfferedProductId,
 }: {
   product: ProductSummary;
   sessionUserId: string;
+  initialOfferedProductId?: string;
 }) {
   const router = useRouter();
   const createRequestMutation = useCreateRequestMutation();
@@ -252,16 +268,27 @@ function RequestComposer({
     status: "ACTIVE",
     limit: 40,
   });
+  const ownAllProductsQuery = useProductsListController({
+    ownerId: sessionUserId,
+    limit: 40,
+  });
 
   const ownOfferableProducts = useMemo(
     () => ownProductsQuery.items.filter((item) => item.id !== product.id && item.isListed),
     [ownProductsQuery.items, product.id],
   );
+  const ownNonCurrentProducts = useMemo(
+    () => ownAllProductsQuery.items.filter((item) => item.id !== product.id),
+    [ownAllProductsQuery.items, product.id],
+  );
+  const hasOwnedProductsButNoneListed = ownNonCurrentProducts.length > 0 && ownOfferableProducts.length === 0;
 
   const { theme } = useAppTheme();
   const [includeMoney, setIncludeMoney] = useState(!product.isFree && product.requestByMoney);
   const [includeProduct, setIncludeProduct] = useState(!product.isFree && !product.requestByMoney);
-  const [offeredProductIds, setOfferedProductIds] = useState<string[]>([]);
+  const [offeredProductIds, setOfferedProductIds] = useState<string[]>(() =>
+    initialOfferedProductId ? [initialOfferedProductId] : [],
+  );
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -277,6 +304,22 @@ function RequestComposer({
   if (isOwner) {
     return null;
   }
+
+  useEffect(() => {
+    if (!initialOfferedProductId) {
+      return;
+    }
+
+    const existsInOwnListings = ownOfferableProducts.some((item) => item.id === initialOfferedProductId);
+    if (!existsInOwnListings) {
+      return;
+    }
+
+    setOfferedProductIds((prev) =>
+      prev.includes(initialOfferedProductId) ? prev : [...prev, initialOfferedProductId],
+    );
+    setIncludeProduct(true);
+  }, [initialOfferedProductId, ownOfferableProducts]);
 
   const submit = async () => {
     setFeedback(null);
@@ -352,14 +395,16 @@ function RequestComposer({
           <View style={styles.modeRow}>
             {supportsMixedOffers ? (
               <>
-                <Button
+                <ToggleChip
                   label="Include money"
-                  variant={includeMoney ? "primary" : "ghost"}
+                  selected={includeMoney}
+                  style={styles.modeChip}
                   onPress={() => setIncludeMoney((prev) => !prev)}
                 />
-                <Button
+                <ToggleChip
                   label="Include product"
-                  variant={includeProduct ? "primary" : "ghost"}
+                  selected={includeProduct}
+                  style={styles.modeChip}
                   onPress={() => setIncludeProduct((prev) => !prev)}
                 />
               </>
@@ -416,7 +461,7 @@ function RequestComposer({
                     <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{offeredProductIds.length} listing(s) selected.</Text>
                   ) : null}
                 </>
-              ) : ownProductsQuery.query.isPending ? null : (
+              ) : ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? null : (
                 <View
                   style={[
                     styles.emptyOfferCard,
@@ -424,17 +469,49 @@ function RequestComposer({
                   ]}
                 >
                   <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>No listing to offer yet.</Text>
-                  <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
-                    Create one first, then come back and include it in this request.
-                  </Text>
-                  <Button
-                    label="Create listing"
-                    variant="ghost"
-                    onPress={() => router.push("/(app)/(tabs)/create")}
-                  />
+                  {hasOwnedProductsButNoneListed ? (
+                    <>
+                      <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
+                        You already have products, but none are currently listed.
+                      </Text>
+                      <View style={styles.emptyOfferActions}>
+                        <Button
+                          label="See listings"
+                          variant="ghost"
+                          onPress={() => router.push("/(app)/(tabs)/my-listings")}
+                        />
+                        <Button
+                          label="Create listing"
+                          variant="ghost"
+                          onPress={() =>
+                            router.push({
+                              pathname: "/(app)/(tabs)/create",
+                              params: { returnToProductId: product.id },
+                            })
+                          }
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
+                        Create one first, then come back and include it in this request.
+                      </Text>
+                      <Button
+                        label="Create listing"
+                        variant="ghost"
+                        onPress={() =>
+                          router.push({
+                            pathname: "/(app)/(tabs)/create",
+                            params: { returnToProductId: product.id },
+                          })
+                        }
+                      />
+                    </>
+                  )}
                 </View>
               )}
-              {ownProductsQuery.query.isPending ? (
+              {ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? (
                 <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>Loading your listings...</Text>
               ) : null}
             </View>
@@ -509,6 +586,24 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 12, fontWeight: "800" },
   description: { fontSize: 15, lineHeight: 22 },
+  inactiveWarningBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  inactiveWarningText: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  inactiveWarningSubtext: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   ownerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -534,6 +629,14 @@ const styles = StyleSheet.create({
   ownerMeta: { flex: 1, minWidth: 0 },
   ownerLabel: { fontSize: 11, fontWeight: "600" },
   ownerName: { fontSize: 14, fontWeight: "700" },
+  ownerEditButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   imageSection: {
     marginVertical: 8,
     alignItems: "center",
@@ -589,31 +692,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
   },
-  metaWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  metaChip: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-  },
-  metaChipText: { fontSize: 12, fontWeight: "700" },
-  // Category — neutral slate
-  metaChipCategory: { backgroundColor: "#f1f5f9", borderColor: "#cbd5e1" },
-  metaChipTextCategory: { color: "#475569" },
-  // Free — green
-  metaChipFree: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
-  metaChipTextFree: { color: "#166534" },
-  // Open to money offers — amber
-  metaChipMoney: { backgroundColor: "#fef3c7", borderColor: "#fcd34d" },
-  metaChipTextMoney: { color: "#92400e" },
-  // Barter only — indigo
-  metaChipBarter: { backgroundColor: "#ede9fe", borderColor: "#c4b5fd" },
-  metaChipTextBarter: { color: "#4c1d95" },
-  // Location — sky blue
-  metaChipLocation: { backgroundColor: "#e0f2fe", borderColor: "#7dd3fc" },
-  metaChipTextLocation: { color: "#0c4a6e" },
-  metaChipExchanged: { backgroundColor: "#ffedd5", borderColor: "#fdba74" },
-  metaChipTextExchanged: { color: "#9a3412" },
   requestCard: {
     borderWidth: 1,
     borderRadius: 14,
@@ -644,10 +722,14 @@ const styles = StyleSheet.create({
   offerChipText: { fontSize: 12, fontWeight: "600" },
   offerChipTextActive: {},
   offerHint: { fontSize: 12 },
+  modeChip: { flex: 1, minWidth: 0 },
   emptyOfferCard: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
+    gap: 8,
+  },
+  emptyOfferActions: {
     gap: 8,
   },
   emptyOfferTitle: { fontSize: 13, fontWeight: "700" },

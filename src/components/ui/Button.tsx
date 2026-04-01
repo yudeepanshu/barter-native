@@ -26,9 +26,22 @@ export function Button({
   const isDisabled = disabled || loading;
   const { theme } = useAppTheme();
 
+  const backgroundColor =
+    variant === "ghost"
+      ? theme.colors.surfaceMuted
+      : variant === "success"
+        ? theme.colors.success
+        : theme.colors.primary;
+  const borderColor = variant === "ghost" ? theme.colors.border : "transparent";
   const labelColor =
-    variant === "ghost" ? theme.colors.textSecondary : variant === "success" ? theme.colors.onSuccess : theme.colors.onPrimary;
-  const loadingColor = variant === "ghost" ? theme.colors.textSecondary : labelColor;
+    variant === "ghost"
+      ? isDisabled
+        ? theme.colors.textMuted
+        : theme.colors.textPrimary
+      : variant === "success"
+        ? theme.colors.onSuccess
+        : theme.colors.onPrimary;
+  const loadingColor = labelColor;
 
   return (
     <Pressable
@@ -44,15 +57,11 @@ export function Button({
         styles.base,
         {
           borderRadius: theme.roundness - 4,
-          opacity: isDisabled ? 0.52 : pressed ? 0.9 : 1,
+          opacity: isDisabled ? 0.86 : pressed ? 0.94 : 1,
           transform: [{ scale: pressed ? 0.99 : 1 }],
-        },
-        variant === "primary" && { backgroundColor: theme.colors.primary },
-        variant === "success" && { backgroundColor: theme.colors.success },
-        variant === "ghost" && {
-          backgroundColor: theme.colors.surfaceMuted,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
+          backgroundColor,
+          borderColor,
+          borderWidth: variant === "ghost" ? 1 : 0,
         },
       ]}
     >

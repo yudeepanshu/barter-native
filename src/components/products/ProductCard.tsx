@@ -1,6 +1,8 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
+import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
 
 interface ProductCardProps {
   product: ProductSummary;
@@ -50,6 +52,7 @@ export function ProductCard({
             style={styles.thumbnail}
             resizeMode="cover"
           />
+          {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
         </View>
       ) : null}
       <View style={styles.cardHeader}>
@@ -67,42 +70,19 @@ export function ProductCard({
         {product.description || "No description provided."}
       </Text>
       {showMeta ? (
-        <View style={styles.metaRow}>
-          <Text
-            style={[
-              styles.metaTag,
-              {
-                color: theme.colors.chipText,
-                backgroundColor: theme.colors.chipBg,
-                borderColor: theme.colors.border,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {product.category?.name ?? "Uncategorized"}
-          </Text>
-          <Text
-            style={[
-              styles.metaTag,
-              {
-                color: theme.colors.chipText,
-                backgroundColor: theme.colors.chipBg,
-                borderColor: theme.colors.border,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {product.isFree ? "Free" : product.requestByMoney ? "Open to offers" : "Barter"}
-          </Text>
+        <View style={styles.metaWrap}>
+          <ProductMetadata
+            product={product}
+            variant="compact"
+            showCategory={false}
+            showLocation={false}
+          />
           {isRequested ? (
-            <Text style={[styles.metaTag, styles.metaTagRequested]} numberOfLines={1}>
-              Requested
-            </Text>
-          ) : null}
-          {product.isPreOwned && product.exchangeCount > 0 && product.isListed ? (
-            <Text style={[styles.metaTag, styles.metaTagExchanged]} numberOfLines={1}>
-              Previously exchanged
-            </Text>
+            <View style={styles.metaRow}>
+              <Text style={[styles.metaTag, styles.metaTagRequested]} numberOfLines={1}>
+                Requested
+              </Text>
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -145,6 +125,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardDescription: { fontSize: 13, lineHeight: 19 },
+  metaWrap: { gap: 6 },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   metaTag: {
     maxWidth: "70%",
@@ -159,12 +140,6 @@ const styles = StyleSheet.create({
     color: "#166534",
     backgroundColor: "#dcfce7",
     borderColor: "#86efac",
-    fontWeight: "700",
-  },
-  metaTagExchanged: {
-    color: "#9a3412",
-    backgroundColor: "#ffedd5",
-    borderColor: "#fdba74",
     fontWeight: "700",
   },
 });

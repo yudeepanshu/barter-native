@@ -37,6 +37,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-image-picker",
+      "expo-notifications",
       [
         "expo-location",
         {
@@ -46,6 +47,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6c1f7076-0070-40a7-8df1-045d67c38d41"
+      }
     }
   }
 }

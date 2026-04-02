@@ -1,8 +1,10 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryClient } from "@/lib/query/queryClient";
 import { useAuthStore } from "@/lib/auth/authStore";
+import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
@@ -146,10 +148,77 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function PushNotificationsBootstrap() {
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
+  const lastRegisteredTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const registerDevice = async () => {
+      try {
+        const expoPushToken = await getExpoPushTokenForDevice();
+        if (!expoPushToken || cancelled) {
+          return;
+        }
+
+        if (lastRegisteredTokenRef.current === expoPushToken) {
+          return;
+        }
+
+        await mobileApiClient.registerPushDevice({
+          expoPushToken,
+          platform: Platform.OS,
+        });
+
+        if (!cancelled) {
+          lastRegisteredTokenRef.current = expoPushToken;
+        }
+      } catch (error) {
+        logAuthBootstrap("warn", "push registration failed", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    };
+
+    void registerDevice();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
+
+  useEffect(() => {
+    if (status !== "unauthenticated") {
+      return;
+    }
+
+    const expoPushToken = lastRegisteredTokenRef.current;
+    if (!expoPushToken) {
+      return;
+    }
+
+    lastRegisteredTokenRef.current = null;
+    void mobileApiClient.unregisterPushDevice({ expoPushToken }).catch(() => {
+      // Best effort cleanup on sign-out.
+    });
+  }, [status]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthBootstrap>{children}</AuthBootstrap>
+      <AuthBootstrap>
+        <PushNotificationsBootstrap />
+        {children}
+      </AuthBootstrap>
     </QueryClientProvider>
   );
 }

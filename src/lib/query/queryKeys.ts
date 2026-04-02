@@ -1,4 +1,4 @@
-import type { ProductsQueryInput } from "@barter/types";
+import type { NotificationsQueryInput, ProductsQueryInput } from "@barter/types";
 
 function normalizeRequestsFilters(filters: { status?: string; limit?: number }) {
   return {
@@ -36,6 +36,13 @@ function normalizeInfiniteProductsFilters(filters: Omit<ProductsQueryInput, "cur
   };
 }
 
+function normalizeNotificationsFilters(filters: Omit<NotificationsQueryInput, "cursor">) {
+  return {
+    limit: filters.limit ?? 20,
+    unreadOnly: filters.unreadOnly ?? false,
+  };
+}
+
 export const queryKeys = {
   auth: {
     me: ["auth", "me"] as const,
@@ -55,6 +62,10 @@ export const queryKeys = {
     receivedInfinite: (filters: { status?: string; limit?: number }) =>
       ["requests", "received", "infinite", normalizeRequestsFilters(filters)] as const,
     detail: (id: string) => ["requests", "detail", id] as const,
+  },
+  notifications: {
+    infinite: (filters: Omit<NotificationsQueryInput, "cursor">) =>
+      ["notifications", "infinite", normalizeNotificationsFilters(filters)] as const,
   },
   transactions: {
     activeByRequest: (requestId: string) =>

@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
+import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
@@ -59,12 +60,26 @@ export function ProductCard({
         <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
           {product.title}
         </Text>
-        <Text
-          style={[styles.badge, { backgroundColor: badgeStyle.bg, color: badgeStyle.text }]}
-          numberOfLines={1}
-        >
-          {product.status}
-        </Text>
+        {isRequested ? (
+          <View
+            style={[
+              styles.badgeWithIcon,
+              { backgroundColor: "#fcd34d", borderColor: "#f59e0b" },
+            ]}
+          >
+            <Feather name="clock" size={12} color="#92400e" />
+            <Text style={[styles.badgeText, { color: "#92400e" }]} numberOfLines={1}>
+              Requested
+            </Text>
+          </View>
+        ) : (
+          <Text
+            style={[styles.badge, { backgroundColor: badgeStyle.bg, color: badgeStyle.text }]}
+            numberOfLines={1}
+          >
+            {product.status}
+          </Text>
+        )}
       </View>
       <Text style={[styles.cardDescription, { color: theme.colors.textMuted }]} numberOfLines={3}>
         {product.description || "No description provided."}
@@ -77,13 +92,6 @@ export function ProductCard({
             showCategory={false}
             showLocation={false}
           />
-          {isRequested ? (
-            <View style={styles.metaRow}>
-              <Text style={[styles.metaTag, styles.metaTagRequested]} numberOfLines={1}>
-                Requested
-              </Text>
-            </View>
-          ) : null}
         </View>
       ) : null}
     </Pressable>
@@ -124,22 +132,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
   },
-  cardDescription: { fontSize: 13, lineHeight: 19 },
-  metaWrap: { gap: 6 },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  metaTag: {
-    maxWidth: "70%",
-    fontSize: 11,
-    borderWidth: 1,
-    borderRadius: 999,
+  badgeWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontWeight: "600",
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 96,
   },
-  metaTagRequested: {
-    color: "#166534",
-    backgroundColor: "#dcfce7",
-    borderColor: "#86efac",
+  badgeText: {
+    fontSize: 11,
     fontWeight: "700",
   },
+  cardDescription: { fontSize: 13, lineHeight: 19 },
+  metaWrap: { gap: 6 },
 });

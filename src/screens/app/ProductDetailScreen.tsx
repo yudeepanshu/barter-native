@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
+import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
@@ -75,6 +76,14 @@ export default function ProductDetailScreen() {
 
   const product = query.data;
   const isOwner = session?.user.id === product.currentOwnerId;
+  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
+  const activeRequest = useMemo(() => {
+    if (isOwner) return null;
+    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    return requests.find(
+      (req) => req.productId === product.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status)
+    );
+  }, [sentRequestsQuery.data, product.id, isOwner]);
   const canEditListing =
     isOwner &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
@@ -240,6 +249,29 @@ export default function ProductDetailScreen() {
           <ProductMetadata product={product} variant="detail" />
         </View>
 
+        {activeRequest && !isOwner ? (
+          <View
+            style={[
+              styles.activeRequestCard,
+              {
+                backgroundColor: theme.colors.primary,
+                borderColor: theme.colors.primary,
+              },
+            ]}
+          >
+            <Text style={[styles.activeRequestTitle, { color: theme.colors.onPrimary }]}>Your active request</Text>
+            <Text style={[styles.activeRequestStatus, { color: theme.colors.onPrimary }]}>
+              Status: {activeRequest.status}
+              {product.status === "INACTIVE" ? " • Product is now inactive" : ""}
+            </Text>
+            <Button
+              label="View request"
+              variant="ghost"
+              onPress={() => router.push(`/(app)/requests/${activeRequest.id}`)}
+            />
+          </View>
+        ) : null}
+
           {session ? (
             <RequestComposer
               product={product}
@@ -301,10 +333,6 @@ function RequestComposer({
   const wantsProduct = supportsMixedOffers ? includeProduct : true;
   const requiresExchangeOffer = !product.isFree;
 
-  if (isOwner) {
-    return null;
-  }
-
   useEffect(() => {
     if (!initialOfferedProductId) {
       return;
@@ -320,6 +348,10 @@ function RequestComposer({
     );
     setIncludeProduct(true);
   }, [initialOfferedProductId, ownOfferableProducts]);
+
+  if (isOwner) {
+    return null;
+  }
 
   const submit = async () => {
     setFeedback(null);
@@ -691,6 +723,21 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
+  },
+  activeRequestCard: {
+    borderWidth: 2,
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+  },
+  activeRequestTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  activeRequestStatus: {
+    fontSize: 13,
+    fontWeight: "500",
+    opacity: 0.9,
   },
   requestCard: {
     borderWidth: 1,

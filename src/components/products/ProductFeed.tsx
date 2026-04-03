@@ -1,10 +1,10 @@
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -32,8 +32,12 @@ import {
 } from "@/components/products/ProductListStates";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AppCard } from "@/components/ui/AppCard";
+import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
+const PROXIMITY_OPTIONS_KM = [2, 5, 10, 25] as const;
+
+type SortOption = "newest" | "oldest";
 
 interface ProductFeedProps {
   userId: string;
@@ -43,9 +47,15 @@ interface ProductFeedProps {
 export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { lastKnown, requestLocation } = useDeviceLocation();
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [draftCategoryId, setDraftCategoryId] = useState("");
+  const [draftRadiusKm, setDraftRadiusKm] = useState<number | null>(null);
 
   const categoriesQuery = useCategoriesQuery();
   const products = useProductsListController(filterState.filters);
@@ -71,6 +81,16 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
   const showInitialLoading = products.query.isPending && products.items.length === 0;
   const showInitialError = Boolean(products.query.error) && products.items.length === 0;
+
+  const visibleProducts = useMemo(() => {
+    const next = freeOnly ? products.items.filter((item) => item.isFree) : [...products.items];
+    next.sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return sortBy === "newest" ? bTime - aTime : aTime - bTime;
+    });
+    return next;
+  }, [freeOnly, products.items, sortBy]);
 
   useEffect(() => {
     if (!showInitialLoading) {
@@ -115,10 +135,48 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     await notificationsQuery.refetch();
   };
 
+  const onOpenFilters = () => {
+    setDraftCategoryId(filterState.categoryId);
+    setDraftRadiusKm(filterState.proximity?.radiusKm ?? null);
+    setShowFilterModal(true);
+  };
+
+  const onApplyFilters = async () => {
+    if (draftRadiusKm == null) {
+      filterState.setProximity(null);
+    } else {
+      const snapshot = lastKnown ?? (await requestLocation());
+      if (!snapshot) {
+        Alert.alert("Location required", "Enable location to use proximity filter.");
+        return;
+      }
+
+      filterState.setProximity({
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        radiusKm: draftRadiusKm,
+      });
+    }
+
+    filterState.setCategoryId(draftCategoryId);
+    setShowFilterModal(false);
+  };
+
+  const onOpenSortPicker = () => {
+    Alert.alert("Sort by", "Choose listing order", [
+      { text: "Newest first", onPress: () => setSortBy("newest") },
+      { text: "Oldest first", onPress: () => setSortBy("oldest") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const activeFilterCount =
+    (filterState.categoryId ? 1 : 0) + (filterState.proximity?.radiusKm ? 1 : 0);
+
   return (
     <>
       <FlatList
-        data={products.items}
+        data={visibleProducts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { backgroundColor: theme.colors.background }]}
         removeClippedSubviews
@@ -174,30 +232,80 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
               ) : null}
 
-              <View>
-                <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Categories</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chips}
+              <View style={styles.controlsWrap}>
+                <Pressable
+                  onPress={onOpenFilters}
+                  style={[
+                    styles.controlButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
                 >
-                  <CategoryChip
-                    active={filterState.categoryId === ""}
-                    label="All"
-                    onPress={() => filterState.setCategoryId("")}
+                  <Feather name="sliders" size={15} color={theme.colors.textSecondary} />
+                  <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Filters</Text>
+                  {activeFilterCount > 0 ? (
+                    <View style={[styles.activeCountPill, { backgroundColor: theme.colors.primary }]}> 
+                      <Text style={[styles.activeCountText, { color: theme.colors.onPrimary }]}> 
+                        {activeFilterCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+
+                <Pressable
+                  onPress={onOpenSortPicker}
+                  style={[
+                    styles.controlButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <Feather name="repeat" size={15} color={theme.colors.textSecondary} />
+                  <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Sort</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setFreeOnly((current) => !current)}
+                  style={[
+                    styles.controlButton,
+                    {
+                      borderColor: freeOnly ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: freeOnly ? theme.colors.chipActiveBg : theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name="gift"
+                    size={15}
+                    color={freeOnly ? theme.colors.chipActiveText : theme.colors.textSecondary}
                   />
-                  {categories.map((category) => (
-                    <CategoryChip
-                      key={category.id}
-                      active={filterState.categoryId === category.id}
-                      label={category.name}
-                      onPress={() => filterState.setCategoryId(category.id)}
-                    />
-                  ))}
-                </ScrollView>
+                  <Text
+                    style={[
+                      styles.controlButtonText,
+                      { color: freeOnly ? theme.colors.chipActiveText : theme.colors.textPrimary },
+                    ]}
+                  >
+                    Free
+                  </Text>
+                </Pressable>
               </View>
 
-              {products.isEmpty && !showInitialLoading && !showInitialError ? (
+              <View style={styles.listSummaryRow}>
+                <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
+                  Showing {visibleProducts.length} listings
+                </Text>
+                {filterState.proximity?.radiusKm ? (
+                  <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
+                    Within {filterState.proximity.radiusKm} km
+                  </Text>
+                ) : null}
+              </View>
+
+              {visibleProducts.length === 0 && !showInitialLoading && !showInitialError ? (
                 <ProductListEmptyState message="No listings found for the current filters." />
               ) : null}
             </AppCard>
@@ -235,6 +343,108 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
+
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <Pressable
+          style={[styles.notificationsBackdrop, { backgroundColor: theme.colors.overlay }]}
+          onPress={() => setShowFilterModal(false)}
+        >
+          <Pressable
+            style={[
+              styles.notificationsPanel,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+            onPress={() => {
+              // Keep modal open when tapping inside.
+            }}
+          >
+            <View style={styles.notificationsHeaderRow}>
+              <Text style={[styles.notificationsTitle, { color: theme.colors.textPrimary }]}>Filters</Text>
+              <Pressable onPress={() => setShowFilterModal(false)}>
+                <Feather name="x" size={18} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
+              <View style={styles.filterOptionsWrap}>
+                <CategoryChip
+                  active={draftCategoryId === ""}
+                  label="All"
+                  onPress={() => setDraftCategoryId("")}
+                />
+                {categories.map((category) => (
+                  <CategoryChip
+                    key={category.id}
+                    active={draftCategoryId === category.id}
+                    label={category.name}
+                    onPress={() => setDraftCategoryId(category.id)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Proximity</Text>
+              <View style={styles.filterOptionsWrap}>
+                <CategoryChip
+                  active={draftRadiusKm == null}
+                  label="Anywhere"
+                  onPress={() => setDraftRadiusKm(null)}
+                />
+                {PROXIMITY_OPTIONS_KM.map((radius) => (
+                  <CategoryChip
+                    key={radius}
+                    active={draftRadiusKm === radius}
+                    label={`${radius} km`}
+                    onPress={() => setDraftRadiusKm(radius)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterActionsRow}>
+              <Pressable
+                style={[
+                  styles.filterActionButton,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceMuted,
+                  },
+                ]}
+                onPress={() => {
+                  setDraftCategoryId("");
+                  setDraftRadiusKm(null);
+                }}
+              >
+                <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.filterActionButton,
+                  {
+                    borderColor: theme.colors.primary,
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => {
+                  void onApplyFilters();
+                }}
+              >
+                <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={showNotifications}
@@ -407,6 +617,45 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, lineHeight: 29, fontWeight: "800" },
   subtitle: { fontSize: 14, marginTop: 3 },
   searchHint: { fontSize: 12, marginTop: -4 },
+  controlsWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  controlButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    height: 36,
+  },
+  controlButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  activeCountPill: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  activeCountText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  listSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  listSummaryText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
   sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
   chip: {
@@ -483,5 +732,30 @@ const styles = StyleSheet.create({
   },
   notificationItemMeta: {
     fontSize: 11,
+  },
+  filterSection: {
+    gap: 8,
+  },
+  filterOptionsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  filterActionButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterActionText: {
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

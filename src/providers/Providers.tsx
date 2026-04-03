@@ -163,7 +163,15 @@ function PushNotificationsBootstrap() {
     const registerDevice = async () => {
       try {
         const expoPushToken = await getExpoPushTokenForDevice();
-        if (!expoPushToken || cancelled) {
+        if (!expoPushToken) {
+          logAuthBootstrap("warn", "push token unavailable; remote push notifications disabled", {
+            platform: Platform.OS,
+            userId: session.user.id,
+          });
+          return;
+        }
+
+        if (cancelled) {
           return;
         }
 
@@ -178,6 +186,10 @@ function PushNotificationsBootstrap() {
 
         if (!cancelled) {
           lastRegisteredTokenRef.current = expoPushToken;
+          logAuthBootstrap("info", "push device registered", {
+            platform: Platform.OS,
+            tokenSuffix: expoPushToken.slice(-8),
+          });
         }
       } catch (error) {
         logAuthBootstrap("warn", "push registration failed", {

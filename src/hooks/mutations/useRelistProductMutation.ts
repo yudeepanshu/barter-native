@@ -26,7 +26,10 @@ export function useRelistProductMutation() {
       queryClient.setQueriesData<InfiniteData<ProductPage>>(
         { queryKey: ["products"] },
         (old) => {
-          if (!old) return old;
+          if (!old || !Array.isArray(old.pages)) {
+            return old;
+          }
+
           return {
             ...old,
             pages: old.pages.map((page) => ({

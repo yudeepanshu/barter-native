@@ -48,6 +48,19 @@ export default function ProductDetailScreen() {
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const query = useProductQuery(productId);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const productData = query.data ?? null;
+  const isOwner = session?.user.id === productData?.currentOwnerId;
+  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
+  const activeRequest = useMemo(() => {
+    if (isOwner || !productData) {
+      return null;
+    }
+
+    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    return requests.find(
+      (req) => req.productId === productData.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status),
+    );
+  }, [sentRequestsQuery.data, productData, isOwner]);
 
   if (query.isPending) {
     return (
@@ -75,15 +88,6 @@ export default function ProductDetailScreen() {
   }
 
   const product = query.data;
-  const isOwner = session?.user.id === product.currentOwnerId;
-  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
-  const activeRequest = useMemo(() => {
-    if (isOwner) return null;
-    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
-    return requests.find(
-      (req) => req.productId === product.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status)
-    );
-  }, [sentRequestsQuery.data, product.id, isOwner]);
   const canEditListing =
     isOwner &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");

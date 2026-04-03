@@ -5,6 +5,14 @@ import type * as ExpoNotifications from "expo-notifications";
 let notificationsModulePromise: Promise<typeof ExpoNotifications | null> | null = null;
 let notificationHandlerConfigured = false;
 
+function logPushRegistration(message: string, meta?: Record<string, unknown>) {
+  if (!__DEV__) {
+    return;
+  }
+
+  console.warn(`[push-registration] ${message}`, meta ?? "");
+}
+
 async function loadNotificationsModule() {
   if (!notificationsModulePromise) {
     notificationsModulePromise = import("expo-notifications")
@@ -67,6 +75,7 @@ export async function getExpoPushTokenForDevice() {
   try {
     const notifications = await loadNotificationsModule();
     if (!notifications) {
+      logPushRegistration("expo-notifications module unavailable");
       return null;
     }
 
@@ -78,6 +87,7 @@ export async function getExpoPushTokenForDevice() {
       typeof notifications.requestPermissionsAsync !== "function" ||
       typeof notifications.getExpoPushTokenAsync !== "function"
     ) {
+      logPushRegistration("notifications API unavailable on this build");
       return null;
     }
 
@@ -90,17 +100,26 @@ export async function getExpoPushTokenForDevice() {
     }
 
     if (finalStatus !== "granted") {
+      logPushRegistration("notification permission not granted", { finalStatus });
       return null;
     }
 
     const projectId = getProjectId();
     if (!projectId) {
+      logPushRegistration("missing EAS projectId for Expo push token lookup");
       return null;
     }
 
     const tokenResponse = await notifications.getExpoPushTokenAsync({ projectId });
-    return typeof tokenResponse.data === "string" ? tokenResponse.data : null;
-  } catch {
+    const token = typeof tokenResponse.data === "string" ? tokenResponse.data : null;
+    if (!token) {
+      logPushRegistration("Expo returned an empty push token");
+    }
+    return token;
+  } catch (error) {
+    logPushRegistration("failed to get Expo push token", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
     return null;
   }
 }

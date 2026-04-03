@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "627749405911",
+    "project_id": "barter-24412",
+    "storage_bucket": "barter-24412.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627749405911:android:92ea8e8fb4976864e15c92",
+        "android_client_info": {
+          "package_name": "com.barter.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDzRhzW3ifbfwemNH4BbmFkmQVpZf5Apg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

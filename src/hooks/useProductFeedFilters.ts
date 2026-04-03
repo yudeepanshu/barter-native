@@ -14,6 +14,11 @@ export function useProductFeedFilters({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
+  const [proximity, setProximity] = useState<{
+    latitude: number;
+    longitude: number;
+    radiusKm: number;
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,8 +34,11 @@ export function useProductFeedFilters({
       categoryId: categoryId || undefined,
       excludeOwnerId: excludeOwnerId || undefined,
       limit,
+      locationLat: proximity?.latitude,
+      locationLng: proximity?.longitude,
+      radiusKm: proximity?.radiusKm,
     }),
-    [debouncedSearch, categoryId, excludeOwnerId, limit],
+    [debouncedSearch, categoryId, excludeOwnerId, limit, proximity],
   );
 
   return {
@@ -38,8 +46,10 @@ export function useProductFeedFilters({
     debouncedSearch,
     isSearchDebouncing: search !== debouncedSearch,
     categoryId,
+    proximity,
     filters,
     setSearch,
     setCategoryId,
+    setProximity,
   };
 }

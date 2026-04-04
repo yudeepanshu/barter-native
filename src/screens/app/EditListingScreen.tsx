@@ -5,7 +5,6 @@ import {
   Switch,
   Text,
   View,
-  Alert,
   Image,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -13,7 +12,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
@@ -22,12 +20,16 @@ import { useEditListingForm } from "@/hooks/useEditListingForm";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+import { ListingLocationSection } from "@/components/products/ListingLocationSection";
+import { ListingTextFields } from "@/components/products/ListingTextFields";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; returnTo?: string }>();
   const productId = typeof params.id === "string" ? params.id : "";
+  const returnTo = params.returnTo === "my-listings" ? "my-listings" : undefined;
 
   const session = useSession();
   const categoriesQuery = useCategoriesQuery();
@@ -78,18 +80,22 @@ export default function EditListingScreen() {
 
   const categories = categoriesQuery.data ?? [];
 
-  return <EditListingFormSection product={productQuery.data} categories={categories} />;
+  return <EditListingFormSection product={productQuery.data} categories={categories} returnTo={returnTo} />;
 }
 
 function EditListingFormSection({
   product,
   categories,
+  returnTo,
 }: {
   product: ProductSummary;
   categories: Category[];
+  returnTo?: "my-listings";
 }) {
   const { theme, statusBarStyle } = useAppTheme();
-  const form = useEditListingForm(product);
+  const form = useEditListingForm(product, { returnTo });
+  const dialog = useAppDialog();
+  const hasAttachedLocation = form.state.manualLatitude != null && form.state.manualLongitude != null;
 
   if (!form.state.hasInitialized) {
     return (
@@ -102,17 +108,21 @@ function EditListingFormSection({
   }
 
   const onRemoveExistingImage = (imageId: string) => {
-    Alert.alert("Remove image", "Remove this image from the listing draft?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => form.actions.removeExistingImage(imageId),
-      },
-    ]);
+    void (async () => {
+      const shouldRemove = await dialog.confirm(
+        "Remove image",
+        "Remove this image from the listing draft?",
+        {
+          confirmLabel: "Remove",
+          cancelLabel: "Cancel",
+          destructive: true,
+        },
+      );
+
+      if (shouldRemove) {
+        form.actions.removeExistingImage(imageId);
+      }
+    })();
   };
 
   return (
@@ -129,28 +139,23 @@ function EditListingFormSection({
         </View>
 
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <Input
-            label="Title"
-            placeholder="e.g., Mountain bike in good condition"
-            value={form.state.title}
-            onChangeText={form.actions.setTitle}
-            error={form.state.fieldErrors.title ?? null}
+          <ListingTextFields
+            title={form.state.title}
+            description={form.state.description}
+            titleError={form.state.fieldErrors.title ?? null}
+            descriptionError={form.state.fieldErrors.description ?? null}
+            onTitleChange={form.actions.setTitle}
+            onDescriptionChange={form.actions.setDescription}
           />
 
-          <Input
-            label="Description"
-            placeholder="Add details about condition, usage, and expectations."
-            value={form.state.description}
-            onChangeText={form.actions.setDescription}
-            error={form.state.fieldErrors.description ?? null}
-          />
-
-          <Input
-            label="Location"
-            placeholder="e.g., Sector 21, Noida"
-            value={form.state.locationName}
-            onChangeText={form.actions.setLocationName}
-            error={form.state.fieldErrors.locationName ?? null}
+          <ListingLocationSection
+            locationName={form.state.locationName}
+            locationWarning={form.state.locationWarning}
+            fieldError={form.state.fieldErrors.locationName ?? null}
+            hasAttachedLocation={hasAttachedLocation}
+            isLocating={form.state.isLocating}
+            onAttachCurrentLocation={form.actions.attachCurrentLocation}
+            onClearLocation={form.actions.clearManualCoordinates}
           />
         </View>
 

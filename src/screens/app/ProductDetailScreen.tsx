@@ -43,13 +43,22 @@ export default function ProductDetailScreen() {
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
   const { width } = useWindowDimensions();
-  const params = useLocalSearchParams<{ id?: string; offeredProductId?: string }>();
+  const params = useLocalSearchParams<{ id?: string; offeredProductId?: string; backTo?: string }>();
   const productId = typeof params.id === "string" ? params.id : "";
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
+  const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
   const query = useProductQuery(productId);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const productData = query.data ?? null;
   const isOwner = session?.user.id === productData?.currentOwnerId;
+  const handleBack = () => {
+    if (backTo === "my-listings") {
+      router.replace("/(app)/(tabs)/my-listings");
+      return;
+    }
+
+    router.back();
+  };
   const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
   const activeRequest = useMemo(() => {
     if (isOwner || !productData) {
@@ -80,7 +89,7 @@ export default function ProductDetailScreen() {
           <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this listing.</Text>
           <View style={styles.actions}>
             <Button label="Retry" onPress={() => void query.refetch()} />
-            <Button label="Back" variant="ghost" onPress={() => router.back()} />
+            <Button label="Back" variant="ghost" onPress={handleBack} />
           </View>
         </View>
       </SafeAreaView>
@@ -106,7 +115,7 @@ export default function ProductDetailScreen() {
         }
       >
         <View style={styles.backRow}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={handleBack}>
             <Text style={[styles.backButtonText, { color: theme.colors.textPrimary }]}>← Back</Text>
           </Pressable>
         </View>
@@ -145,7 +154,15 @@ export default function ProductDetailScreen() {
                     styles.ownerEditButton,
                     { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
                   ]}
-                  onPress={() => router.push(`/(app)/listings/${product.id}/edit`)}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/listings/[id]/edit",
+                      params: {
+                        id: product.id,
+                        ...(backTo ? { returnTo: backTo } : null),
+                      },
+                    })
+                  }
                   hitSlop={8}
                 >
                   <Feather name="edit-2" size={16} color={theme.colors.textPrimary} />

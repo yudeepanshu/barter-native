@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import {
   CREATE_LISTING_RULES,
@@ -19,14 +18,25 @@ import {
   toUploadErrorMessage,
   uploadImageAssetToPresignedUrl,
 } from "@/lib/uploads/presignedImageUpload";
+import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
-export function useEditListingForm(product: ProductSummary) {
+export function useEditListingForm(
+  product: ProductSummary,
+  options?: {
+    returnTo?: "my-listings";
+  },
+) {
   const router = useRouter();
   const updateMutation = useUpdateProductMutation(product.id);
+  const { requestLocation } = useDeviceLocation();
+  const dialog = useAppDialog();
 
   const [title, setTitle] = useState(() => product.title ?? "");
   const [description, setDescription] = useState(() => product.description ?? "");
   const [locationName, setLocationName] = useState(() => product.locationName ?? "");
+  const [manualLatitude, setManualLatitude] = useState<number | null>(() => product.latitude ?? null);
+  const [manualLongitude, setManualLongitude] = useState<number | null>(() => product.longitude ?? null);
   const [categoryId, setCategoryId] = useState(() => product.categoryId ?? "");
   const [isFree, setIsFree] = useState(() => Boolean(product.isFree));
   const [requestByMoney, setRequestByMoney] = useState(() => Boolean(product.requestByMoney));
@@ -34,20 +44,32 @@ export function useEditListingForm(product: ProductSummary) {
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [fieldErrors, setFieldErrors] = useState<CreateListingValidationResult["fieldErrors"]>({});
+  const [locationWarning, setLocationWarning] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
 
-  const askImageSource = () =>
-    new Promise<"camera" | "library" | null>((resolve) => {
-      Alert.alert("Choose image source", "Select how you want to add images.", [
-        { text: "Camera", onPress: () => resolve("camera") },
-        { text: "Gallery", onPress: () => resolve("library") },
-        { text: "Cancel", style: "cancel", onPress: () => resolve(null) },
-      ]);
+  const askImageSource = async (): Promise<"camera" | "library" | null> => {
+    const action = await dialog.show({
+      title: "Choose image source",
+      message: "Select how you want to add images.",
+      actions: [
+        { key: "camera", label: "Camera" },
+        { key: "library", label: "Gallery" },
+        { key: "cancel", label: "Cancel", role: "cancel" },
+      ],
     });
+
+    if (action === "camera" || action === "library") {
+      return action;
+    }
+
+    return null;
+  };
 
   const submit = async () => {
     setFormError(null);
+    setLocationWarning(null);
     setFieldErrors({});
 
     const effectiveImageCount = existingImages.length + newImages.length;
@@ -77,11 +99,21 @@ export function useEditListingForm(product: ProductSummary) {
       return;
     }
 
-    const payload = buildUpdatePayload(product, validation.normalized);
+    const payload = buildUpdatePayload(product, validation.normalized, {
+      latitude: manualLatitude,
+      longitude: manualLongitude,
+    });
     const hasImageChanges = removedImageIds.length > 0 || newImages.length > 0;
 
     if (Object.keys(payload).length === 0 && !hasImageChanges) {
-      router.push(`/(app)/products/${product.id}`);
+      if (options?.returnTo === "my-listings") {
+        router.replace({
+          pathname: "/(app)/products/[id]",
+          params: { id: product.id, backTo: "my-listings" },
+        });
+      } else {
+        router.push(`/(app)/products/${product.id}`);
+      }
       return;
     }
 
@@ -104,7 +136,14 @@ export function useEditListingForm(product: ProductSummary) {
         }
       }
 
-      router.replace(`/(app)/products/${product.id}`);
+      if (options?.returnTo === "my-listings") {
+        router.replace({
+          pathname: "/(app)/products/[id]",
+          params: { id: product.id, backTo: "my-listings" },
+        });
+      } else {
+        router.replace(`/(app)/products/${product.id}`);
+      }
     } catch (error) {
       setFormError(toUploadErrorMessage(error, toErrorMessage));
     } finally {
@@ -174,26 +213,74 @@ export function useEditListingForm(product: ProductSummary) {
     setNewImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
   };
 
+  const attachCurrentLocation = async () => {
+    setLocationWarning(null);
+    setFormError(null);
+    setIsLocating(true);
+    try {
+      const snapshot = await requestLocation({ maxAccuracyMeters: 50 });
+      if (!snapshot) {
+        setFormError("Unable to get a location accurate within 50m. Check permission, move to an open area, and refresh.");
+        return false;
+      }
+
+      setManualLatitude(snapshot.latitude);
+      setManualLongitude(snapshot.longitude);
+
+      if (snapshot.locationName?.trim()) {
+        setLocationName(snapshot.locationName);
+        setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
+        return true;
+      }
+
+      const fallbackName = await reverseGeocodeCoords(snapshot.latitude, snapshot.longitude);
+      if (fallbackName) {
+        setLocationName(fallbackName);
+        setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
+      }
+
+      return true;
+    } catch {
+      setFormError("Unable to fetch current location. Please try again.");
+      return false;
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const clearManualCoordinates = () => {
+    setLocationWarning(null);
+    setManualLatitude(null);
+    setManualLongitude(null);
+    setLocationName("");
+    setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
+  };
+
   return {
     rules: CREATE_LISTING_RULES,
     state: {
       title,
       description,
       locationName,
+      manualLatitude,
+      manualLongitude,
       categoryId,
       isFree,
       requestByMoney,
       existingImages,
       newImages,
       fieldErrors,
+      locationWarning,
       formError,
+      isLocating,
       isSubmitting: updateMutation.isPending || isUploadingImages,
       hasInitialized: true,
     },
     actions: {
       setTitle,
       setDescription,
-      setLocationName,
+      attachCurrentLocation,
+      clearManualCoordinates,
       setCategoryId,
       setIsFree,
       setRequestByMoney,
@@ -257,10 +344,16 @@ function buildUpdatePayload(
     isFree?: boolean;
     locationName?: string;
   },
+  location: {
+    latitude: number | null;
+    longitude: number | null;
+  },
 ): UpdateProductInput {
   const nextDescription = normalized.description ?? null;
   const nextLocation = normalized.locationName ?? null;
   const nextCategoryId = normalized.categoryId ?? null;
+  const nextLatitude = location.latitude ?? null;
+  const nextLongitude = location.longitude ?? null;
   const payload: UpdateProductInput = {};
 
   if (normalized.title !== product.title) {
@@ -271,6 +364,12 @@ function buildUpdatePayload(
   }
   if ((product.locationName ?? null) !== nextLocation) {
     payload.locationName = nextLocation;
+  }
+  if ((product.latitude ?? null) !== nextLatitude) {
+    payload.latitude = nextLatitude;
+  }
+  if ((product.longitude ?? null) !== nextLongitude) {
+    payload.longitude = nextLongitude;
   }
   if ((product.categoryId ?? null) !== nextCategoryId) {
     payload.categoryId = nextCategoryId;

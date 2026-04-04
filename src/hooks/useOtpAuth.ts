@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
+import { useRouter } from "expo-router";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
+import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 
 export type OtpStep = "identifier" | "code";
 
@@ -21,6 +23,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
   const [step, setStep] = useState<OtpStep>("identifier");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const setSession = useAuthStore((s) => s.setSession);
   const clearSession = useAuthStore((s) => s.clearSession);
@@ -52,13 +55,17 @@ export function useOtpAuth(): UseOtpAuthReturn {
         if (!payload) throw new Error("No payload returned from server");
         // setSession writes to Zustand; persist middleware persists to SecureStore
         setSession({ user: payload.user, tokens: payload.tokens });
+
+        if (needsProfileCompletion(payload.user.userName)) {
+          router.replace("/(app)/complete-profile");
+        }
       } catch (err) {
         setError(toMessage(err));
       } finally {
         setBusy(false);
       }
     },
-    [setSession],
+    [router, setSession],
   );
 
   const signOut = useCallback(async () => {

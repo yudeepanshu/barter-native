@@ -1,5 +1,4 @@
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,7 +8,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
@@ -38,6 +37,7 @@ import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 
@@ -76,34 +76,53 @@ export default function RequestsScreen() {
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const ownOfferableProducts = ownProducts.items;
   const [activeTab, setActiveTab] = useState<"received" | "sent">("received");
-  const [hasAutoSelectedTab, setHasAutoSelectedTab] = useState(false);
+  const lastNonEmptyTabOptionsRef = useRef<Array<{ value: "received" | "sent"; label: string }>>([]);
+  const hasReceivedItems = receivedItems.length > 0;
+  const hasSentItems = sentItems.length > 0;
+  const isInitialLoading =
+    (sentQuery.isPending && sentQuery.data == null && !sentQuery.error) ||
+    (receivedQuery.isPending && receivedQuery.data == null && !receivedQuery.error);
 
   const tabOptions = useMemo(
-    () => [
-      { value: "received" as const, label: `Received (${receivedItems.length})` },
-      { value: "sent" as const, label: `Sent (${sentItems.length})` },
-    ],
-    [receivedItems.length, sentItems.length],
+    () => {
+      const next: Array<{ value: "received" | "sent"; label: string }> = [];
+      if (hasReceivedItems) {
+        next.push({ value: "received", label: `Received (${receivedItems.length})` });
+      }
+      if (hasSentItems) {
+        next.push({ value: "sent", label: `Sent (${sentItems.length})` });
+      }
+      return next;
+    },
+    [hasReceivedItems, hasSentItems, receivedItems.length, sentItems.length],
   );
 
   useEffect(() => {
-    if (hasAutoSelectedTab || receivedQuery.isPending || sentQuery.isPending) {
+    if (tabOptions.length > 0) {
+      lastNonEmptyTabOptionsRef.current = tabOptions;
+    }
+  }, [tabOptions]);
+
+  const stableTabOptions =
+    tabOptions.length === 0 &&
+    (sentQuery.isPending || receivedQuery.isPending || sentQuery.isFetching || receivedQuery.isFetching)
+      ? lastNonEmptyTabOptionsRef.current
+      : tabOptions;
+
+  useEffect(() => {
+    if (receivedQuery.isPending || sentQuery.isPending || stableTabOptions.length === 0) {
       return;
     }
 
-    if (receivedItems.length > 0) {
-      setActiveTab("received");
-    } else if (sentItems.length > 0) {
-      setActiveTab("sent");
+    const hasCurrentTab = stableTabOptions.some((option) => option.value === activeTab);
+    if (!hasCurrentTab) {
+      setActiveTab(stableTabOptions[0].value);
     }
-
-    setHasAutoSelectedTab(true);
   }, [
-    hasAutoSelectedTab,
+    activeTab,
     receivedQuery.isPending,
     sentQuery.isPending,
-    receivedItems.length,
-    sentItems.length,
+    stableTabOptions,
   ]);
 
   const isEverythingEmpty =
@@ -142,15 +161,25 @@ export default function RequestsScreen() {
           <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Manage incoming and outgoing negotiations.</Text>
         </View>
 
-        <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <SegmentedControl
-            value={activeTab}
-            options={tabOptions}
-            onChange={setActiveTab}
-          />
-        </View>
+        {isInitialLoading ? (
+          <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Spinner size={20} />
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>
+          </View>
+        ) : null}
 
-        {isEverythingEmpty ? (
+        {!isInitialLoading && stableTabOptions.length > 0 ? (
+          <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            <SegmentedControl
+              value={activeTab}
+              options={stableTabOptions}
+              onChange={setActiveTab}
+            />
+          </View>
+        ) : null}
+
+        {!isInitialLoading && isEverythingEmpty ? (
           <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Feather name="inbox" size={20} color={theme.colors.textMuted} />
             <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No requests right now</Text>
@@ -158,7 +187,7 @@ export default function RequestsScreen() {
           </View>
         ) : null}
 
-        {activeTab === "received" ? (
+        {!isInitialLoading && activeTab === "received" ? (
           <RequestSection
             title="Received"
             actorTurn="SELLER"
@@ -179,7 +208,9 @@ export default function RequestsScreen() {
             sessionUserId={session?.user.id ?? ""}
             ownOfferableProducts={ownOfferableProducts}
           />
-        ) : (
+        ) : null}
+
+        {!isInitialLoading && activeTab === "sent" ? (
           <RequestSection
             title="Sent"
             actorTurn="BUYER"
@@ -200,7 +231,7 @@ export default function RequestsScreen() {
             sessionUserId={session?.user.id ?? ""}
             ownOfferableProducts={ownOfferableProducts}
           />
-        )}
+        ) : null}
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -246,6 +277,7 @@ function RequestSection({
   ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
+  const dialog = useAppDialog();
 
   return (
     <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -324,6 +356,7 @@ function RequestItem({
   ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
+  const dialog = useAppDialog();
   const activeTransactionQuery = useActiveTransactionQuery(
     item.id,
     item.status === "ACCEPTED" && item.product.status !== "EXCHANGED",
@@ -468,19 +501,26 @@ function RequestItem({
   };
 
   const onRequestContactReveal = () => {
-    Alert.alert("Reveal contact info", "Send a reveal request to the other party?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Request",
-        onPress: () => {
-          void requestContactRevealMutation
-            .mutateAsync({ requestId: item.id, payload: {} })
-            .catch((error) => {
-              setTxFeedback(toRequestErrorMessage(error));
-            });
+    void (async () => {
+      const shouldRequest = await dialog.confirm(
+        "Reveal contact info",
+        "Send a reveal request to the other party?",
+        {
+          confirmLabel: "Request",
+          cancelLabel: "Cancel",
         },
-      },
-    ]);
+      );
+
+      if (!shouldRequest) {
+        return;
+      }
+
+      void requestContactRevealMutation
+        .mutateAsync({ requestId: item.id, payload: {} })
+        .catch((error) => {
+          setTxFeedback(toRequestErrorMessage(error));
+        });
+    })();
   };
 
   const onRespondContactReveal = (approve: boolean) => {

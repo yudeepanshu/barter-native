@@ -1,6 +1,8 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => (
@@ -10,9 +12,41 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
 
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
+  const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
+  const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
+  const dialog = useAppDialog();
 
   return (
     <Tabs
+      screenListeners={({ navigation, route }) => ({
+        tabPress: (event) => {
+          const state = navigation.getState();
+          const currentRouteName = state.routes[state.index]?.name;
+          const leavingCreateTab = currentRouteName === "create" && route.name !== "create";
+
+          if (!leavingCreateTab || !hasUnsavedCreateDraft) {
+            return;
+          }
+
+          event.preventDefault();
+          void (async () => {
+            const shouldDiscard = await dialog.confirm(
+              "Discard draft?",
+              "You have unsaved listing details. Keep editing or discard them?",
+              {
+                cancelLabel: "Keep editing",
+                confirmLabel: "Discard",
+                destructive: true,
+              },
+            );
+
+            if (shouldDiscard) {
+              resetCreateDraft?.();
+              navigation.navigate(route.name);
+            }
+          })();
+        },
+      })}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.textPrimary,

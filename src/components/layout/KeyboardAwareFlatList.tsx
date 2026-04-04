@@ -1,62 +1,41 @@
+import { useCallback, useEffect, useMemo, useRef, type ReactElement } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  type PropsWithChildren,
-} from "react";
-import {
-  KeyboardAvoidingView,
+  FlatList,
   Platform,
-  ScrollView,
   StyleSheet,
-  type NativeSyntheticEvent,
+  type FlatListProps,
   type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type TextInput,
-  type KeyboardAvoidingViewProps,
-  type ScrollViewProps,
-  type StyleProp,
-  type ViewStyle,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardMetrics } from "@/hooks/useKeyboardMetrics";
-import {
-  KeyboardAwareContext,
-  type KeyboardAwareContextValue,
-} from "@/components/layout/KeyboardAwareContext";
+import { KeyboardAwareContext, type KeyboardAwareContextValue } from "@/components/layout/KeyboardAwareContext";
 
-interface KeyboardAwareScrollViewProps extends PropsWithChildren {
-  containerStyle?: StyleProp<ViewStyle>;
-  contentContainerStyle?: ScrollViewProps["contentContainerStyle"];
-  keyboardVerticalOffset?: number;
-  keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
-  keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
-  refreshControl?: ScrollViewProps["refreshControl"];
+interface KeyboardAwareFlatListProps<ItemT> extends FlatListProps<ItemT> {
   extraBottomPadding?: number;
   extraScrollPadding?: number;
   androidKeyboardHandling?: "auto" | "resize" | "pan";
   autoScrollToFocusedInput?: boolean;
 }
 
-export function KeyboardAwareScrollView({
-  children,
-  containerStyle,
+export function KeyboardAwareFlatList<ItemT>({
   contentContainerStyle,
-  keyboardVerticalOffset = 0,
   keyboardDismissMode,
   keyboardShouldPersistTaps = "handled",
-  refreshControl,
+  onScroll,
+  scrollEventThrottle = 16,
   extraBottomPadding = 20,
   extraScrollPadding = 20,
   androidKeyboardHandling = "auto",
   autoScrollToFocusedInput = true,
-}: KeyboardAwareScrollViewProps) {
-  const behavior: KeyboardAvoidingViewProps["behavior"] = Platform.OS === "ios" ? "padding" : "height";
+  ...rest
+}: KeyboardAwareFlatListProps<ItemT>): ReactElement {
   const insets = useSafeAreaInsets();
   const windowDimensions = useWindowDimensions();
   const keyboard = useKeyboardMetrics();
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<ItemT>>(null);
   const focusedInputRef = useRef<TextInput | null>(null);
   const scrollOffsetYRef = useRef(0);
   const baselineWindowHeightRef = useRef(windowDimensions.height);
@@ -93,11 +72,12 @@ export function KeyboardAwareScrollView({
     return Math.max(0, keyboard.height - safeInset);
   }, [insets.bottom, isAndroidResizeActive, keyboard.height, keyboard.isVisible]);
 
-  const onScroll = useCallback(
+  const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
+      onScroll?.(event);
     },
-    [],
+    [onScroll],
   );
 
   const ensureFocusedInputVisible = useCallback(
@@ -107,8 +87,8 @@ export function KeyboardAwareScrollView({
       }
 
       const input = targetInput ?? focusedInputRef.current;
-      const scroll = scrollRef.current;
-      if (!input || !scroll) {
+      const list = listRef.current;
+      if (!input || !list) {
         return;
       }
 
@@ -121,13 +101,13 @@ export function KeyboardAwareScrollView({
 
             if (inputBottom > visibleBottom) {
               const delta = inputBottom - visibleBottom;
-              scroll.scrollTo({ y: Math.max(0, scrollOffsetYRef.current + delta), animated: true });
+              list.scrollToOffset({ offset: Math.max(0, scrollOffsetYRef.current + delta), animated: true });
               return;
             }
 
             if (y < visibleTop) {
               const delta = visibleTop - y;
-              scroll.scrollTo({ y: Math.max(0, scrollOffsetYRef.current - delta), animated: true });
+              list.scrollToOffset({ offset: Math.max(0, scrollOffsetYRef.current - delta), animated: true });
             }
           });
         });
@@ -150,7 +130,7 @@ export function KeyboardAwareScrollView({
 
   const contextValue = useMemo<KeyboardAwareContextValue>(
     () => ({
-      notifyInputFocused: (input: TextInput | null) => {
+      notifyInputFocused: (input) => {
         focusedInputRef.current = input;
         ensureFocusedInputVisible(input);
       },
@@ -172,28 +152,16 @@ export function KeyboardAwareScrollView({
 
   return (
     <KeyboardAwareContext.Provider value={contextValue}>
-      <KeyboardAvoidingView
-        style={[styles.keyboardWrap, containerStyle]}
-        behavior={behavior}
-        keyboardVerticalOffset={Platform.OS === "ios" ? keyboardVerticalOffset : 0}
-      >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={resolvedContentContainerStyle}
-          keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-          keyboardDismissMode={keyboardDismissMode ?? (Platform.OS === "ios" ? "interactive" : "on-drag")}
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-          refreshControl={refreshControl}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-        >
-          {children}
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <FlatList
+        ref={listRef}
+        contentContainerStyle={resolvedContentContainerStyle}
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+        keyboardDismissMode={keyboardDismissMode ?? (Platform.OS === "ios" ? "interactive" : "on-drag")}
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        onScroll={handleScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        {...rest}
+      />
     </KeyboardAwareContext.Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboardWrap: { flex: 1 },
-});

@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,17 +10,18 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import * as Location from "expo-location";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams } from "expo-router";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useCreateListingForm } from "@/hooks/useCreateListingForm";
-import { ensureGeocodingPermission } from "@/hooks/useDeviceLocation";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+import { ListingLocationSection } from "@/components/products/ListingLocationSection";
+import { ListingTextFields } from "@/components/products/ListingTextFields";
+import { useUnsavedChangesPrompt } from "@/hooks/useUnsavedChangesPrompt";
+import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -29,52 +29,47 @@ export default function CreateListingScreen() {
   const returnToProductId = typeof params.returnToProductId === "string" ? params.returnToProductId : undefined;
   const categoriesQuery = useCategoriesQuery();
   const form = useCreateListingForm({ returnToProductId });
-  const [showAddressSearch, setShowAddressSearch] = useState(false);
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
-  const [addressQuery, setAddressQuery] = useState("");
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
 
   const categories = categoriesQuery.data ?? [];
-  const hasManualPick = form.state.manualLatitude != null && form.state.manualLongitude != null;
+  const hasAttachedLocation = form.state.manualLatitude != null && form.state.manualLongitude != null;
+  const hasUnsavedChanges =
+    form.state.title.trim().length > 0 ||
+    form.state.description.trim().length > 0 ||
+    form.state.locationName.trim().length > 0 ||
+    form.state.manualLatitude != null ||
+    form.state.manualLongitude != null ||
+    form.state.categoryId.length > 0 ||
+    form.state.isFree ||
+    form.state.requestByMoney ||
+    form.state.images.length > 0;
+  const setHasUnsavedChanges = useCreateListingDraftGuardStore((state) => state.setHasUnsavedChanges);
+  const setResetDraft = useCreateListingDraftGuardStore((state) => state.setResetDraft);
 
-  const onOpenAddressSearch = () => {
-    setAddressSearchError(null);
-    setShowAddressSearch(true);
-  };
+  useEffect(() => {
+    setHasUnsavedChanges(hasUnsavedChanges);
 
-  const onSearchAddress = async () => {
-    const q = addressQuery.trim();
-    if (!q) return;
-    setIsSearchingAddress(true);
-    setAddressSearchError(null);
-    try {
-      const canGeocode = await ensureGeocodingPermission();
-      if (!canGeocode) {
-        setAddressSearchError("Location permission is required to search addresses on Android.");
-        return;
-      }
+    return () => {
+      setHasUnsavedChanges(false);
+    };
+  }, [hasUnsavedChanges, setHasUnsavedChanges]);
 
-      const results = await Location.geocodeAsync(q);
-      if (results.length === 0) {
-        setAddressSearchError("No location found. Try a more specific address.");
-        return;
-      }
-      const { latitude, longitude } = results[0];
-      // setManualCoordinates also reverse-geocodes and fills locationName
-      void form.actions.setManualCoordinates(latitude, longitude);
-      setShowAddressSearch(false);
-      setAddressQuery("");
-    } catch (error) {
-      setAddressSearchError(
-        error instanceof Error && error.message
-          ? error.message
-          : "Search failed. Check your internet connection.",
-      );
-    } finally {
-      setIsSearchingAddress(false);
-    }
-  };
+  useEffect(() => {
+    setResetDraft(() => form.actions.resetDraft);
+
+    return () => {
+      setResetDraft(null);
+    };
+  }, [form.actions.resetDraft, setResetDraft]);
+
+  useUnsavedChangesPrompt({
+    enabled: hasUnsavedChanges && !form.state.isSubmitting,
+    title: "Discard draft?",
+    message: "You have unsaved listing details. Keep editing or discard them?",
+    keepEditingLabel: "Keep editing",
+    discardLabel: "Discard",
+    onDiscard: form.actions.resetDraft,
+  });
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
@@ -90,38 +85,24 @@ export default function CreateListingScreen() {
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Input
-            label="Title"
-            placeholder="e.g., Mountain bike in good condition"
-            value={form.state.title}
-            onChangeText={form.actions.setTitle}
-            error={form.state.fieldErrors.title ?? null}
+          <ListingTextFields
+            title={form.state.title}
+            description={form.state.description}
+            titleError={form.state.fieldErrors.title ?? null}
+            descriptionError={form.state.fieldErrors.description ?? null}
+            onTitleChange={form.actions.setTitle}
+            onDescriptionChange={form.actions.setDescription}
           />
 
-          <Input
-            label="Description"
-            placeholder="Add details about condition, usage, and expectations."
-            value={form.state.description}
-            onChangeText={form.actions.setDescription}
-            error={form.state.fieldErrors.description ?? null}
+          <ListingLocationSection
+            locationName={form.state.locationName}
+            locationWarning={form.state.locationWarning}
+            fieldError={form.state.fieldErrors.locationName ?? null}
+            hasAttachedLocation={hasAttachedLocation}
+            isLocating={form.state.isLocating}
+            onAttachCurrentLocation={form.actions.attachCurrentLocation}
+            onClearLocation={form.actions.clearManualCoordinates}
           />
-
-          <View style={[styles.locationModeBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Location</Text>
-
-            {form.state.locationName ? (
-              <Text style={[styles.locationHintStrong, { color: theme.colors.textPrimary }]}>{form.state.locationName}</Text>
-            ) : null}
-
-            {/* Auto picker is temporarily disabled until location flow is stabilized. */}
-            <Text style={[styles.locationHint, { color: theme.colors.textMuted }]}>Auto picker is temporarily disabled.</Text>
-
-            <Button
-              label={hasManualPick ? "Update manual location" : "Search location by address"}
-              variant="ghost"
-              onPress={onOpenAddressSearch}
-            />
-          </View>
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -232,55 +213,6 @@ export default function CreateListingScreen() {
       </KeyboardAwareScrollView>
 
       <Modal
-        visible={showAddressSearch}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddressSearch(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Set location manually</Text>
-            <Text style={[styles.modalHint, { color: theme.colors.textMuted }]}>
-              Type a city, area, or full address. We'll look up its coordinates automatically.
-            </Text>
-
-            <Input
-              label=""
-              placeholder="e.g., Sector 21, Noida"
-              value={addressQuery}
-              onChangeText={setAddressQuery}
-            />
-
-            {addressSearchError ? (
-              <Text style={styles.errorText}>{addressSearchError}</Text>
-            ) : null}
-
-            <View style={styles.modalActions}>
-              <View style={styles.modalActionCell}>
-                <Button
-                  label="Cancel"
-                  variant="ghost"
-                  onPress={() => {
-                    setShowAddressSearch(false);
-                    setAddressQuery("");
-                    setAddressSearchError(null);
-                  }}
-                />
-              </View>
-              <View style={styles.modalActionCell}>
-                <Button
-                  label="Find location"
-                  loading={isSearchingAddress}
-                  onPress={() => void onSearchAddress()}
-                  disabled={!addressQuery.trim()}
-                />
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
         visible={Boolean(previewImageUri)}
         transparent
         animationType="fade"
@@ -383,18 +315,8 @@ const styles = StyleSheet.create({
   },
   switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   switchLabel: { fontSize: 14, fontWeight: "500" },
-  locationModeBlock: {
-    marginTop: 2,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  locationModeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  locationHint: { fontSize: 12 },
-  locationHintStrong: { fontSize: 12, fontWeight: "600" },
   actions: { gap: 10, marginTop: 6 },
-  errorText: { fontSize: 13 },
+  errorText: { fontSize: 13, color: "#dc2626" },
   imageBlock: { gap: 6 },
   imageHint: { fontSize: 12 },
   imagePreviewList: { gap: 10, paddingVertical: 6 },
@@ -438,20 +360,4 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 14,
-    gap: 10,
-    maxHeight: "86%",
-  },
-  modalTitle: { fontSize: 18, fontWeight: "800" },
-  modalHint: { fontSize: 13 },
-  modalActions: { flexDirection: "row", gap: 8 },
-  modalActionCell: { flex: 1 },
 });

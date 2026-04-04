@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { CreateProductInput } from "@barter/types";
 import {
@@ -13,11 +12,12 @@ import {
   useCreateProductMutation,
   toErrorMessage,
 } from "@/hooks/mutations/useCreateProductMutation";
-import { reverseGeocodeCoords } from "@/hooks/useDeviceLocation";
+import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
 import {
   toUploadErrorMessage,
   uploadImageAssetToPresignedUrl,
 } from "@/lib/uploads/presignedImageUpload";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 interface UseCreateListingFormOptions {
   returnToProductId?: string;
@@ -26,6 +26,8 @@ interface UseCreateListingFormOptions {
 export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const router = useRouter();
   const createMutation = useCreateProductMutation();
+  const { requestLocation } = useDeviceLocation();
+  const dialog = useAppDialog();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -38,21 +40,55 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const [requestByMoney, setRequestByMoney] = useState(false);
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [fieldErrors, setFieldErrors] = useState<CreateListingValidationResult["fieldErrors"]>({});
+  const [locationWarning, setLocationWarning] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
-  const askImageSource = () =>
-    new Promise<"camera" | "library" | null>((resolve) => {
-      Alert.alert("Choose image source", "Select how you want to add images.", [
-        { text: "Camera", onPress: () => resolve("camera") },
-        { text: "Gallery", onPress: () => resolve("library") },
-        { text: "Cancel", style: "cancel", onPress: () => resolve(null) },
-      ]);
+  const askImageSource = async (): Promise<"camera" | "library" | null> => {
+    const action = await dialog.show({
+      title: "Choose image source",
+      message: "Select how you want to add images.",
+      actions: [
+        { key: "camera", label: "Camera" },
+        { key: "library", label: "Gallery" },
+        { key: "cancel", label: "Cancel", role: "cancel" },
+      ],
     });
+
+    if (action === "camera" || action === "library") {
+      return action;
+    }
+
+    return null;
+  };
+
+  const resetDraft = () => {
+    setTitle("");
+    setDescription("");
+    setLocationName("");
+    setUseManualLocation(false);
+    setManualLatitude(null);
+    setManualLongitude(null);
+    setCategoryId("");
+    setIsFree(false);
+    setRequestByMoney(false);
+    setImages([]);
+    setFieldErrors({});
+    setLocationWarning(null);
+    setFormError(null);
+    setIsUploadingImages(false);
+  };
 
   const submit = async () => {
     setFormError(null);
+    setLocationWarning(null);
     setFieldErrors({});
+
+    if (manualLatitude == null || manualLongitude == null) {
+      setLocationWarning("Please select your current location before publishing.");
+      return;
+    }
 
     const validation = validateCreateListingDraft({
       title,
@@ -74,8 +110,8 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     try {
       const payload: CreateProductInput = { ...validation.normalized };
 
-      // Location is optional — attach it when available
-      if (useManualLocation && manualLatitude != null && manualLongitude != null) {
+      // Location is mandatory for create listing at this stage.
+      if (manualLatitude != null && manualLongitude != null) {
         payload.latitude = manualLatitude;
         payload.longitude = manualLongitude;
         if (!payload.locationName && locationName) {
@@ -91,18 +127,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       }
 
       // Reset all fields after successful creation
-      setTitle("");
-      setDescription("");
-      setLocationName("");
-      setUseManualLocation(false);
-      setManualLatitude(null);
-      setManualLongitude(null);
-      setCategoryId("");
-      setIsFree(false);
-      setRequestByMoney(false);
-      setImages([]);
-      setFieldErrors({});
-      setFormError(null);
+      resetDraft();
 
       if (options?.returnToProductId) {
         router.replace({
@@ -116,6 +141,40 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       setFormError(toUploadErrorMessage(error, toErrorMessage));
     } finally {
       setIsUploadingImages(false);
+    }
+  };
+
+  const attachCurrentLocation = async () => {
+    setLocationWarning(null);
+    setFormError(null);
+    setIsLocating(true);
+    try {
+      const snapshot = await requestLocation({ maxAccuracyMeters: 50 });
+      if (!snapshot) {
+        setFormError("Unable to get a location accurate within 50m. Check permission, move to an open area, and refresh.");
+        return false;
+      }
+
+      setUseManualLocation(true);
+      setManualLatitude(snapshot.latitude);
+      setManualLongitude(snapshot.longitude);
+
+      if (snapshot.locationName?.trim()) {
+        setLocationName(snapshot.locationName);
+        return true;
+      }
+
+      const fallbackName = await reverseGeocodeCoords(snapshot.latitude, snapshot.longitude);
+      if (fallbackName) {
+        setLocationName(fallbackName);
+      }
+
+      return true;
+    } catch {
+      setFormError("Unable to fetch current location. Please try again.");
+      return false;
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -190,16 +249,22 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       requestByMoney,
       images,
       fieldErrors,
+      locationWarning,
       formError,
+      isLocating,
       isSubmitting: createMutation.isPending || isUploadingImages,
     },
     actions: {
       setTitle,
       setDescription,
+      attachCurrentLocation,
       setManualCoordinates,
       clearManualCoordinates: () => {
+        setLocationWarning(null);
+        setUseManualLocation(false);
         setManualLatitude(null);
         setManualLongitude(null);
+        setLocationName("");
       },
       setCategoryId,
       setIsFree,
@@ -207,23 +272,8 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       submit,
       pickImages,
       removeImageAt,
-      cancel: () => {
-        // Reset all fields before navigating back
-        setTitle("");
-        setDescription("");
-        setLocationName("");
-        setUseManualLocation(false);
-        setManualLatitude(null);
-        setManualLongitude(null);
-        setCategoryId("");
-        setIsFree(false);
-        setRequestByMoney(false);
-        setImages([]);
-        setFieldErrors({});
-        setFormError(null);
-        setIsUploadingImages(false);
-        router.back();
-      },
+      resetDraft,
+      cancel: () => router.back(),
     },
   };
 }

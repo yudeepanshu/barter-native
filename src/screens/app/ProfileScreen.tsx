@@ -1,5 +1,4 @@
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -35,6 +34,7 @@ import type { ThemePreference } from "@/theme/appTheme";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AppCard } from "@/components/ui/AppCard";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const THEME_OPTIONS: { label: string; value: ThemePreference }[] = [
   { label: "Light", value: "light" },
@@ -49,6 +49,8 @@ function normalizePhone(value: string) {
   return value.replace(/\s+/g, "").trim();
 }
 
+type ProfilePicturePickMode = "deferred" | "direct";
+
 export default function ProfileScreen() {
   const status = useAuthStatus();
   const session = useSession();
@@ -56,6 +58,7 @@ export default function ProfileScreen() {
   const { signOut, busy } = useOtpAuth();
   const updateProfileMutation = useUpdateProfileMutation();
   const { theme, statusBarStyle, preference, resolvedMode, setPreference } = useAppTheme();
+  const dialog = useAppDialog();
   const user = profileQuery.data ?? session?.user ?? null;
 
   const [userName, setUserName] = useState("");
@@ -146,18 +149,7 @@ export default function ProfileScreen() {
         setIsUploadingPhoto(true);
         const fileName =
           pendingProfileFileName ?? pendingProfileAsset.fileName ?? `profile-${Date.now()}.jpg`;
-        const uploadEnvelope = await mobileApiClient.generateProfilePictureUploadUrl(fileName);
-        const upload = uploadEnvelope.data;
-        if (!upload) {
-          throw new Error("Could not generate upload URL");
-        }
-
-        await uploadImageAssetToPresignedUrl({
-          asset: pendingProfileAsset,
-          signedUrl: upload.signedUrl,
-          fileName,
-        });
-        nextProfilePicture = upload.publicUrl;
+        nextProfilePicture = await uploadProfilePictureAsset(pendingProfileAsset, fileName);
       }
 
       await updateProfileMutation.mutateAsync({
@@ -177,17 +169,40 @@ export default function ProfileScreen() {
     }
   };
 
-  const onSelectProfilePicture = async () => {
+  const uploadProfilePictureAsset = async (
+    asset: ImagePickerAsset,
+    fileName: string,
+  ) => {
+    const uploadEnvelope = await mobileApiClient.generateProfilePictureUploadUrl(fileName);
+    const upload = uploadEnvelope.data;
+    if (!upload) {
+      throw new Error("Could not generate upload URL");
+    }
+
+    await uploadImageAssetToPresignedUrl({
+      asset,
+      signedUrl: upload.signedUrl,
+      fileName,
+    });
+
+    return upload.publicUrl;
+  };
+
+  const onSelectProfilePicture = async (mode: ProfilePicturePickMode = "deferred") => {
     setFormMessage(null);
 
     try {
-      const source = await new Promise<"camera" | "library" | null>((resolve) => {
-        Alert.alert("Choose profile photo", "Select how you want to set your photo.", [
-          { text: "Camera", onPress: () => resolve("camera") },
-          { text: "Gallery", onPress: () => resolve("library") },
-          { text: "Cancel", style: "cancel", onPress: () => resolve(null) },
-        ]);
+      const sourceAction = await dialog.show({
+        title: "Choose profile photo",
+        message: "Select how you want to set your photo.",
+        actions: [
+          { key: "camera", label: "Camera" },
+          { key: "library", label: "Gallery" },
+          { key: "cancel", label: "Cancel", role: "cancel" },
+        ],
       });
+
+      const source = sourceAction === "camera" || sourceAction === "library" ? sourceAction : null;
 
       if (!source) {
         return;
@@ -231,11 +246,27 @@ export default function ProfileScreen() {
         throw new Error("No image selected");
       }
 
+      const fileName = asset.fileName ?? `profile-${Date.now()}.jpg`;
+
+      if (mode === "direct") {
+        setIsUploadingPhoto(true);
+        const profilePicture = await uploadProfilePictureAsset(asset, fileName);
+        await updateProfileMutation.mutateAsync({ profilePicture });
+        setPendingProfileAsset(null);
+        setPendingProfileFileName(null);
+        setFormMessage("Profile picture updated.");
+        return;
+      }
+
       setPendingProfileAsset(asset);
-      setPendingProfileFileName(asset.fileName ?? `profile-${Date.now()}.jpg`);
+      setPendingProfileFileName(fileName);
       setFormMessage("Photo selected. Save changes to upload it.");
     } catch (error) {
       setFormMessage(toUploadErrorMessage(error, toErrorMessage));
+    } finally {
+      if (mode === "direct") {
+        setIsUploadingPhoto(false);
+      }
     }
   };
 
@@ -298,7 +329,13 @@ export default function ProfileScreen() {
               onSignOut={() => void signOut()}
               signingOut={busy}
               onAvatarPress={() => {
+                setFormMessage(null);
                 setPreviewLoadFailed(false);
+                if (!user.profilePicture) {
+                  void onSelectProfilePicture("direct");
+                  return;
+                }
+
                 setShowPhotoPreview(true);
               }}
               onEditPress={() => {
@@ -381,18 +418,54 @@ export default function ProfileScreen() {
                 ) : null}
 
                 <View style={styles.formActions}>
-                  <Button
-                    label="Save changes"
-                    onPress={() => void onSave()}
-                    loading={updateProfileMutation.isPending}
-                    disabled={!isDirty || isUploadingPhoto}
-                  />
-                  <Button
-                    label="Reset"
-                    variant="ghost"
-                    onPress={onReset}
-                    disabled={!isDirty || updateProfileMutation.isPending || isUploadingPhoto}
-                  />
+                  <View style={styles.formActionsRow}>
+                    <Pressable
+                      onPress={() => {
+                        if (!isDirty || updateProfileMutation.isPending || isUploadingPhoto) {
+                          return;
+                        }
+                        onReset();
+                      }}
+                      disabled={!isDirty || updateProfileMutation.isPending || isUploadingPhoto}
+                      accessibilityRole="button"
+                      android_ripple={{ color: theme.mode === "dark" ? "rgba(248, 113, 113, 0.14)" : "rgba(220, 38, 38, 0.08)" }}
+                      style={({ pressed }) => [
+                        styles.formActionCell,
+                        styles.resetButton,
+                        {
+                          borderColor: theme.colors.border,
+                          backgroundColor: theme.colors.surfaceMuted,
+                          borderRadius: theme.roundness - 4,
+                          opacity:
+                            !isDirty || updateProfileMutation.isPending || isUploadingPhoto
+                              ? 0.86
+                              : pressed
+                                ? 0.94
+                                : 1,
+                          transform: [{ scale: pressed ? 0.99 : 1 }],
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.resetButtonLabel,
+                          {
+                            color: theme.colors.danger,
+                          },
+                        ]}
+                      >
+                        Reset
+                      </Text>
+                    </Pressable>
+                    <View style={styles.formActionCell}>
+                      <Button
+                        label="Update"
+                        onPress={() => void onSave()}
+                        loading={updateProfileMutation.isPending}
+                        disabled={!isDirty || isUploadingPhoto}
+                      />
+                    </View>
+                  </View>
                   <Button
                     label="Close"
                     variant="ghost"
@@ -443,7 +516,7 @@ export default function ProfileScreen() {
               <Pressable
                 onPress={() => {
                   setShowPhotoPreview(false);
-                  void onSelectProfilePicture();
+                  void onSelectProfilePicture("direct");
                 }}
                 hitSlop={8}
                 style={styles.previewImageButton}
@@ -458,9 +531,29 @@ export default function ProfileScreen() {
                 />
               </Pressable>
             ) : (
-              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Image not accessible from this URL.</Text>
+              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Profile picture not available.</Text>
             )}
-            <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Tap the image to update profile picture.</Text>
+            {user?.profilePicture && !previewLoadFailed ? (
+              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
+                Tap the image to update profile picture.
+              </Text>
+            ) : (
+              <>
+                <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
+                  Please{" "}
+                  <Text
+                    style={[styles.previewUploadText, { color: theme.colors.primary }]}
+                    onPress={() => {
+                      setShowPhotoPreview(false);
+                      void onSelectProfilePicture("direct");
+                    }}
+                  >
+                    upload
+                  </Text>{" "}
+                  a profile picture.
+                </Text>
+              </>
+            )}
             <Button label="Close" variant="ghost" onPress={() => setShowPhotoPreview(false)} />
           </View>
         </Pressable>
@@ -491,6 +584,21 @@ const styles = StyleSheet.create({
   formMessage: { fontSize: 13 },
   pendingPhotoText: { fontSize: 12 },
   formActions: { gap: 10 },
+  formActionsRow: { flexDirection: "row", gap: 10 },
+  formActionCell: { flex: 1 },
+  resetButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  resetButtonLabel: {
+    fontSize: 15.5,
+    fontWeight: "700",
+    letterSpacing: 0.25,
+  },
   previewBackdrop: {
     flex: 1,
     backgroundColor: "rgba(2, 6, 23, 0.7)",
@@ -517,4 +625,5 @@ const styles = StyleSheet.create({
     borderRadius: 110,
   },
   previewHint: { fontSize: 13, textAlign: "center" },
+  previewUploadText: { fontSize: 15, fontWeight: "700", textDecorationLine: "underline" },
 });

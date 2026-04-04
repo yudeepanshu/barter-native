@@ -1,5 +1,4 @@
 import {
-  Alert,
   ActivityIndicator,
   FlatList,
   Modal,
@@ -33,6 +32,7 @@ import {
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AppCard } from "@/components/ui/AppCard";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const PROXIMITY_OPTIONS_KM = [2, 5, 10, 25] as const;
@@ -50,8 +50,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const { lastKnown, requestLocation } = useDeviceLocation();
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
+  const dialog = useAppDialog();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
   const [freeOnly, setFreeOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [draftCategoryId, setDraftCategoryId] = useState("");
@@ -147,7 +149,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     } else {
       const snapshot = lastKnown ?? (await requestLocation());
       if (!snapshot) {
-        Alert.alert("Location required", "Enable location to use proximity filter.");
+        await dialog.alert("Location required", "Enable location to use proximity filter.");
         return;
       }
 
@@ -163,11 +165,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   };
 
   const onOpenSortPicker = () => {
-    Alert.alert("Sort by", "Choose listing order", [
-      { text: "Newest first", onPress: () => setSortBy("newest") },
-      { text: "Oldest first", onPress: () => setSortBy("oldest") },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    setShowSortModal(true);
+  };
+
+  const onSelectSort = (nextSort: SortOption) => {
+    setSortBy(nextSort);
+    setShowSortModal(false);
   };
 
   const activeFilterCount =
@@ -175,174 +178,173 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
   return (
     <>
-      <FlatList
-        data={visibleProducts}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { backgroundColor: theme.colors.background }]}
-        removeClippedSubviews
-        initialNumToRender={6}
-        maxToRenderPerBatch={8}
-        windowSize={7}
-        refreshControl={
-          <RefreshControl refreshing={products.query.isRefetching} onRefresh={products.refresh} />
-        }
-        onEndReachedThreshold={0.35}
-        onEndReached={products.loadMore}
-        ListHeaderComponent={
-          <View style={styles.listHeaderWrap}>
-            <AppCard>
-              <View style={styles.greetingRow}>
-                <View style={styles.greetingContent}>
-                  <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                    Hello, {userName}
-                  </Text>
-                  <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                    Discover high-value listings near you
-                  </Text>
-                </View>
-
-                <Pressable
-                  onPress={() => void onOpenNotificationsPanel()}
-                  style={[
-                    styles.notificationBell,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surfaceMuted,
-                    },
-                  ]}
-                >
-                  <Feather name="bell" size={18} color={theme.colors.textPrimary} />
-                  {unreadCount > 0 ? (
-                    <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}>
-                      <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}>
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-              </View>
-
-              <Input
-                label="Search listings"
-                placeholder="Try bicycle, books, guitar..."
-                value={filterState.search}
-                onChangeText={filterState.setSearch}
-              />
-              {filterState.isSearchDebouncing ? (
-                <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
-              ) : null}
-
-              <View style={styles.controlsWrap}>
-                <Pressable
-                  onPress={onOpenFilters}
-                  style={[
-                    styles.controlButton,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surface,
-                    },
-                  ]}
-                >
-                  <Feather name="sliders" size={15} color={theme.colors.textSecondary} />
-                  <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Filters</Text>
-                  {activeFilterCount > 0 ? (
-                    <View style={[styles.activeCountPill, { backgroundColor: theme.colors.primary }]}> 
-                      <Text style={[styles.activeCountText, { color: theme.colors.onPrimary }]}> 
-                        {activeFilterCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-
-                <Pressable
-                  onPress={onOpenSortPicker}
-                  style={[
-                    styles.controlButton,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surface,
-                    },
-                  ]}
-                >
-                  <Feather name="repeat" size={15} color={theme.colors.textSecondary} />
-                  <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Sort</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setFreeOnly((current) => !current)}
-                  style={[
-                    styles.controlButton,
-                    {
-                      borderColor: freeOnly ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: freeOnly ? theme.colors.chipActiveBg : theme.colors.surface,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name="gift"
-                    size={15}
-                    color={freeOnly ? theme.colors.chipActiveText : theme.colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.controlButtonText,
-                      { color: freeOnly ? theme.colors.chipActiveText : theme.colors.textPrimary },
-                    ]}
-                  >
-                    Free
-                  </Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.listSummaryRow}>
-                <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
-                  Showing {visibleProducts.length} listings
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.listHeaderWrap}>
+          <AppCard>
+            <View style={styles.greetingRow}>
+              <View style={styles.greetingContent}>
+                <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                  Hello, {userName}
                 </Text>
-                {filterState.proximity?.radiusKm ? (
-                  <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
-                    Within {filterState.proximity.radiusKm} km
-                  </Text>
-                ) : null}
+                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                  Discover high-value listings near you
+                </Text>
               </View>
 
-              {visibleProducts.length === 0 && !showInitialLoading && !showInitialError ? (
-                <ProductListEmptyState message="No listings found for the current filters." />
+              <Pressable
+                onPress={() => void onOpenNotificationsPanel()}
+                style={[
+                  styles.notificationBell,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceMuted,
+                  },
+                ]}
+              >
+                <Feather name="bell" size={18} color={theme.colors.textPrimary} />
+                {unreadCount > 0 ? (
+                  <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}> 
+                    <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}> 
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
+
+            <Input
+              label=""
+              placeholder="Try bicycle, books, guitar..."
+              value={filterState.search}
+              onChangeText={filterState.setSearch}
+            />
+            {filterState.isSearchDebouncing ? (
+              <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
+            ) : null}
+
+            <View style={styles.controlsWrap}>
+              <Pressable
+                onPress={onOpenFilters}
+                style={[
+                  styles.controlButton,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <Feather name="sliders" size={15} color={theme.colors.textSecondary} />
+                <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Filters</Text>
+                {activeFilterCount > 0 ? (
+                  <View style={[styles.activeCountPill, { backgroundColor: theme.colors.primary }]}> 
+                    <Text style={[styles.activeCountText, { color: theme.colors.onPrimary }]}> 
+                      {activeFilterCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+
+              <Pressable
+                onPress={onOpenSortPicker}
+                style={[
+                  styles.controlButton,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <Feather name="repeat" size={15} color={theme.colors.textSecondary} />
+                <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Sort</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setFreeOnly((current) => !current)}
+                style={[
+                  styles.controlButton,
+                  {
+                    borderColor: freeOnly ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: freeOnly ? theme.colors.chipActiveBg : theme.colors.surface,
+                  },
+                ]}
+              >
+                <Feather
+                  name="gift"
+                  size={15}
+                  color={freeOnly ? theme.colors.chipActiveText : theme.colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.controlButtonText,
+                    { color: freeOnly ? theme.colors.chipActiveText : theme.colors.textPrimary },
+                  ]}
+                >
+                  Free
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.listSummaryRow}>
+              <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
+                Showing {visibleProducts.length} listings
+              </Text>
+              {filterState.proximity?.radiusKm ? (
+                <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
+                  Within {filterState.proximity.radiusKm} km
+                </Text>
               ) : null}
-            </AppCard>
-          </View>
-        }
-        ListEmptyComponent={
-          showInitialLoading ? (
-            initialLoadTimedOut ? (
+            </View>
+          </AppCard>
+        </View>
+
+        <FlatList
+          data={visibleProducts}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          removeClippedSubviews
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          refreshControl={
+            <RefreshControl refreshing={products.query.isRefetching} onRefresh={products.refresh} />
+          }
+          onEndReachedThreshold={0.35}
+          onEndReached={products.loadMore}
+          ListEmptyComponent={
+            showInitialLoading ? (
+              initialLoadTimedOut ? (
+                <ProductListErrorState
+                  message="Loading is taking longer than expected. Check your connection and retry."
+                  onRetry={products.refresh}
+                />
+              ) : (
+                <ProductListLoadingState spinnerSize={30} />
+              )
+            ) : showInitialError ? (
               <ProductListErrorState
-                message="Loading is taking longer than expected. Check your connection and retry."
+                message="Could not load listings. Please try again."
                 onRetry={products.refresh}
               />
             ) : (
-              <ProductListLoadingState spinnerSize={30} />
+              <ProductListEmptyState message="No listings found for the current filters." />
             )
-          ) : showInitialError ? (
-            <ProductListErrorState
-              message="Could not load listings. Please try again."
-              onRetry={products.refresh}
+          }
+          ListFooterComponent={
+            products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
+          }
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              onPress={() => {
+                router.push(`/(app)/products/${item.id}`);
+              }}
+              showMeta
+              isRequested={requestedProductIds.has(item.id)}
             />
-          ) : null
-        }
-        ListFooterComponent={
-          products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
-        }
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            onPress={() => {
-              router.push(`/(app)/products/${item.id}`);
-            }}
-            showMeta
-            isRequested={requestedProductIds.has(item.id)}
-          />
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-      />
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        />
+      </View>
 
       <Modal
         visible={showFilterModal}
@@ -442,6 +444,70 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showSortModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSortModal(false)}
+      >
+        <Pressable
+          style={[styles.sortBackdrop, { backgroundColor: theme.colors.overlay }]}
+          onPress={() => setShowSortModal(false)}
+        >
+          <Pressable
+            style={[
+              styles.sortSheet,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+            onPress={() => {
+              // Keep sheet open when tapping inside.
+            }}
+          >
+            <View style={styles.notificationsHeaderRow}>
+              <Text style={[styles.notificationsTitle, { color: theme.colors.textPrimary }]}>Sort by</Text>
+              <Pressable onPress={() => setShowSortModal(false)}>
+                <Feather name="x" size={18} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[
+                styles.sortOption,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: sortBy === "newest" ? theme.colors.surfaceMuted : theme.colors.surface,
+                },
+              ]}
+              onPress={() => onSelectSort("newest")}
+            >
+              <Text style={[styles.sortOptionLabel, { color: theme.colors.textPrimary }]}>Newest first</Text>
+              {sortBy === "newest" ? (
+                <Feather name="check" size={16} color={theme.colors.primary} />
+              ) : null}
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.sortOption,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: sortBy === "oldest" ? theme.colors.surfaceMuted : theme.colors.surface,
+                },
+              ]}
+              onPress={() => onSelectSort("oldest")}
+            >
+              <Text style={[styles.sortOptionLabel, { color: theme.colors.textPrimary }]}>Oldest first</Text>
+              {sortBy === "oldest" ? (
+                <Feather name="check" size={16} color={theme.colors.primary} />
+              ) : null}
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -577,8 +643,9 @@ function CategoryChip({
 }
 
 const styles = StyleSheet.create({
-  listContent: { padding: 16, paddingBottom: 108, gap: 2 },
-  listHeaderWrap: { marginBottom: 10 },
+  container: { flex: 1 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 108, paddingTop: 2, gap: 2 },
+  listHeaderWrap: { marginBottom: 10, paddingHorizontal: 16, paddingTop: 16 },
   headerSection: {
     gap: 14,
     marginBottom: 12,
@@ -672,6 +739,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 96,
     paddingBottom: 24,
+  },
+  sortBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+    paddingTop: 24,
+  },
+  sortSheet: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    gap: 10,
+    minHeight: 220,
+  },
+  sortOption: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sortOptionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   notificationsPanel: {
     borderWidth: 1,

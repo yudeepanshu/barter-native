@@ -1,4 +1,4 @@
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -27,6 +27,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ProductCard } from "@/components/products/ProductCard";
 import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -55,6 +56,7 @@ function getOfferStatusBadgeStyle(status: string): { bg: string; text: string } 
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { theme, statusBarStyle } = useAppTheme();
+  const dialog = useAppDialog();
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = typeof params.id === "string" ? params.id : "";
 
@@ -132,10 +134,10 @@ export default function RequestDetailScreen() {
         requestId: request.id,
         payload: {},
       });
-      Alert.alert("Request sent", "Contact reveal request was sent to the other party.");
+      await dialog.alert("Request sent", "Contact reveal request was sent to the other party.");
       void requestQuery.refetch();
     } catch (error) {
-      Alert.alert("Request failed", toRequestErrorMessage(error));
+      await dialog.alert("Request failed", toRequestErrorMessage(error));
     }
   };
 
@@ -151,7 +153,7 @@ export default function RequestDetailScreen() {
         revealRequestId,
         payload: { approve },
       });
-      Alert.alert(
+      await dialog.alert(
         approve ? "Reveal approved" : "Reveal rejected",
         approve
           ? "Contact info is now revealed to the requester."
@@ -159,7 +161,7 @@ export default function RequestDetailScreen() {
       );
       void requestQuery.refetch();
     } catch (error) {
-      Alert.alert("Action failed", toRequestErrorMessage(error));
+      await dialog.alert("Action failed", toRequestErrorMessage(error));
     }
   };
 
@@ -299,14 +301,20 @@ export default function RequestDetailScreen() {
                 <Button
                   label="Request contact reveal"
                   onPress={() => {
-                    Alert.alert(
-                      "Reveal contact info",
-                      "Send a reveal request to the other party?",
-                      [
-                        { text: "Cancel", style: "cancel" },
-                        { text: "Request", onPress: () => void onRequestContactReveal() },
-                      ],
-                    );
+                    void (async () => {
+                      const shouldRequest = await dialog.confirm(
+                        "Reveal contact info",
+                        "Send a reveal request to the other party?",
+                        {
+                          confirmLabel: "Request",
+                          cancelLabel: "Cancel",
+                        },
+                      );
+
+                      if (shouldRequest) {
+                        void onRequestContactReveal();
+                      }
+                    })();
                   }}
                   loading={requestContactRevealMutation.isPending}
                 />
@@ -352,7 +360,7 @@ export default function RequestDetailScreen() {
                   label="Accept"
                   onPress={() =>
                     acceptMutation.mutateAsync(request.id).catch((error) => {
-                      Alert.alert("Error", toRequestErrorMessage(error));
+                      void dialog.alert("Error", toRequestErrorMessage(error));
                     })
                   }
                   loading={acceptMutation.isPending}
@@ -362,7 +370,7 @@ export default function RequestDetailScreen() {
                   variant="ghost"
                   onPress={() =>
                     rejectMutation.mutateAsync(request.id).catch((error) => {
-                      Alert.alert("Error", toRequestErrorMessage(error));
+                      void dialog.alert("Error", toRequestErrorMessage(error));
                     })
                   }
                   loading={rejectMutation.isPending}
@@ -377,7 +385,7 @@ export default function RequestDetailScreen() {
                   cancelMutation
                     .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
                     .catch((error) => {
-                      Alert.alert("Error", toRequestErrorMessage(error));
+                      void dialog.alert("Error", toRequestErrorMessage(error));
                     })
                 }
                 loading={cancelMutation.isPending}

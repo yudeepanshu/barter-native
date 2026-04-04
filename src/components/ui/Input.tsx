@@ -1,22 +1,26 @@
 import type { ComponentProps } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useKeyboardAwareInput } from "@/components/layout/KeyboardAwareContext";
 
 interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
-  label: string;
+  label?: string;
   error?: string | null;
   style?: ComponentProps<typeof TextInput>["style"];
 }
 
 export function Input({ label, error, style, ...rest }: InputProps) {
   const { theme } = useAppTheme();
+  const keyboardAware = useKeyboardAwareInput();
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text>
+      {label ? <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text> : null}
       <TextInput
+        ref={inputRef}
         placeholderTextColor={theme.colors.textMuted}
         style={[
           styles.input,
@@ -31,6 +35,7 @@ export function Input({ label, error, style, ...rest }: InputProps) {
         ]}
         onFocus={(event) => {
           setFocused(true);
+          keyboardAware?.notifyInputFocused(inputRef.current);
           rest.onFocus?.(event);
         }}
         onBlur={(event) => {

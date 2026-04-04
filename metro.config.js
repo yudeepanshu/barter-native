@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
@@ -25,6 +26,22 @@ config.server = {
       }
       base(req, res, next);
     };
+  },
+};
+
+// Redirect expo-router's renderRootComponent to a patched copy that adds
+// .catch(() => {}) to the _internal_preventAutoHideAsync setTimeout call,
+// preventing unhandled "ExpoKeepAwake.activate" rejections on Android hot-reload.
+config.resolver = {
+  ...config.resolver,
+  resolveRequest: (context, moduleName, platform) => {
+    if (moduleName === 'expo-router/build/renderRootComponent') {
+      return {
+        filePath: path.resolve(__dirname, 'src/patches/renderRootComponent.js'),
+        type: 'sourceFile',
+      };
+    }
+    return context.resolveRequest(context, moduleName, platform);
   },
 };
 

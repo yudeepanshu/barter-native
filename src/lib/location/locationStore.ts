@@ -5,6 +5,7 @@ export type DeviceLocationPermission = "undetermined" | "granted" | "denied";
 export interface DeviceLocationSnapshot {
   latitude: number;
   longitude: number;
+  accuracyMeters?: number;
   locationName?: string;
   capturedAt: number;
 }

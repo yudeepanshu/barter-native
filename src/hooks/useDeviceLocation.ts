@@ -8,15 +8,30 @@ import {
   type DeviceLocationSnapshot,
 } from "@/lib/location/locationStore";
 
+interface RequestLocationOptions {
+  maxAccuracyMeters?: number;
+}
+
 function buildLocationName(
-  placemark: { city?: string | null; region?: string | null; country?: string | null } | null,
+  placemark: {
+    district?: string | null;
+    subregion?: string | null;
+    city?: string | null;
+    region?: string | null;
+    name?: string | null;
+  } | null,
 ): string | undefined {
   if (!placemark) return undefined;
-  const parts = [placemark.city, placemark.region, placemark.country]
-    .map((v) => v?.trim())
-    .filter((v): v is string => Boolean(v));
-  if (parts.length === 0) return undefined;
-  return Array.from(new Set(parts)).join(", ");
+  const picked = [
+    placemark.district,
+    placemark.subregion,
+    placemark.city,
+    placemark.region,
+    placemark.name,
+  ]
+    .map((value) => value?.trim())
+    .find((value): value is string => Boolean(value));
+  return picked;
 }
 
 export async function reverseGeocodeCoords(
@@ -50,42 +65,54 @@ export async function ensureGeocodingPermission() {
   return requested.granted;
 }
 
-// Fetches the best available position.
-// Strategy: last-known (instant, no GPS warm-up) → Accuracy.Low (cell/wifi, fast) → Accuracy.Balanced.
-async function fetchPositionSnapshot(): Promise<DeviceLocationSnapshot> {
-  let coords: { latitude: number; longitude: number } | null = null;
+function hasRequiredAccuracy(
+  accuracy: number | null | undefined,
+  maxAccuracyMeters: number,
+): boolean {
+  return Number.isFinite(accuracy) && Number(accuracy) <= maxAccuracyMeters;
+}
 
-  // 1. Try last-known first (instant, zero battery cost)
+// Fetches the best available position.
+// Strategy: precise cached fix first → high-accuracy fresh fix.
+async function fetchPositionSnapshot(options?: RequestLocationOptions): Promise<DeviceLocationSnapshot> {
+  const maxAccuracyMeters = options?.maxAccuracyMeters ?? 500;
+  let coords: { latitude: number; longitude: number } | null = null;
+  let accuracyMeters: number | undefined;
+
+  // 1. Try last-known first when it already satisfies requested accuracy.
   try {
     const last = await Location.getLastKnownPositionAsync({
-      maxAge: 300_000,       // accept fixes up to 5 minutes old
-      requiredAccuracy: 500, // within 500 m is fine for listing location
+      maxAge: 120_000,
+      requiredAccuracy: maxAccuracyMeters,
     });
-    if (last) {
+    if (last && hasRequiredAccuracy(last.coords.accuracy, maxAccuracyMeters)) {
       coords = { latitude: last.coords.latitude, longitude: last.coords.longitude };
+      accuracyMeters = last.coords.accuracy ?? undefined;
     }
   } catch {
     // No cached fix available
   }
 
   if (!coords) {
-    // 2. Accuracy.Low = cell tower / WiFi positioning, fast and works indoors without GPS
+    // 2. Request a fresh high-accuracy fix.
     try {
       const current = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Low,
+        accuracy:
+          maxAccuracyMeters <= 50
+            ? Location.Accuracy.Highest
+            : Location.Accuracy.Balanced,
       });
-      coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+      if (hasRequiredAccuracy(current.coords.accuracy, maxAccuracyMeters)) {
+        coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+        accuracyMeters = current.coords.accuracy ?? undefined;
+      }
     } catch {
-      // Cell/WiFi location unavailable, fall through to GPS
+      // Leave as null and fail below.
     }
   }
 
   if (!coords) {
-    // 3. Full GPS fix as last resort
-    const current = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    coords = { latitude: current.coords.latitude, longitude: current.coords.longitude };
+    throw new Error(`Unable to get location within ${maxAccuracyMeters}m accuracy.`);
   }
 
   let locationName: string | undefined;
@@ -99,6 +126,7 @@ async function fetchPositionSnapshot(): Promise<DeviceLocationSnapshot> {
   return {
     latitude: coords.latitude,
     longitude: coords.longitude,
+    accuracyMeters,
     locationName,
     capturedAt: Date.now(),
   };
@@ -112,7 +140,7 @@ export function useDeviceLocation() {
 
   // requestForegroundPermissionsAsync is idempotent: if already granted the OS resolves
   // it instantly without showing a dialog again.
-  const requestLocation = useCallback(async () => {
+  const requestLocation = useCallback(async (options?: RequestLocationOptions) => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     const granted = status === "granted";
     setPermission(granted ? "granted" : "denied");
@@ -125,7 +153,7 @@ export function useDeviceLocation() {
     // Isolate GPS/hardware errors from the permission state — permission is fine,
     // so a position failure should NOT mark permission as denied.
     try {
-      const snapshot = await fetchPositionSnapshot();
+      const snapshot = await fetchPositionSnapshot(options);
       setLastKnown(snapshot);
       return snapshot;
     } catch {

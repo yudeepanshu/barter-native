@@ -1,13 +1,20 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { ApiClient } from "@barter/api-client";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryClient } from "@/lib/query/queryClient";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
+import { AppDialogProvider } from "@/providers/AppDialogProvider";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
+
+function isAuthBootstrapFailure(error: unknown) {
+  const apiError = ApiClient.toApiError(error);
+  return apiError.statusCode === 401 || apiError.statusCode === 403;
+}
 
 function logAuthBootstrap(
   level: "info" | "warn" | "error",
@@ -107,11 +114,24 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
             logAuthBootstrap("info", "session validated");
           }
         } catch (error) {
-          logAuthBootstrap("warn", "session validation failed, clearing session", {
-            reason: error instanceof Error ? error.message : "unknown",
-          });
+          const authFailure = isAuthBootstrapFailure(error);
+
+          logAuthBootstrap(
+            authFailure ? "warn" : "error",
+            authFailure
+              ? "session validation failed after refresh attempt, clearing session"
+              : "session validation deferred; preserving persisted session",
+            {
+              reason: error instanceof Error ? error.message : "unknown",
+            },
+          );
+
           if (!cancelled) {
-            state.clearSession();
+            if (authFailure) {
+              state.clearSession();
+            } else {
+              state.setSession(state.session);
+            }
           }
         }
       } catch (error) {
@@ -228,8 +248,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthBootstrap>
-        <PushNotificationsBootstrap />
-        {children}
+        <AppDialogProvider>
+          <PushNotificationsBootstrap />
+          {children}
+        </AppDialogProvider>
       </AuthBootstrap>
     </QueryClientProvider>
   );

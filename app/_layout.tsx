@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { Providers } from "@/providers/Providers";
 import { useAuthStatus } from "@/hooks/useSession";
 import { useAuthStore } from "@/lib/auth/authStore";
+import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 import {
   addNotificationResponseReceivedListener,
   getLastNotificationResponse,
@@ -12,6 +13,7 @@ const ROUTE_GUARD_LOADING_TIMEOUT_MS = 10000;
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const status = useAuthStatus();
+  const session = useAuthStore((state) => state.session);
   const router = useRouter();
   const segments = useSegments();
 
@@ -36,13 +38,29 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inAppGroup = segments[0] === "(app)";
+    const inCompleteProfile = inAppGroup && segments[1] === "complete-profile";
+    const mustCompleteProfile =
+      status === "authenticated" && needsProfileCompletion(session?.user.userName);
 
     if (status === "unauthenticated" && !inAuthGroup) {
       router.replace("/(auth)/login");
-    } else if (status === "authenticated" && !inAppGroup) {
+      return;
+    }
+
+    if (mustCompleteProfile && !inCompleteProfile) {
+      router.replace("/(app)/complete-profile");
+      return;
+    }
+
+    if (status === "authenticated" && !mustCompleteProfile && inCompleteProfile) {
+      router.replace("/(app)/(tabs)/home");
+      return;
+    }
+
+    if (status === "authenticated" && !inAppGroup) {
       router.replace("/(app)/(tabs)/home");
     }
-  }, [status, segments, router]);
+  }, [status, session?.user.userName, segments, router]);
 
   return <>{children}</>;
 }

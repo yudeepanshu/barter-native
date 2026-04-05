@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
 import { useAppDialog } from "@/providers/AppDialogProvider";
@@ -12,9 +13,12 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
 
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
   const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
   const dialog = useAppDialog();
+  const tabBarBottomPadding = Math.max(insets.bottom, 10);
+  const tabBarHeight = 58 + tabBarBottomPadding;
 
   return (
     <Tabs
@@ -61,9 +65,9 @@ export default function AppTabsLayout() {
           marginHorizontal: 2,
         },
         tabBarStyle: {
-          height: 68,
+          height: tabBarHeight,
           paddingTop: 8,
-          paddingBottom: 10,
+          paddingBottom: tabBarBottomPadding,
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           backgroundColor: theme.colors.backgroundElevated,

@@ -1,7 +1,6 @@
 import type { AuthUser } from "@barter/types";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface SessionCardProps {
@@ -20,8 +19,10 @@ export function SessionCard({
   onEditPress,
 }: SessionCardProps) {
   const { theme } = useAppTheme();
+  const isSigningOut = signingOut;
   const initials = user.userName.slice(0, 2).toUpperCase();
   const [imageFailed, setImageFailed] = useState(false);
+  const activeSinceLabel = useMemo(() => formatActiveSince(user.createdAt), [user.createdAt]);
 
   useEffect(() => {
     setImageFailed(false);
@@ -66,7 +67,13 @@ export function SessionCard({
         </Pressable>
         <View style={styles.nameBlock}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{user.userName}</Text>
+            <Text
+              style={[styles.name, { color: theme.colors.textPrimary }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {user.userName}
+            </Text>
             {onEditPress ? (
               <Pressable
                 style={[styles.editIconButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
@@ -77,7 +84,7 @@ export function SessionCard({
               </Pressable>
             ) : null}
           </View>
-          <Text style={[styles.subtext, { color: theme.colors.textMuted }]}>Member</Text>
+          <Text style={[styles.subtext, { color: theme.colors.textMuted }]}>{activeSinceLabel}</Text>
         </View>
       </View>
 
@@ -88,9 +95,67 @@ export function SessionCard({
         <Row label="Phone" value={user.mobileNumber ?? "—"} />
       </View>
 
-      <Button label="Sign out" variant="ghost" onPress={onSignOut} loading={signingOut} />
+      <Pressable
+        key={`signout-${theme.mode}`}
+        onPress={() => {
+          if (!isSigningOut) {
+            onSignOut();
+          }
+        }}
+        disabled={isSigningOut}
+        accessibilityRole="button"
+        android_ripple={{ color: theme.mode === "dark" ? "rgba(148, 163, 184, 0.18)" : "rgba(15, 23, 42, 0.08)" }}
+        style={({ pressed }) => [
+          styles.signOutButton,
+          {
+            borderColor: theme.colors.border,
+            borderRadius: theme.roundness - 4,
+            backgroundColor: theme.colors.surfaceMuted,
+            opacity: isSigningOut ? 0.86 : pressed ? 0.94 : 1,
+            transform: [{ scale: pressed ? 0.99 : 1 }],
+          },
+        ]}
+      >
+        {isSigningOut ? (
+          <ActivityIndicator size={18} color={theme.colors.textMuted} />
+        ) : (
+          <Text style={[styles.signOutLabel, { color: theme.colors.textPrimary }]}>Sign out</Text>
+        )}
+      </Pressable>
     </View>
   );
+}
+
+function formatActiveSince(createdAt?: string) {
+  if (!createdAt) {
+    return "Member";
+  }
+
+  const createdTime = new Date(createdAt).getTime();
+  if (Number.isNaN(createdTime)) {
+    return "Member";
+  }
+
+  const elapsedMs = Date.now() - createdTime;
+  if (elapsedMs <= 0) {
+    return "Member";
+  }
+
+  const days = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+  if (days < 1) {
+    return "Active since today";
+  }
+  if (days < 30) {
+    return `Active since ${days} day${days === 1 ? "" : "s"}`;
+  }
+
+  const months = Math.floor(days / 30);
+  if (months < 12) {
+    return `Active since ${months} month${months === 1 ? "" : "s"}`;
+  }
+
+  const years = Math.floor(days / 365);
+  return `Active since ${years} year${years === 1 ? "" : "s"}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -134,7 +199,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  name: { fontSize: 18, fontWeight: "800" },
+  name: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: "800" },
   editIconButton: {
     width: 28,
     height: 28,
@@ -153,4 +218,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
   rowLabel: { width: 56, fontSize: 13, fontWeight: "700" },
   rowValue: { flex: 1, fontSize: 14, fontWeight: "500" },
+  signOutButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  signOutLabel: {
+    fontSize: 15.5,
+    fontWeight: "700",
+    letterSpacing: 0.25,
+  },
 });

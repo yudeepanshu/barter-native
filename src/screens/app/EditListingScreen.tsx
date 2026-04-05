@@ -130,17 +130,17 @@ function EditListingFormSection({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <View style={styles.fixedTopContent}>
+        <PageHeaderCard
+          title="Edit Listing"
+          subtitle="Update your listing details."
+        />
+      </View>
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
       >
-        <PageHeaderCard
-          title="Edit Listing"
-          subtitle="Update your listing details."
-          style={styles.headerCard}
-        />
-
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <ListingTextFields
             title={form.state.title}
@@ -270,8 +270,13 @@ function EditListingFormSection({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  fixedTopContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
   keyboardWrap: { flex: 1 },
-  content: { padding: 16, paddingBottom: 110, gap: 12 },
+  content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110, gap: 12 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorCard: {
     margin: 16,
@@ -279,9 +284,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     gap: 8,
-  },
-  headerCard: {
-    marginBottom: 0,
   },
   title: { fontSize: 24, fontWeight: "800" },
   description: { fontSize: 14 },

@@ -14,6 +14,7 @@ export interface AppDialogOptions {
   title: string;
   message?: string;
   actions: AppDialogAction[];
+  showCloseButton?: boolean;
 }
 
 interface PendingDialog extends AppDialogOptions {
@@ -121,6 +122,16 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
           >
             {pendingDialog ? (
               <>
+                {pendingDialog.showCloseButton ? (
+                  <Pressable
+                    style={[styles.closeButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                    onPress={() => onClose(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close dialog"
+                  >
+                    <Text style={[styles.closeButtonLabel, { color: theme.colors.textSecondary }]}>×</Text>
+                  </Pressable>
+                ) : null}
                 <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{pendingDialog.title}</Text>
                 {pendingDialog.message ? (
                   <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{pendingDialog.message}</Text>
@@ -187,6 +198,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: {
+    paddingRight: 36,
     fontSize: 28,
     fontWeight: "800",
   },
@@ -212,6 +224,23 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 14,
+    fontWeight: "700",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  closeButtonLabel: {
+    fontSize: 20,
+    lineHeight: 22,
     fontWeight: "700",
   },
 });

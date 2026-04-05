@@ -76,16 +76,17 @@ export default function CreateListingScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <View style={styles.fixedTopContent}>
+        <PageHeaderCard
+          title="Create Listing"
+          subtitle="Share clear details so buyers can decide faster."
+        />
+      </View>
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
       >
-        <PageHeaderCard
-          title="Create Listing"
-          subtitle="Share clear details so buyers can decide faster."
-        />
-
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <ListingTextFields
             title={form.state.title}
@@ -194,7 +195,10 @@ export default function CreateListingScreen() {
                 <Text style={[styles.imagePreviewHint, { color: theme.colors.textMuted }]}>Tap an image to preview. Tap x to remove.</Text>
               </>
             ) : (
-              <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>JPEG, PNG, or WebP only.</Text>
+              <View style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+                <Feather name="image" size={16} color={theme.colors.textMuted} />
+                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>Add 1 or more images before publishing.</Text>
+              </View>
             )}
             {form.state.fieldErrors.images ? (
               <Text style={styles.errorText}>{form.state.fieldErrors.images}</Text>
@@ -245,8 +249,13 @@ export default function CreateListingScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  fixedTopContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
   keyboardWrap: { flex: 1 },
-  content: { padding: 16, paddingBottom: 110, gap: 12 },
+  content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110, gap: 12 },
   sectionCard: {
     borderWidth: 1,
     borderRadius: 16,
@@ -294,6 +303,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imagePreviewHint: { fontSize: 12 },
+  emptyImagesCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 80,
+  },
   previewBackdrop: {
     flex: 1,
     justifyContent: "center",

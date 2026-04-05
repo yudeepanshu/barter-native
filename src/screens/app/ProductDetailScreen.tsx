@@ -20,7 +20,12 @@ import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useR
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
-import { ProductMetadata, hasExchangeHistory, getInactiveExpiryWarning } from "@/components/products/ProductMetadata";
+import {
+  ProductMetadata,
+  hasExchangeHistory,
+  getInactiveExpiryWarning,
+  formatDistanceLabel,
+} from "@/components/products/ProductMetadata";
 import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
@@ -35,10 +40,19 @@ export default function ProductDetailScreen() {
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
   const { width } = useWindowDimensions();
-  const params = useLocalSearchParams<{ id?: string; offeredProductId?: string; backTo?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    offeredProductId?: string;
+    backTo?: string;
+    distanceKm?: string;
+  }>();
   const productId = typeof params.id === "string" ? params.id : "";
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
+  const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;
+  const routeDistanceLabel = Number.isFinite(routeDistanceKm)
+    ? formatDistanceLabel(routeDistanceKm)
+    : null;
   const query = useProductQuery(productId);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const productData = query.data ?? null;
@@ -101,6 +115,18 @@ export default function ProductDetailScreen() {
   const typeTag = getTopTypeTag(product);
   const contextTag = getContextTag(product, isRequested);
   const imageFrameSize = Math.max(220, Math.round(width - 68));
+  const listedOnDate = (() => {
+    const createdAtDate = new Date(product.createdAt);
+    if (Number.isNaN(createdAtDate.getTime())) {
+      return "Date unavailable";
+    }
+
+    return createdAtDate.toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  })();
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
@@ -231,7 +257,7 @@ export default function ProductDetailScreen() {
                       resizeMode="cover"
                     />
                     {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
-                    {image.isPrimary && <Text style={styles.imagePrimaryBadge}>Primary</Text>}
+                    {isOwner && image.isPrimary ? <Text style={styles.imagePrimaryBadge}>Primary</Text> : null}
                   </View>
                 ))}
               </ScrollView>
@@ -270,8 +296,24 @@ export default function ProductDetailScreen() {
               showProductType={false}
               showLocation={false}
               viewerLocation={viewerLocation}
-              fallbackDistanceLabel={viewerLocation ? null : ">100km away"}
+              fallbackDistanceLabel={viewerLocation ? null : ">100 km away"}
+              distanceOverrideLabel={routeDistanceLabel}
             />
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.listedOnCard,
+            {
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <View style={styles.listedOnRow}>
+            <Text style={[styles.listedOnLabel, { color: theme.colors.textMuted }]}>Listed on</Text>
+            <Text style={[styles.listedOnValue, { color: theme.colors.textPrimary }]}>{listedOnDate}</Text>
           </View>
         </View>
 
@@ -286,7 +328,7 @@ export default function ProductDetailScreen() {
             ]}
           >
             <Text style={[styles.activeRequestTitle, { color: theme.colors.onPrimary }]}>Your active request</Text>
-            <Text style={[styles.activeRequestStatus, { color: theme.colors.onPrimary }]}>
+            <Text style={[styles.activeRequestStatus, { color: theme.colors.onPrimary }]}> 
               Status: {activeRequest.status}
               {product.status === "INACTIVE" ? " • Product is now inactive" : ""}
             </Text>
@@ -339,7 +381,11 @@ function RequestComposer({
     () => ownAllProductsQuery.items.filter((item) => item.id !== product.id),
     [ownAllProductsQuery.items, product.id],
   );
-  const hasOwnedProductsButNoneListed = ownNonCurrentProducts.length > 0 && ownOfferableProducts.length === 0;
+  const hasInactiveOrUnlistedProducts = ownNonCurrentProducts.some(
+    (item) => item.status === "INACTIVE" || (item.status !== "REMOVED" && !item.isListed),
+  );
+  const hasOwnedProductsButNoneListed =
+    hasInactiveOrUnlistedProducts && ownOfferableProducts.length === 0;
 
   const { theme } = useAppTheme();
   const [includeMoney, setIncludeMoney] = useState(!product.isFree && product.requestByMoney);
@@ -759,6 +805,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     opacity: 0.9,
+  },
+  listedOnCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  listedOnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  listedOnLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  listedOnValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "right",
   },
   requestCard: {
     borderWidth: 1,

@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -73,9 +73,9 @@ export function ListControlsRow({
             },
           ]}
         >
-          <Feather
-            name="gift"
-            size={15}
+          <MaterialCommunityIcons
+            name="hand-heart"
+            size={16}
             color={freeOnly ? theme.colors.chipActiveText : theme.colors.textSecondary}
           />
           <Text

@@ -118,15 +118,22 @@ export default function RequestDetailScreen() {
   const revealState = request.contactReveal;
   const actorTurn = isBuyer ? "BUYER" : "SELLER";
   const isExchangeFinalized = request.product.status === "EXCHANGED";
-  const showTransactionSection = request.status === "ACCEPTED" && !isExchangeFinalized;
   const showContactRevealSection = request.status === "ACCEPTED" && request.product.status === "RESERVED";
-  const showPhone = request.contactPreference === "PHONE" || request.contactPreference === "BOTH";
   const showEmail = request.contactPreference === "EMAIL" || request.contactPreference === "BOTH";
 
   const canActByTurn = OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
   const canCancel = OPEN_STATUSES.includes(request.status);
   const activeOffer = request.offers[request.offers.length - 1];
   const tx = transactionQuery.data;
+  const isRequestCompleted =
+    request.status === "COMPLETED" ||
+    (request.status === "ACCEPTED" && (isExchangeFinalized || (!transactionQuery.isPending && !tx)));
+  const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : request.status;
+  const showTransactionSection =
+    request.status === "ACCEPTED" && !isRequestCompleted && (transactionQuery.isPending || Boolean(tx));
+  const showPhone =
+    (request.contactPreference === "PHONE" || request.contactPreference === "BOTH") &&
+    Boolean(counterparty.mobileNumber);
 
   const onRequestContactReveal = async () => {
     try {
@@ -134,7 +141,10 @@ export default function RequestDetailScreen() {
         requestId: request.id,
         payload: {},
       });
-      await dialog.alert("Request sent", "Contact reveal request was sent to the other party.");
+      await dialog.alert(
+        "Request sent",
+        "Contact reveal request was sent. If approved, both parties will be able to see each other's contact details.",
+      );
       void requestQuery.refetch();
     } catch (error) {
       await dialog.alert("Request failed", toRequestErrorMessage(error));
@@ -156,7 +166,7 @@ export default function RequestDetailScreen() {
       await dialog.alert(
         approve ? "Reveal approved" : "Reveal rejected",
         approve
-          ? "Contact info is now revealed to the requester."
+          ? "Contact info is now revealed to both parties."
           : "Reveal request was rejected.",
       );
       void requestQuery.refetch();
@@ -220,9 +230,9 @@ export default function RequestDetailScreen() {
         <View style={[styles.headerCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={3}>{request.product.title}</Text>
-            <View style={[styles.badge, { backgroundColor: getStatusBadgeStyle(request.status).bg }]}>
-              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(request.status).text }]}>
-                {request.status}
+            <View style={[styles.badge, { backgroundColor: getStatusBadgeStyle(displayStatus).bg }]}>
+              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]}>
+                {displayStatus}
               </Text>
             </View>
           </View>
@@ -276,6 +286,9 @@ export default function RequestDetailScreen() {
         {showContactRevealSection ? (
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Contact Info</Text>
+            {!revealState?.contactVisible ? (
+              <Text style={[styles.contactInfoHint, { color: theme.colors.textMuted }]}>Request approval will reveal contact details for both parties.</Text>
+            ) : null}
 
             <View style={styles.contactRow}>
               <Text style={[styles.label, { color: theme.colors.textMuted }]}>Name</Text>
@@ -285,7 +298,7 @@ export default function RequestDetailScreen() {
             {showPhone ? (
               <View style={styles.contactRow}>
                 <Text style={[styles.label, { color: theme.colors.textMuted }]}>Phone</Text>
-                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.mobileNumber ?? "Not available"}</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.mobileNumber}</Text>
               </View>
             ) : null}
 
@@ -299,12 +312,12 @@ export default function RequestDetailScreen() {
             <View style={styles.contactActionsRow}>
               {revealState?.canRequestReveal ? (
                 <Button
-                  label="Request contact reveal"
+                  label="Request contact reveal (both sides)"
                   onPress={() => {
                     void (async () => {
                       const shouldRequest = await dialog.confirm(
                         "Reveal contact info",
-                        "Send a reveal request to the other party?",
+                        "Send a reveal request? If approved, contact details will be visible to both parties.",
                         {
                           confirmLabel: "Request",
                           cancelLabel: "Cancel",
@@ -340,7 +353,7 @@ export default function RequestDetailScreen() {
             {revealState?.viewerRequestStatus === "PENDING" ? (
               <View style={styles.revealInfoRow}>
                 <Feather name="eye" size={14} color={theme.colors.textMuted} />
-                <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Reveal request pending approval.</Text>
+                <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Reveal request pending approval. Approval reveals contact details to both parties.</Text>
               </View>
             ) : null}
 
@@ -550,10 +563,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
+    paddingVertical: 2,
+  },
+  contactInfoHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 2,
+    marginBottom: 6,
   },
   contactActionsRow: {
     gap: 8,
-    marginTop: 4,
+    marginTop: 6,
   },
   contactApproveRow: {
     gap: 8,

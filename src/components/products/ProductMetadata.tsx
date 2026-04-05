@@ -13,6 +13,7 @@ interface ProductMetadataProps {
   showLocation?: boolean;
   viewerLocation?: { latitude: number; longitude: number } | null;
   fallbackDistanceLabel?: string | null;
+  distanceOverrideLabel?: string | null;
   locationLines?: number;
 }
 
@@ -20,7 +21,7 @@ function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
-function haversineDistanceKm(
+export function haversineDistanceKm(
   from: { latitude: number; longitude: number },
   to: { latitude: number; longitude: number },
 ) {
@@ -36,15 +37,18 @@ function haversineDistanceKm(
   return earthRadiusKm * c;
 }
 
-function formatDistanceLabel(distanceKm: number) {
+export function formatDistanceLabel(distanceKm: number) {
   if (!Number.isFinite(distanceKm) || distanceKm < 0) {
     return null;
   }
+  if (distanceKm < 1) {
+    return "Nearby";
+  }
   if (distanceKm > 100) {
-    return ">100km away";
+    return ">100 km away";
   }
   const kmText = distanceKm < 10 ? distanceKm.toFixed(1) : Math.round(distanceKm).toString();
-  return `${kmText}km away`;
+  return `${kmText} km away`;
 }
 
 export function getProductTypeLabel(product: ProductSummary) {
@@ -98,6 +102,7 @@ export function ProductMetadata({
   showLocation,
   viewerLocation,
   fallbackDistanceLabel = null,
+  distanceOverrideLabel = null,
   locationLines = 2,
 }: ProductMetadataProps) {
   const { theme } = useAppTheme();
@@ -105,7 +110,7 @@ export function ProductMetadata({
   const includeLocation = showLocation ?? variant === "detail";
   const location = getLocationLabel(product);
   const hasProductCoords = product.latitude != null && product.longitude != null;
-  const distanceLabel =
+  const computedDistanceLabel =
     viewerLocation && hasProductCoords
       ? formatDistanceLabel(
           haversineDistanceKm(viewerLocation, {
@@ -113,7 +118,8 @@ export function ProductMetadata({
             longitude: product.longitude as number,
           }),
         )
-      : fallbackDistanceLabel;
+      : null;
+  const distanceLabel = distanceOverrideLabel ?? computedDistanceLabel ?? fallbackDistanceLabel;
 
   const chips: Array<{
     key: string;

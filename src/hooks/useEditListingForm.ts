@@ -14,12 +14,18 @@ import {
   toErrorMessage,
   useUpdateProductMutation,
 } from "@/hooks/mutations/useUpdateProductMutation";
-import {
-  toUploadErrorMessage,
-  uploadImageAssetToPresignedUrl,
-} from "@/lib/uploads/presignedImageUpload";
+import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
 import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import {
+  askImageSource,
+  requestCameraPermission,
+  requestMediaLibraryPermission,
+  launchCamera,
+  launchImageLibrary,
+  uploadImages as uploadProductImages,
+  LISTING_FORM_ERRORS,
+} from "@/lib/forms/listingFormUtils";
 
 export function useEditListingForm(
   product: ProductSummary,
@@ -49,22 +55,47 @@ export function useEditListingForm(
   const [isLocating, setIsLocating] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
 
-  const askImageSource = async (): Promise<"camera" | "library" | null> => {
-    const action = await dialog.show({
-      title: "Choose image source",
-      message: "Select how you want to add images.",
-      actions: [
-        { key: "camera", label: "Camera" },
-        { key: "library", label: "Gallery" },
-        { key: "cancel", label: "Cancel", role: "cancel" },
-      ],
-    });
-
-    if (action === "camera" || action === "library") {
-      return action;
+  const pickImages = async () => {
+    const source = await askImageSource(dialog);
+    if (!source) {
+      return;
     }
 
-    return null;
+    const remainingSlots = CREATE_LISTING_RULES.MAX_IMAGES - (existingImages.length + newImages.length);
+    if (remainingSlots <= 0) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        images: `You can upload up to ${CREATE_LISTING_RULES.MAX_IMAGES} images`,
+      }));
+      return;
+    }
+
+    if (source === "camera") {
+      const hasPermission = await requestCameraPermission();
+      if (!hasPermission) {
+        setFormError(LISTING_FORM_ERRORS.CAMERA_PERMISSION);
+        return;
+      }
+
+      const result = await launchCamera();
+      if (!result.canceled && result.assets.length > 0) {
+        setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
+        setFieldErrors((prev) => ({ ...prev, images: undefined }));
+      }
+      return;
+    }
+
+    const hasPermission = await requestMediaLibraryPermission();
+    if (!hasPermission) {
+      setFormError(LISTING_FORM_ERRORS.MEDIA_PERMISSION);
+      return;
+    }
+
+    const result = await launchImageLibrary(remainingSlots);
+    if (!result.canceled) {
+      setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
+      setFieldErrors((prev) => ({ ...prev, images: undefined }));
+    }
   };
 
   const submit = async () => {
@@ -132,7 +163,11 @@ export function useEditListingForm(
         }
 
         if (newImages.length > 0) {
-          await uploadImages(product.id, newImages, existingImages.length > 0);
+          await uploadProductImages(
+            product.id,
+            newImages,
+            (index) => !existingImages.length && index === 0,
+          );
         }
       }
 
@@ -148,59 +183,6 @@ export function useEditListingForm(
       setFormError(toUploadErrorMessage(error, toErrorMessage));
     } finally {
       setIsUploadingImages(false);
-    }
-  };
-
-  const pickImages = async () => {
-    const source = await askImageSource();
-    if (!source) {
-      return;
-    }
-
-    const remainingSlots = CREATE_LISTING_RULES.MAX_IMAGES - (existingImages.length + newImages.length);
-    if (remainingSlots <= 0) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        images: `You can upload up to ${CREATE_LISTING_RULES.MAX_IMAGES} images`,
-      }));
-      return;
-    }
-
-    if (source === "camera") {
-      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!cameraPermission.granted) {
-        setFormError("Camera permission is required to capture photos.");
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ["images"],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets.length > 0) {
-        setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
-        setFieldErrors((prev) => ({ ...prev, images: undefined }));
-      }
-      return;
-    }
-
-    const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!mediaPermission.granted) {
-      setFormError("Media library permission is required to choose images.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsMultipleSelection: true,
-      selectionLimit: remainingSlots,
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
-      setFieldErrors((prev) => ({ ...prev, images: undefined }));
     }
   };
 
@@ -220,7 +202,7 @@ export function useEditListingForm(
     try {
       const snapshot = await requestLocation({ maxAccuracyMeters: 50 });
       if (!snapshot) {
-        setFormError("Unable to get a location accurate within 50m. Check permission, move to an open area, and refresh.");
+        setFormError(LISTING_FORM_ERRORS.LOCATION_ACCURACY);
         return false;
       }
 
@@ -241,7 +223,7 @@ export function useEditListingForm(
 
       return true;
     } catch {
-      setFormError("Unable to fetch current location. Please try again.");
+      setFormError(LISTING_FORM_ERRORS.LOCATION_FETCH);
       return false;
     } finally {
       setIsLocating(false);
@@ -292,46 +274,6 @@ export function useEditListingForm(
       cancel: () => router.back(),
     },
   };
-}
-
-async function uploadImages(
-  productId: string,
-  assets: ImagePicker.ImagePickerAsset[],
-  hasExistingImages: boolean,
-) {
-  const limitedImages = assets.slice(0, CREATE_LISTING_RULES.MAX_IMAGES);
-  const fileNames = limitedImages.map(
-    (asset, index) => asset.fileName ?? `mobile-image-${index + 1}.jpg`,
-  );
-
-  const presignedEnvelope = await mobileApiClient.generateProductImageUploadUrls(productId, fileNames);
-  const uploads = presignedEnvelope.data ?? [];
-
-  if (uploads.length !== limitedImages.length) {
-    throw new Error("Upload URL generation failed");
-  }
-
-  await Promise.all(
-    uploads.map(async (upload, index) => {
-      const asset = limitedImages[index];
-      const fileName = fileNames[index];
-
-      await uploadImageAssetToPresignedUrl({
-        asset,
-        signedUrl: upload.signedUrl,
-        fileName,
-      });
-    }),
-  );
-
-  await mobileApiClient.addProductImages(
-    productId,
-    uploads.map((upload, index) => ({
-      storageKey: upload.storageKey,
-      url: upload.publicUrl,
-      isPrimary: !hasExistingImages && index === 0,
-    })),
-  );
 }
 
 function buildUpdatePayload(

@@ -32,6 +32,7 @@ import { FilterChip } from "@/components/filters/FilterChip";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
+import { AnchoredContextMenu, type AnchoredContextMenuItem } from "@/components/ui/AnchoredContextMenu";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -75,9 +76,16 @@ export default function MyListingsScreen() {
   const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
   const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [contextMenuProductId, setContextMenuProductId] = useState<string | null>(null);
+  const [contextMenuAnchor, setContextMenuAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
   const products = useProductsListController({ ownerId: session?.user.id, limit: 20 });
   const receivedRequestsQuery = useRequestsQuery("received", { limit: 100 });
   const categories = categoriesQuery.data ?? [];
+
+  const closeContextMenu = () => {
+    setContextMenuProductId(null);
+    setContextMenuAnchor(null);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -161,6 +169,11 @@ export default function MyListingsScreen() {
     return map;
   }, [receivedRequestsQuery.data]);
 
+  const contextMenuProduct = useMemo(
+    () => filteredItems.find((item) => item.id === contextMenuProductId) ?? null,
+    [contextMenuProductId, filteredItems],
+  );
+
   const selectedFilterLabel = LISTING_FILTERS.find((item) => item.key === selectedFilter)?.label ?? "All";
   const selectedCategoryLabel =
     categories.find((category) => category.id === selectedCategoryId)?.name ?? "All";
@@ -174,6 +187,12 @@ export default function MyListingsScreen() {
     (selectedCategoryId ? 1 : 0) +
     (selectedFilter !== "ALL" ? 1 : 0) +
     (selectedTradeType !== "ALL" ? 1 : 0);
+  const showListingsEndMessage =
+    filteredItems.length > 0 &&
+    !products.query.isPending &&
+    !products.query.error &&
+    !products.query.isFetchingNextPage &&
+    !products.query.hasNextPage;
   const selectedFilterSummary = [
     selectedCategoryId ? selectedCategoryLabel : null,
     selectedFilter !== "ALL" ? selectedFilterLabel : null,
@@ -279,6 +298,51 @@ export default function MyListingsScreen() {
     })();
   };
 
+  const contextMenuItems = useMemo(() => {
+    if (!contextMenuProductId) {
+      return [];
+    }
+
+    const items: AnchoredContextMenuItem[] = [
+      {
+        key: "edit",
+        label: "Edit",
+        icon: "edit",
+        onPress: () => {
+          router.push({
+            pathname: "/(app)/listings/[id]/edit",
+            params: { id: contextMenuProductId, returnTo: "my-listings" },
+          });
+        },
+      },
+      {
+        key: "toggle-listing",
+        label: contextMenuProduct?.status === "ACTIVE" ? "Unlist" : "Relist",
+        icon: contextMenuProduct?.status === "ACTIVE" ? "eye-off" : "eye",
+        onPress: () => {
+          if (contextMenuProduct?.status === "ACTIVE") {
+            onUnlist(contextMenuProductId);
+            return;
+          }
+
+          onRelist(contextMenuProductId);
+        },
+      },
+      {
+        key: "delete",
+        label: "Delete",
+        icon: "trash-2",
+        destructive: true,
+        dividerTop: true,
+        onPress: () => {
+          onDelete(contextMenuProductId);
+        },
+      },
+    ];
+
+    return items;
+  }, [contextMenuProduct, contextMenuProductId, router]);
+
   if (!session || products.query.isPending) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
@@ -367,7 +431,13 @@ export default function MyListingsScreen() {
               />
             }
             ListFooterComponent={
-              products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
+              products.query.isFetchingNextPage ? (
+                <ProductListFooterLoadingState />
+              ) : showListingsEndMessage ? (
+                <View style={styles.endListWrap}>
+                  <Text style={[styles.endListText, { color: theme.colors.textMuted }]}>All caught up. Your listings have no secret bottom level.</Text>
+                </View>
+              ) : null
             }
             renderItem={({ item }) => {
             const openRequestCount = openRequestCountByProductId.get(item.id) ?? 0;
@@ -391,17 +461,23 @@ export default function MyListingsScreen() {
                       style={[
                         styles.editIconButton,
                         { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-                        hasExchangeHistory(item) && styles.editIconButtonBelowBadge,
                       ]}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(app)/listings/[id]/edit",
-                          params: { id: item.id, returnTo: "my-listings" },
-                        })
-                      }
+                      onPress={(event) => {
+                        const { pageX, pageY, locationX, locationY } = event.nativeEvent;
+                        const buttonLeft = pageX - locationX;
+                        const buttonTop = pageY - locationY;
+                        const buttonSize = 38;
+                        setContextMenuProductId(item.id);
+                        // Anchor at button left-bottom so menu top-right touches this point.
+                        setContextMenuAnchor({
+                          left: buttonLeft,
+                          top: buttonTop,
+                          bottom: buttonTop + buttonSize,
+                        });
+                      }}
                       hitSlop={8}
                     >
-                      <Feather name="edit-2" size={16} color={theme.colors.textPrimary} />
+                      <Feather name="more-vertical" size={16} color={theme.colors.textPrimary} />
                     </Pressable>
                   ) : null}
                 </Pressable>
@@ -412,7 +488,7 @@ export default function MyListingsScreen() {
                       styles.openRequestCard,
                       {
                         borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.surfaceMuted,
+                        backgroundColor: theme.colors.surface,
                       },
                     ]}
                   >
@@ -432,65 +508,15 @@ export default function MyListingsScreen() {
                       style={[
                         styles.openRequestViewButton,
                         {
-                          borderColor: theme.colors.primary,
-                          backgroundColor: theme.colors.primary,
+                          borderColor: "#111827",
+                          backgroundColor: "#111827",
                         },
                       ]}
                     >
-                      <Text style={[styles.openRequestViewButtonText, { color: theme.colors.onPrimary }]}>View</Text>
+                      <Text style={[styles.openRequestViewButtonText, { color: "#ffffff" }]}>View</Text>
                     </Pressable>
                   </View>
                 ) : null}
-
-                <View style={[styles.actionBar, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-                  {item.status === "ACTIVE" && (
-                    <Pressable
-                      style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
-                      onPress={() => onUnlist(item.id)}
-                      disabled={Boolean(unlistingId) && unlistingId !== item.id}
-                    >
-                      <Text style={[
-                        styles.actionBtnText,
-                        { color: theme.colors.textSecondary },
-                        unlistingId === item.id && unlistMutation.isPending && styles.actionBtnLoading,
-                      ]}>
-                        {unlistingId === item.id && unlistMutation.isPending ? "Unlisting…" : "Unlist"}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {(item.status === "EXCHANGED" || item.status === "REMOVED" || item.status === "INACTIVE") && (
-                    <Pressable
-                      style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
-                      onPress={() => onRelist(item.id)}
-                      disabled={Boolean(relistingId) && relistingId !== item.id}
-                    >
-                      <Text style={[
-                        styles.actionBtnText,
-                        { color: theme.colors.textSecondary },
-                        relistingId === item.id && relistMutation.isPending && styles.actionBtnLoading,
-                      ]}>
-                        {relistingId === item.id && relistMutation.isPending ? "Relisting…" : "Relist"}
-                      </Text>
-                    </Pressable>
-                  )}
-                  <Pressable
-                    style={[
-                      styles.actionBtn,
-                      styles.actionBtnRight,
-                      { borderRightColor: theme.colors.border },
-                    ]}
-                    onPress={() => onDelete(item.id)}
-                    disabled={Boolean(deletingId) && deletingId !== item.id}
-                  >
-                    <Text style={[
-                      styles.actionBtnText,
-                      styles.actionBtnTextDestructive,
-                      deletingId === item.id && deleteMutation.isPending && styles.actionBtnLoading,
-                    ]}>
-                      {deletingId === item.id && deleteMutation.isPending ? "Deleting…" : "Delete"}
-                    </Text>
-                  </Pressable>
-                </View>
               </View>
             );
             }}
@@ -629,6 +655,13 @@ export default function MyListingsScreen() {
         onClose={() => setShowSortModal(false)}
         onChange={setSortBy}
       />
+
+      <AnchoredContextMenu
+        visible={Boolean(contextMenuProductId && contextMenuAnchor)}
+        anchor={contextMenuAnchor}
+        onClose={closeContextMenu}
+        items={contextMenuItems}
+      />
     </SafeAreaView>
   );
 }
@@ -648,12 +681,12 @@ function ListingPreview({
         {primaryImage ? (
           <>
             <Image source={{ uri: primaryImage.url }} style={styles.image} resizeMode="cover" />
-            {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
+            {hasExchangeHistory(product) ? <ProductExchangeBadge position="left" /> : null}
           </>
         ) : (
           <View style={[styles.imageFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Text style={[styles.imageFallbackText, { color: theme.colors.textMuted }]}>No image available</Text>
-            {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
+            {hasExchangeHistory(product) ? <ProductExchangeBadge position="left" /> : null}
           </View>
         )}
       </View>
@@ -682,10 +715,6 @@ function ListingPreview({
             </Text>
           </View>
         </View>
-
-        <Text style={[styles.previewDesc, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-          {product.description || "No description added yet."}
-        </Text>
 
         <View style={styles.previewTagsWrap}>
           <ProductMetadata
@@ -729,6 +758,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     flexShrink: 1,
+  },
+  endListWrap: {
+    alignItems: "center",
+    paddingTop: 27,
+    paddingBottom: 2,
+  },
+  endListText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   sortBackdrop: {
     flex: 1,
@@ -884,42 +922,14 @@ const styles = StyleSheet.create({
 
   editIconButton: {
     position: "absolute",
-    top: 20,
-    right: 20,
+    top: 18,
+    right: 18,
     width: 38,
     height: 38,
     borderRadius: 19,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  editIconButtonBelowBadge: {
-    // badge is top:8, ~26px tall + 8px gap = clear at top:42
-    top: 50,
-  },
-  actionBar: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRightWidth: 1,
-  },
-  actionBtnRight: {
-    borderRightWidth: 0,
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  actionBtnTextDestructive: {
-    color: "#ef4444",
-  },
-  actionBtnLoading: {
-    opacity: 0.5,
   },
   errorWrap: {
     margin: 16,

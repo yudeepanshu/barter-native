@@ -413,6 +413,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     (filterState.categoryId ? 1 : 0) +
     (filterState.proximity?.radiusKm ? 1 : 0) +
     (selectedTradeType !== "ALL" ? 1 : 0);
+  const showFeedEndMessage =
+    visibleProducts.length > 0 &&
+    !showInitialLoading &&
+    !showInitialError &&
+    !products.query.isFetchingNextPage &&
+    !products.query.hasNextPage;
 
   return (
     <>
@@ -423,7 +429,11 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               <View style={styles.greetingRow}>
                 <View style={styles.greetingContent}>
                   <View style={styles.greetingTitleRow}>
-                    <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                    <Text
+                      style={[styles.greeting, { color: theme.colors.textPrimary }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       Hello, {userName}
                     </Text>
                     <Pressable
@@ -538,18 +548,35 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             )
           }
           ListFooterComponent={
-            products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
+            products.query.isFetchingNextPage ? (
+              <ProductListFooterLoadingState />
+            ) : showFeedEndMessage ? (
+              <View style={styles.endListWrap}>
+                <Text style={[styles.endListText, { color: theme.colors.textMuted }]}>You made it to the end. No more listings hiding below.</Text>
+              </View>
+            ) : null
           }
           renderItem={({ item }) => (
             <ProductCard
               product={item}
               onPress={() => {
-                router.push(`/(app)/products/${item.id}`);
+                const distanceKm =
+                  viewerLocation && item.latitude != null && item.longitude != null
+                    ? getDistanceKm(viewerLocation, { latitude: item.latitude, longitude: item.longitude })
+                    : null;
+
+                router.push({
+                  pathname: "/(app)/products/[id]",
+                  params: {
+                    id: item.id,
+                    ...(distanceKm != null ? { distanceKm: distanceKm.toString() } : null),
+                  },
+                });
               }}
               showMeta
               isRequested={requestedProductIds.has(item.id)}
               viewerLocation={permission === "granted" ? viewerLocation : null}
-              fallbackDistanceLabel={permission === "granted" ? null : ">100km away"}
+              fallbackDistanceLabel={permission === "granted" ? null : ">100 km away"}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -891,6 +918,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    minWidth: 0,
   },
   headerToggleButton: {
     width: 30,
@@ -923,7 +951,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
-  greeting: { fontSize: 24, lineHeight: 29, fontWeight: "800" },
+  greeting: { flexShrink: 1, fontSize: 24, lineHeight: 29, fontWeight: "800" },
   subtitle: { fontSize: 14, marginTop: 3 },
   collapseContent: {
     gap: 10,
@@ -938,6 +966,15 @@ const styles = StyleSheet.create({
   },
   listSummaryText: {
     fontSize: 13,
+    fontWeight: "600",
+  },
+  endListWrap: {
+    alignItems: "center",
+    paddingTop: 27,
+    paddingBottom: 2,
+  },
+  endListText: {
+    fontSize: 12,
     fontWeight: "600",
   },
   sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 6 },

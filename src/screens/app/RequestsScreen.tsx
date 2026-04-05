@@ -25,22 +25,14 @@ import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
   useCreateCounterOfferMutation,
-  useRequestContactRevealMutation,
-  useRespondContactRevealMutation,
   useRejectRequestMutation,
   toErrorMessage as toRequestErrorMessage,
 } from "@/hooks/mutations/useRequestMutations";
-import {
-  useGenerateTransactionOtpMutation,
-  useVerifyTransactionOtpMutation,
-  toErrorMessage as toTransactionErrorMessage,
-} from "@/hooks/mutations/useTransactionMutations";
 import { useActiveTransactionQuery } from "@/hooks/queries/useActiveTransactionQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
@@ -112,8 +104,6 @@ export default function RequestsScreen() {
   const rejectMutation = useRejectRequestMutation();
   const cancelMutation = useCancelRequestMutation();
   const counterOfferMutation = useCreateCounterOfferMutation();
-  const requestContactRevealMutation = useRequestContactRevealMutation();
-  const respondContactRevealMutation = useRespondContactRevealMutation();
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
@@ -327,7 +317,7 @@ export default function RequestsScreen() {
             </ScrollView>
           ) : null}
 
-          {!isInitialLoading && activeTab === "received" ? (
+          {!isInitialLoading && !isEverythingEmpty && activeTab === "received" ? (
             <RequestSection
               title="Received"
               actorTurn="SELLER"
@@ -346,8 +336,6 @@ export default function RequestsScreen() {
               rejectMutation={rejectMutation}
               cancelMutation={cancelMutation}
               counterOfferMutation={counterOfferMutation}
-              requestContactRevealMutation={requestContactRevealMutation}
-              respondContactRevealMutation={respondContactRevealMutation}
               sessionUserId={session?.user.id ?? ""}
               ownOfferableProducts={ownOfferableProducts}
               isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
@@ -355,7 +343,7 @@ export default function RequestsScreen() {
             />
           ) : null}
 
-          {!isInitialLoading && activeTab === "sent" ? (
+          {!isInitialLoading && !isEverythingEmpty && activeTab === "sent" ? (
             <RequestSection
               title="Sent"
               actorTurn="BUYER"
@@ -374,8 +362,6 @@ export default function RequestsScreen() {
               rejectMutation={rejectMutation}
               cancelMutation={cancelMutation}
               counterOfferMutation={counterOfferMutation}
-              requestContactRevealMutation={requestContactRevealMutation}
-              respondContactRevealMutation={respondContactRevealMutation}
               sessionUserId={session?.user.id ?? ""}
               ownOfferableProducts={ownOfferableProducts}
               isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
@@ -489,8 +475,6 @@ function RequestSection({
   rejectMutation,
   cancelMutation,
   counterOfferMutation,
-  requestContactRevealMutation,
-  respondContactRevealMutation,
   sessionUserId,
   ownOfferableProducts,
 }: {
@@ -513,8 +497,6 @@ function RequestSection({
   rejectMutation: ReturnType<typeof useRejectRequestMutation>;
   cancelMutation: ReturnType<typeof useCancelRequestMutation>;
   counterOfferMutation: ReturnType<typeof useCreateCounterOfferMutation>;
-  requestContactRevealMutation: ReturnType<typeof useRequestContactRevealMutation>;
-  respondContactRevealMutation: ReturnType<typeof useRespondContactRevealMutation>;
   sessionUserId: string;
   ownOfferableProducts: ProductSummary[];
 }) {
@@ -614,8 +596,6 @@ function RequestSection({
                   rejectMutation={rejectMutation}
                   cancelMutation={cancelMutation}
                   counterOfferMutation={counterOfferMutation}
-                  requestContactRevealMutation={requestContactRevealMutation}
-                  respondContactRevealMutation={respondContactRevealMutation}
                   sessionUserId={sessionUserId}
                   ownOfferableProducts={ownOfferableProducts}
                 />
@@ -641,8 +621,6 @@ function RequestItem({
   rejectMutation,
   cancelMutation,
   counterOfferMutation,
-  requestContactRevealMutation,
-  respondContactRevealMutation,
   sessionUserId,
   ownOfferableProducts,
 }: {
@@ -653,22 +631,14 @@ function RequestItem({
   rejectMutation: ReturnType<typeof useRejectRequestMutation>;
   cancelMutation: ReturnType<typeof useCancelRequestMutation>;
   counterOfferMutation: ReturnType<typeof useCreateCounterOfferMutation>;
-  requestContactRevealMutation: ReturnType<typeof useRequestContactRevealMutation>;
-  respondContactRevealMutation: ReturnType<typeof useRespondContactRevealMutation>;
   sessionUserId: string;
   ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
-  const dialog = useAppDialog();
   const activeTransactionQuery = useActiveTransactionQuery(
     item.id,
     item.status === "ACCEPTED" && item.product.status !== "EXCHANGED",
   );
-  const generateOtpMutation = useGenerateTransactionOtpMutation();
-  const verifyOtpMutation = useVerifyTransactionOtpMutation();
-
-  const [otpInput, setOtpInput] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [txFeedback, setTxFeedback] = useState<string | null>(null);
   const [showCounterForm, setShowCounterForm] = useState(false);
   const [counterOfferType, setCounterOfferType] = useState<"PRODUCT" | "MONEY" | "MIXED" | "NONE">(
@@ -688,8 +658,13 @@ function RequestItem({
 
   const activeOffer = item.offers[item.offers.length - 1];
   const isExchangeFinalized = item.product.status === "EXCHANGED";
-  const showTransactionSection = item.status === "ACCEPTED" && !isExchangeFinalized;
-  const showContactRevealSection = item.status === "ACCEPTED" && item.product.status === "RESERVED";
+  const tx = activeTransactionQuery.data;
+  const isRequestCompleted =
+    item.status === "COMPLETED" ||
+    (item.status === "ACCEPTED" && (isExchangeFinalized || (!activeTransactionQuery.isPending && !tx)));
+  const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : item.status;
+  const showTransactionSection =
+    item.status === "ACCEPTED" && !isRequestCompleted && (activeTransactionQuery.isPending || Boolean(tx));
   const canActByTurn = !showTransactionSection && OPEN_STATUSES.includes(item.status) && item.currentTurn === actorTurn;
   const canCancel = !showTransactionSection && OPEN_STATUSES.includes(item.status);
   const canCounter =
@@ -698,13 +673,7 @@ function RequestItem({
     canActByTurn;
   const isBuyer = sessionUserId === item.buyerId;
   const isSeller = sessionUserId === item.sellerId;
-  const counterparty = isBuyer ? item.seller : item.buyer;
-  const revealState = item.contactReveal;
-  const showPhone = item.contactPreference === "PHONE" || item.contactPreference === "BOTH";
-  const showEmail = item.contactPreference === "EMAIL" || item.contactPreference === "BOTH";
-  const tx = activeTransactionQuery.data;
-  const hasInlineInputOpen =
-    showCounterForm || (isSeller && tx?.status === "IN_PROGRESS");
+  const hasInlineInputOpen = showCounterForm;
   const selectableOwnProducts = ownOfferableProducts.filter(
     (product) => product.id !== item.productId,
   );
@@ -726,39 +695,6 @@ function RequestItem({
       .mutateAsync({ requestId: item.id, reason: "Cancelled from app" })
       .catch((error) => {
         setTxFeedback(toRequestErrorMessage(error));
-      });
-  };
-
-  const onGenerateOtp = () => {
-    if (!tx) return;
-    setTxFeedback(null);
-
-    void generateOtpMutation
-      .mutateAsync(tx.id)
-      .then((result) => {
-        setGeneratedOtp(result.otp);
-        setTxFeedback(
-          `OTP generated. Expires at ${new Date(result.expiresAt).toLocaleTimeString()}.`,
-        );
-      })
-      .catch((error) => {
-        setTxFeedback(toTransactionErrorMessage(error));
-      });
-  };
-
-  const onVerifyOtp = () => {
-    if (!tx) return;
-    setTxFeedback(null);
-
-    void verifyOtpMutation
-      .mutateAsync({ transactionId: tx.id, otp: otpInput.trim() })
-      .then(() => {
-        setOtpInput("");
-        setGeneratedOtp(null);
-        setTxFeedback("OTP verified. Transaction completed.");
-      })
-      .catch((error) => {
-        setTxFeedback(toTransactionErrorMessage(error));
       });
   };
 
@@ -803,45 +739,6 @@ function RequestItem({
       });
   };
 
-  const onRequestContactReveal = () => {
-    void (async () => {
-      const shouldRequest = await dialog.confirm(
-        "Reveal contact info",
-        "Send a reveal request to the other party?",
-        {
-          confirmLabel: "Request",
-          cancelLabel: "Cancel",
-        },
-      );
-
-      if (!shouldRequest) {
-        return;
-      }
-
-      void requestContactRevealMutation
-        .mutateAsync({ requestId: item.id, payload: {} })
-        .catch((error) => {
-          setTxFeedback(toRequestErrorMessage(error));
-        });
-    })();
-  };
-
-  const onRespondContactReveal = (approve: boolean) => {
-    if (!revealState?.incomingRequestId) {
-      return;
-    }
-
-    void respondContactRevealMutation
-      .mutateAsync({
-        requestId: item.id,
-        revealRequestId: revealState.incomingRequestId,
-        payload: { approve },
-      })
-      .catch((error) => {
-        setTxFeedback(toRequestErrorMessage(error));
-      });
-  };
-
   return (
     <Pressable
       style={styles.itemCardPressable}
@@ -852,9 +749,9 @@ function RequestItem({
         <View style={styles.detailsBlock}>
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, styles.statusLabel, { color: theme.colors.textMuted }]}>Status</Text>
-            <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(item.status).bg }]}> 
-              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(item.status).text }]} numberOfLines={1}>
-                {item.status}
+            <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(displayStatus).bg }]}> 
+              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
+                {displayStatus}
               </Text>
             </View>
           </View>
@@ -878,55 +775,6 @@ function RequestItem({
           ) : null}
         </View>
         {item.message ? <Text style={[styles.messageText, { color: theme.colors.textSecondary }]}>{item.message}</Text> : null}
-
-        {showContactRevealSection ? (
-          <>
-            <View style={[styles.contactCardRow, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
-              {showPhone ? (
-                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Phone: {counterparty.mobileNumber ?? "Not available"}</Text>
-              ) : null}
-              {showEmail ? (
-                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Email: {counterparty.email ?? "Not available"}</Text>
-              ) : null}
-              {revealState?.canRequestReveal ? (
-                <Pressable
-                  style={[styles.eyeButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
-                  onPress={onRequestContactReveal}
-                >
-                  <Feather name="eye" size={14} color={theme.colors.textPrimary} />
-                </Pressable>
-              ) : null}
-            </View>
-
-            {revealState?.canApproveIncoming && revealState.incomingRequestId ? (
-              <View style={styles.actionRowSecondary}>
-                <View style={styles.actionSecondaryCell}>
-                  <Button
-                    label="Approve reveal"
-                    onPress={() => onRespondContactReveal(true)}
-                    loading={respondContactRevealMutation.isPending}
-                  />
-                </View>
-                <View style={styles.actionSecondaryCell}>
-                  <Button
-                    label="Reject reveal"
-                    variant="ghost"
-                    onPress={() => onRespondContactReveal(false)}
-                    loading={respondContactRevealMutation.isPending}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {revealState?.viewerRequestStatus === "PENDING" ? (
-              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Contact reveal request pending.</Text>
-            ) : null}
-
-            {revealState?.viewerRequestStatus === "REJECTED" ? (
-              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Your reveal request was rejected.</Text>
-            ) : null}
-          </>
-        ) : null}
 
         {/*
         <View style={styles.actions}>
@@ -1127,56 +975,6 @@ function RequestItem({
         </View>
       ) : null}
 
-      {showTransactionSection ? (
-        <View style={[styles.transactionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
-          <Text style={[styles.transactionTitle, { color: theme.colors.textPrimary }]}>Transaction</Text>
-
-          {activeTransactionQuery.isPending ? (
-            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Checking active transaction...</Text>
-          ) : null}
-
-          {activeTransactionQuery.error ? (
-            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>No active transaction found for this request.</Text>
-          ) : null}
-
-          {tx ? (
-            <>
-              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Status: {tx.status}</Text>
-
-              {isBuyer ? (
-                <Button
-                  label={tx.status === "IN_PROGRESS" ? "Regenerate OTP" : "Generate OTP"}
-                  loading={generateOtpMutation.isPending}
-                  onPress={onGenerateOtp}
-                />
-              ) : null}
-
-              {generatedOtp ? <Text style={[styles.otpText, { color: theme.colors.textPrimary }]}>OTP: {generatedOtp}</Text> : null}
-
-              {isSeller && tx.status === "IN_PROGRESS" ? (
-                <>
-                  <Input
-                    label="Verify OTP"
-                    placeholder="6 digit code"
-                    value={otpInput}
-                    onChangeText={setOtpInput}
-                    keyboardType="number-pad"
-                  />
-                  <Button
-                    label="Verify OTP"
-                    loading={verifyOtpMutation.isPending}
-                    onPress={onVerifyOtp}
-                  />
-                </>
-              ) : isSeller ? (
-                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
-              ) : null}
-            </>
-          ) : null}
-
-          {txFeedback ? <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>{txFeedback}</Text> : null}
-        </View>
-      ) : null}
       </View>
     </Pressable>
   );

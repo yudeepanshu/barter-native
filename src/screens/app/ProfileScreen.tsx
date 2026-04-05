@@ -195,10 +195,10 @@ export default function ProfileScreen() {
       const sourceAction = await dialog.show({
         title: "Choose profile photo",
         message: "Select how you want to set your photo.",
+        showCloseButton: true,
         actions: [
           { key: "camera", label: "Camera" },
           { key: "library", label: "Gallery" },
-          { key: "cancel", label: "Cancel", role: "cancel" },
         ],
       });
 

@@ -14,12 +14,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams } from "expo-router";
 import { Button } from "@/components/ui/Button";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useCreateListingForm } from "@/hooks/useCreateListingForm";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { ListingLocationSection } from "@/components/products/ListingLocationSection";
 import { ListingTextFields } from "@/components/products/ListingTextFields";
+import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { useUnsavedChangesPrompt } from "@/hooks/useUnsavedChangesPrompt";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
 
@@ -55,7 +57,7 @@ export default function CreateListingScreen() {
   }, [hasUnsavedChanges, setHasUnsavedChanges]);
 
   useEffect(() => {
-    setResetDraft(() => form.actions.resetDraft);
+    setResetDraft(form.actions.resetDraft);
 
     return () => {
       setResetDraft(null);
@@ -79,10 +81,10 @@ export default function CreateListingScreen() {
         keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.headerCard}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Create Listing</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Share clear details so buyers can decide faster.</Text>
-        </View>
+        <PageHeaderCard
+          title="Create Listing"
+          subtitle="Share clear details so buyers can decide faster."
+        />
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <ListingTextFields
@@ -113,13 +115,13 @@ export default function CreateListingScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chips}
             >
-              <CategoryChip
+              <FormCategoryChip
                 label="None"
                 active={form.state.categoryId === ""}
                 onPress={() => form.actions.setCategoryId("")}
               />
               {categories.map((category) => (
-                <CategoryChip
+                <FormCategoryChip
                   key={category.id}
                   label={category.name}
                   active={form.state.categoryId === category.id}
@@ -241,72 +243,19 @@ export default function CreateListingScreen() {
   );
 }
 
-function CategoryChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-
-  return (
-    <Pressable onPress={onPress}>
-      <Text
-        style={[
-          styles.chip,
-          {
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.surfaceMuted,
-            color: theme.colors.textSecondary,
-          },
-          active
-            ? {
-                borderColor: theme.colors.primary,
-                backgroundColor: theme.colors.primary,
-                color: theme.colors.onPrimary,
-              }
-            : undefined,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
   content: { padding: 16, paddingBottom: 110, gap: 12 },
-  headerCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    gap: 4,
-  },
-  subtitle: { fontSize: 13 },
   sectionCard: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 12,
     gap: 10,
   },
-  title: { fontSize: 24, fontWeight: "800" },
   label: { fontSize: 13, fontWeight: "600" },
   categoryBlock: { gap: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  chipActive: {},
   switchBlock: {
     borderWidth: 1,
     borderRadius: 12,

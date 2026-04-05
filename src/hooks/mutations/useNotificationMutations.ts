@@ -32,3 +32,17 @@ export function useMarkAllNotificationsReadMutation() {
     },
   });
 }
+
+export function useClearAllNotificationsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const envelope = await mobileApiClient.clearAllNotifications();
+      return envelope.data ?? null;
+    },
+    onSuccess: async () => {
+      await invalidateNotifications(queryClient);
+    },
+  });
+}

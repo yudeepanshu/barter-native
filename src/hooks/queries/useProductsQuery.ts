@@ -3,9 +3,19 @@ import type { ProductsQueryInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/queryKeys";
 
-export function useProductsQuery(filters: Omit<ProductsQueryInput, "cursor">) {
+interface UseProductsQueryOptions {
+  enabled?: boolean;
+}
+
+export function useProductsQuery(
+  filters: Omit<ProductsQueryInput, "cursor">,
+  options: UseProductsQueryOptions = {},
+) {
+  const { enabled = true } = options;
+
   return useInfiniteQuery({
     queryKey: queryKeys.products.infinite(filters),
+    enabled,
     queryFn: async ({ pageParam }) => {
       const envelope = await mobileApiClient.getProducts({
         ...filters,

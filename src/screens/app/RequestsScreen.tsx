@@ -1,4 +1,6 @@
 import {
+  FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,7 +11,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +19,8 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { ToggleChip } from "@/components/ui/ToggleChip";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
@@ -36,10 +40,48 @@ import { useProductsListController } from "@/hooks/queries/useProductsListContro
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
+const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
+
+type ProductRequestGroup = {
+  productId: string;
+  productTitle: string;
+  requests: RequestSummary[];
+  latestUpdatedAtMs: number;
+};
+
+function buildProductRequestGroups(items: RequestSummary[]) {
+  const map = new Map<string, ProductRequestGroup>();
+
+  for (const item of items) {
+    const current = map.get(item.productId);
+    const updatedAtMs = new Date(item.updatedAt).getTime();
+
+    if (!current) {
+      map.set(item.productId, {
+        productId: item.productId,
+        productTitle: item.product.title,
+        requests: [item],
+        latestUpdatedAtMs: updatedAtMs,
+      });
+      continue;
+    }
+
+    current.requests.push(item);
+    current.latestUpdatedAtMs = Math.max(current.latestUpdatedAtMs, updatedAtMs);
+  }
+
+  return Array.from(map.values())
+    .map((group) => ({
+      ...group,
+      requests: [...group.requests].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    }))
+    .sort((a, b) => b.latestUpdatedAtMs - a.latestUpdatedAtMs);
+}
 
 function getStatusBadgeStyle(status: string): { bg: string; text: string } {
   switch (status) {
@@ -55,6 +97,7 @@ function getStatusBadgeStyle(status: string): { bg: string; text: string } {
 
 export default function RequestsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string; productId?: string }>();
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
   const sentQuery = useRequestsQuery("sent", { limit: 20 });
@@ -74,9 +117,24 @@ export default function RequestsScreen() {
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const receivedGroups = useMemo(() => buildProductRequestGroups(receivedItems), [receivedItems]);
+  const sentGroups = useMemo(() => buildProductRequestGroups(sentItems), [sentItems]);
   const ownOfferableProducts = ownProducts.items;
-  const [activeTab, setActiveTab] = useState<"received" | "sent">("received");
+  const [activeTab, setActiveTab] = useState<"received" | "sent">(
+    params.tab === "sent" ? "sent" : "received",
+  );
+  const [selectedProductByTab, setSelectedProductByTab] = useState<{
+    received: string;
+    sent: string;
+  }>({
+    received: ALL_PRODUCTS_FILTER,
+    sent: ALL_PRODUCTS_FILTER,
+  });
+  const [showProductFilterModal, setShowProductFilterModal] = useState(false);
+  const [draftProductFilter, setDraftProductFilter] = useState(ALL_PRODUCTS_FILTER);
+  const [isViewTransitioning, setIsViewTransitioning] = useState(false);
   const lastNonEmptyTabOptionsRef = useRef<Array<{ value: "received" | "sent"; label: string }>>([]);
+  const lastAppliedParamKeyRef = useRef<string | null>(null);
   const hasReceivedItems = receivedItems.length > 0;
   const hasSentItems = sentItems.length > 0;
   const isInitialLoading =
@@ -133,41 +191,99 @@ export default function RequestsScreen() {
     sentItems.length === 0 &&
     receivedItems.length === 0;
 
+  const currentGroups = activeTab === "received" ? receivedGroups : sentGroups;
+  const selectedProductId = activeTab === "received" ? selectedProductByTab.received : selectedProductByTab.sent;
+  const filteredGroups = useMemo(() => {
+    if (selectedProductId === ALL_PRODUCTS_FILTER) {
+      return currentGroups;
+    }
+
+    return currentGroups.filter((group) => group.productId === selectedProductId);
+  }, [currentGroups, selectedProductId]);
+  const productFilterOptions = useMemo(
+    () => [
+      {
+        value: ALL_PRODUCTS_FILTER,
+        label: "All products",
+        count: currentGroups.reduce((sum, group) => sum + group.requests.length, 0),
+      },
+      ...currentGroups.map((group) => ({
+        value: group.productId,
+        label: group.productTitle,
+        count: group.requests.length,
+      })),
+    ],
+    [currentGroups],
+  );
+  const selectedProductLabel =
+    productFilterOptions.find((option) => option.value === selectedProductId)?.label ?? "All products";
+  const requestFilterActiveCount = selectedProductId === ALL_PRODUCTS_FILTER ? 0 : 1;
+
+  useEffect(() => {
+    const requestedProductId = typeof params.productId === "string" ? params.productId : null;
+    if (!requestedProductId) {
+      return;
+    }
+
+    const tab = params.tab === "sent" ? "sent" : "received";
+    const paramKey = `${tab}:${requestedProductId}`;
+    if (lastAppliedParamKeyRef.current === paramKey) {
+      return;
+    }
+
+    const hasRequestedProduct = (tab === "sent" ? sentGroups : receivedGroups).some(
+      (group) => group.productId === requestedProductId,
+    );
+
+    if (!hasRequestedProduct) {
+      return;
+    }
+
+    setActiveTab(tab);
+    setSelectedProductByTab((prev) => ({
+      ...prev,
+      [tab]: requestedProductId,
+    }));
+    lastAppliedParamKeyRef.current = paramKey;
+  }, [params.productId, params.tab, receivedGroups, sentGroups]);
+
+  useEffect(() => {
+    setIsViewTransitioning(true);
+    const timer = setTimeout(() => setIsViewTransitioning(false), 180);
+    return () => clearTimeout(timer);
+  }, [activeTab, selectedProductByTab.received, selectedProductByTab.sent]);
+
+  const onOpenProductFilter = () => {
+    setDraftProductFilter(selectedProductId);
+    setShowProductFilterModal(true);
+  };
+
+  const onApplyProductFilter = () => {
+    setSelectedProductByTab((prev) => ({
+      ...prev,
+      [activeTab]: draftProductFilter,
+    }));
+    setShowProductFilterModal(false);
+  };
+
+  const onRefreshAll = () => {
+    void Promise.all([
+      sentQuery.refetch(),
+      receivedQuery.refetch(),
+      ownProducts.query.refetch(),
+    ]);
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAwareScrollView
-        containerStyle={styles.keyboardWrap}
-        keyboardVerticalOffset={12}
-        contentContainerStyle={styles.content}
-        keyboardDismissMode="on-drag"
-        refreshControl={
-          <RefreshControl
-            refreshing={
-              sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching
-            }
-            onRefresh={() => {
-              void Promise.all([
-                sentQuery.refetch(),
-                receivedQuery.refetch(),
-                ownProducts.query.refetch(),
-              ]);
-            }}
-          />
-        }
-      >
-        <View style={styles.headerCard}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Requests</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Manage incoming and outgoing negotiations.</Text>
-        </View>
-
-        {isInitialLoading ? (
-          <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Spinner size={20} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
-            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>
-          </View>
-        ) : null}
+      <View style={styles.screen}>
+        <View style={styles.fixedTopContent}>
+        <PageHeaderCard
+          title="Requests"
+          subtitle="Manage incoming and outgoing negotiations."
+          style={styles.headerCard}
+        />
 
         {!isInitialLoading && stableTabOptions.length > 0 ? (
           <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
@@ -179,60 +295,176 @@ export default function RequestsScreen() {
           </View>
         ) : null}
 
-        {!isInitialLoading && isEverythingEmpty ? (
+        {isInitialLoading ? (
           <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Feather name="inbox" size={20} color={theme.colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No requests right now</Text>
-            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Once someone sends or receives an offer, it will appear here.</Text>
+            <Spinner size={20} />
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>
           </View>
         ) : null}
 
-        {!isInitialLoading && activeTab === "received" ? (
-          <RequestSection
-            title="Received"
-            actorTurn="SELLER"
-            router={router}
-            items={receivedItems}
-            isPending={receivedQuery.isPending}
-            isError={Boolean(receivedQuery.error)}
-            onRetry={() => void receivedQuery.refetch()}
-            hasNextPage={Boolean(receivedQuery.hasNextPage)}
-            loadingNext={receivedQuery.isFetchingNextPage}
-            onLoadMore={() => void receivedQuery.fetchNextPage()}
-            acceptMutation={acceptMutation}
-            rejectMutation={rejectMutation}
-            cancelMutation={cancelMutation}
-            counterOfferMutation={counterOfferMutation}
-            requestContactRevealMutation={requestContactRevealMutation}
-            respondContactRevealMutation={respondContactRevealMutation}
-            sessionUserId={session?.user.id ?? ""}
-            ownOfferableProducts={ownOfferableProducts}
-          />
-        ) : null}
+        </View>
 
-        {!isInitialLoading && activeTab === "sent" ? (
-          <RequestSection
-            title="Sent"
-            actorTurn="BUYER"
-            router={router}
-            items={sentItems}
-            isPending={sentQuery.isPending}
-            isError={Boolean(sentQuery.error)}
-            onRetry={() => void sentQuery.refetch()}
-            hasNextPage={Boolean(sentQuery.hasNextPage)}
-            loadingNext={sentQuery.isFetchingNextPage}
-            onLoadMore={() => void sentQuery.fetchNextPage()}
-            acceptMutation={acceptMutation}
-            rejectMutation={rejectMutation}
-            cancelMutation={cancelMutation}
-            counterOfferMutation={counterOfferMutation}
-            requestContactRevealMutation={requestContactRevealMutation}
-            respondContactRevealMutation={respondContactRevealMutation}
-            sessionUserId={session?.user.id ?? ""}
-            ownOfferableProducts={ownOfferableProducts}
-          />
-        ) : null}
-      </KeyboardAwareScrollView>
+        <View style={styles.scrollArea}>
+          {!isInitialLoading && isEverythingEmpty ? (
+            <ScrollView
+              contentContainerStyle={styles.scrollAreaContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={
+                    sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching
+                  }
+                  onRefresh={onRefreshAll}
+                />
+              }
+              keyboardDismissMode="on-drag"
+            >
+              <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+                <Feather name="inbox" size={20} color={theme.colors.textMuted} />
+                <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No requests right now</Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Once someone sends or receives an offer, it will appear here.</Text>
+              </View>
+            </ScrollView>
+          ) : null}
+
+          {!isInitialLoading && activeTab === "received" ? (
+            <RequestSection
+              title="Received"
+              actorTurn="SELLER"
+              router={router}
+              groups={filteredGroups}
+              isPending={receivedQuery.isPending}
+              isError={Boolean(receivedQuery.error)}
+              onRetry={() => void receivedQuery.refetch()}
+              hasNextPage={Boolean(receivedQuery.hasNextPage)}
+              loadingNext={receivedQuery.isFetchingNextPage}
+              onLoadMore={() => void receivedQuery.fetchNextPage()}
+              selectedProductLabel={selectedProductLabel}
+              activeFilterCount={requestFilterActiveCount}
+              onOpenFilter={onOpenProductFilter}
+              acceptMutation={acceptMutation}
+              rejectMutation={rejectMutation}
+              cancelMutation={cancelMutation}
+              counterOfferMutation={counterOfferMutation}
+              requestContactRevealMutation={requestContactRevealMutation}
+              respondContactRevealMutation={respondContactRevealMutation}
+              sessionUserId={session?.user.id ?? ""}
+              ownOfferableProducts={ownOfferableProducts}
+              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
+              onRefresh={onRefreshAll}
+            />
+          ) : null}
+
+          {!isInitialLoading && activeTab === "sent" ? (
+            <RequestSection
+              title="Sent"
+              actorTurn="BUYER"
+              router={router}
+              groups={filteredGroups}
+              isPending={sentQuery.isPending}
+              isError={Boolean(sentQuery.error)}
+              onRetry={() => void sentQuery.refetch()}
+              hasNextPage={Boolean(sentQuery.hasNextPage)}
+              loadingNext={sentQuery.isFetchingNextPage}
+              onLoadMore={() => void sentQuery.fetchNextPage()}
+              selectedProductLabel={selectedProductLabel}
+              activeFilterCount={requestFilterActiveCount}
+              onOpenFilter={onOpenProductFilter}
+              acceptMutation={acceptMutation}
+              rejectMutation={rejectMutation}
+              cancelMutation={cancelMutation}
+              counterOfferMutation={counterOfferMutation}
+              requestContactRevealMutation={requestContactRevealMutation}
+              respondContactRevealMutation={respondContactRevealMutation}
+              sessionUserId={session?.user.id ?? ""}
+              ownOfferableProducts={ownOfferableProducts}
+              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
+              onRefresh={onRefreshAll}
+            />
+          ) : null}
+        </View>
+
+        <Modal
+          visible={showProductFilterModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowProductFilterModal(false)}
+        >
+          <Pressable
+            style={[styles.filterModalBackdrop, { backgroundColor: theme.colors.overlay }]}
+            onPress={() => setShowProductFilterModal(false)}
+          >
+            <Pressable
+              style={[
+                styles.filterModalSheet,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                },
+              ]}
+              onPress={() => {
+                // Keep modal open when tapping inside.
+              }}
+            >
+              <View style={styles.filterModalHeaderRow}>
+                <Text style={[styles.filterModalTitle, { color: theme.colors.textPrimary }]}>Filter by product</Text>
+                <Pressable onPress={() => setShowProductFilterModal(false)}>
+                  <Feather name="x" size={18} color={theme.colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              {productFilterOptions.map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.filterOption,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor:
+                        draftProductFilter === option.value ? theme.colors.surfaceMuted : theme.colors.surface,
+                    },
+                  ]}
+                  onPress={() => setDraftProductFilter(option.value)}
+                >
+                  <Text style={[styles.filterOptionText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                    {option.label} ({option.count})
+                  </Text>
+                  {draftProductFilter === option.value ? (
+                    <Feather name="check" size={16} color={theme.colors.primary} />
+                  ) : null}
+                </Pressable>
+              ))}
+
+              <View style={styles.filterActionRow}>
+                <Pressable
+                  style={[
+                    styles.filterActionBtn,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                    },
+                  ]}
+                  onPress={() => setDraftProductFilter(ALL_PRODUCTS_FILTER)}
+                >
+                  <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.filterActionBtn,
+                    {
+                      borderColor: theme.colors.primary,
+                      backgroundColor: theme.colors.primary,
+                    },
+                  ]}
+                  onPress={onApplyProductFilter}
+                >
+                  <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
@@ -241,13 +473,18 @@ function RequestSection({
   title,
   actorTurn,
   router,
-  items,
+  groups,
   isPending,
   isError,
   onRetry,
   hasNextPage,
   loadingNext,
   onLoadMore,
+  selectedProductLabel,
+  activeFilterCount,
+  onOpenFilter,
+  isRefreshing,
+  onRefresh,
   acceptMutation,
   rejectMutation,
   cancelMutation,
@@ -260,13 +497,18 @@ function RequestSection({
   title: string;
   actorTurn: RequestTurn;
   router: ReturnType<typeof useRouter>;
-  items: RequestSummary[];
+  groups: ProductRequestGroup[];
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
   hasNextPage: boolean;
   loadingNext: boolean;
   onLoadMore: () => void;
+  selectedProductLabel: string;
+  activeFilterCount: number;
+  onOpenFilter: () => void;
+  isRefreshing: boolean;
+  onRefresh: () => void;
   acceptMutation: ReturnType<typeof useAcceptRequestMutation>;
   rejectMutation: ReturnType<typeof useRejectRequestMutation>;
   cancelMutation: ReturnType<typeof useCancelRequestMutation>;
@@ -277,11 +519,40 @@ function RequestSection({
   ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
-  const dialog = useAppDialog();
+  const flattenedRows = useMemo(() => {
+    return groups.flatMap((group, groupIndex) => [
+      {
+        kind: "header" as const,
+        key: `${group.productId}-header`,
+        group,
+        groupIndex,
+      },
+      ...group.requests.map((item) => ({
+        kind: "item" as const,
+        key: item.id,
+        item,
+      })),
+    ]);
+  }, [groups]);
+
+  const stickyHeaderIndices = useMemo(() => {
+    return flattenedRows
+      .map((row, index) => (row.kind === "header" ? index : -1))
+      .filter((index) => index !== -1);
+  }, [flattenedRows]);
 
   return (
-    <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{title}</Text>
+    <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{title}</Text>
+        <ListControlsRow
+          activeFilterCount={activeFilterCount}
+          freeOnly={false}
+          onOpenFilters={onOpenFilter}
+          showSort={false}
+          showFree={false}
+        />
+      </View>
 
       {isPending ? (
         <View style={styles.loadingWrap}>
@@ -296,34 +567,66 @@ function RequestSection({
         </View>
       ) : null}
 
-      {!isPending && !isError && items.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No requests yet.</Text>
+      {!isPending && !isError && groups.length === 0 ? (
+        <View style={[styles.emptyCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}> 
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No {title.toLowerCase()} requests for {selectedProductLabel.toLowerCase()}.</Text>
         </View>
       ) : null}
 
-      {!isPending && !isError && items.length > 0 ? (
-        <View style={styles.listWrap}>
-          {items.map((item) => (
-            <RequestItem
-              key={item.id}
-              item={item}
-              router={router}
-              actorTurn={actorTurn}
-              acceptMutation={acceptMutation}
-              rejectMutation={rejectMutation}
-              cancelMutation={cancelMutation}
-              counterOfferMutation={counterOfferMutation}
-              requestContactRevealMutation={requestContactRevealMutation}
-              respondContactRevealMutation={respondContactRevealMutation}
-              sessionUserId={sessionUserId}
-              ownOfferableProducts={ownOfferableProducts}
-            />
-          ))}
-
-          {hasNextPage ? (
-            <Button label="Load more" variant="ghost" loading={loadingNext} onPress={onLoadMore} />
-          ) : null}
+      {!isPending && !isError && groups.length > 0 ? (
+        <View style={styles.listWrapFlatlist}>
+          <FlatList<typeof flattenedRows[0]>
+            style={styles.sectionScroll}
+            contentContainerStyle={styles.sectionScrollContent}
+            data={flattenedRows}
+            keyExtractor={(item) => item.key}
+            stickyHeaderIndices={stickyHeaderIndices}
+            scrollEnabled={true}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: row }) =>
+              row.kind === "header" ? (
+                <View
+                  style={[
+                    styles.productGroupHeader,
+                    {
+                      borderBottomColor: theme.colors.border,
+                      borderTopColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    },
+                    row.groupIndex > 0 ? styles.productGroupHeaderWithTopBorder : undefined,
+                  ]}
+                >
+                  <Text style={[styles.productGroupTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                    {row.group.productTitle}
+                  </Text>
+                  <Text style={[styles.productGroupCount, { color: theme.colors.textMuted }]}>
+                    {row.group.requests.length} request(s)
+                  </Text>
+                </View>
+              ) : (
+                <RequestItem
+                  item={row.item}
+                  router={router}
+                  actorTurn={actorTurn}
+                  acceptMutation={acceptMutation}
+                  rejectMutation={rejectMutation}
+                  cancelMutation={cancelMutation}
+                  counterOfferMutation={counterOfferMutation}
+                  requestContactRevealMutation={requestContactRevealMutation}
+                  respondContactRevealMutation={respondContactRevealMutation}
+                  sessionUserId={sessionUserId}
+                  ownOfferableProducts={ownOfferableProducts}
+                />
+              )
+            }
+            ListFooterComponent={
+              hasNextPage ? (
+                <Button label="Load more" variant="ghost" loading={loadingNext} onPress={onLoadMore} />
+              ) : null
+            }
+          />
         </View>
       ) : null}
     </View>
@@ -546,27 +849,32 @@ function RequestItem({
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
       <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}> 
-        <View style={styles.itemHeader}>
-          <Text style={[styles.itemTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-            {item.product.title}
-          </Text>
-          <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(item.status).bg }]}>
-            <Text style={[styles.badgeText, { color: getStatusBadgeStyle(item.status).text }]} numberOfLines={1}>
-              {item.status}
+        <View style={styles.detailsBlock}>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, styles.statusLabel, { color: theme.colors.textMuted }]}>Status</Text>
+            <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(item.status).bg }]}> 
+              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(item.status).text }]} numberOfLines={1}>
+                {item.status}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+              {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
             </Text>
           </View>
-        </View>
-        <View style={styles.metaRow}>
-          <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>
-            {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
-          </Text>
-          <Text style={[styles.metaDot, { color: theme.colors.textMuted }]}>·</Text>
-          <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>{activeOffer?.type ?? "NONE"}</Text>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest Offer</Text>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>{activeOffer?.type ?? "NONE"}</Text>
+          </View>
           {activeOffer?.offeredAmount != null ? (
-            <>
-              <Text style={[styles.metaDot, { color: theme.colors.textMuted }]}>·</Text>
-              <Text style={[styles.metaPill, { color: theme.colors.textMuted }]}>₹{activeOffer.offeredAmount}</Text>
-            </>
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Amount</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                ₹{activeOffer.offeredAmount}
+              </Text>
+            </View>
           ) : null}
         </View>
         {item.message ? <Text style={[styles.messageText, { color: theme.colors.textSecondary }]}>{item.message}</Text> : null}
@@ -620,48 +928,104 @@ function RequestItem({
           </>
         ) : null}
 
+        {/*
         <View style={styles.actions}>
-          {canActByTurn ? (
-            <View style={styles.actionRow}>
-              <View style={styles.actionCell}>
-                <Button label="Accept" loading={acceptMutation.isPending} onPress={onAccept} />
-              </View>
-              <View style={styles.actionCell}>
-                <Button
-                  label="Decline offer"
-                  variant="ghost"
-                  loading={rejectMutation.isPending}
-                  onPress={onReject}
-                />
-              </View>
-            </View>
-          ) : null}
+          <View style={styles.actionPillRow}>
+            {canActByTurn ? (
+              <Pressable
+                onPress={onAccept}
+                disabled={acceptMutation.isPending}
+                style={[
+                  styles.actionPill,
+                  {
+                    borderColor: "#86efac",
+                    backgroundColor: "#f0fdf4",
+                  },
+                  acceptMutation.isPending ? styles.actionPillDisabled : null,
+                ]}
+              >
+                {acceptMutation.isPending ? (
+                  <Spinner size={12} />
+                ) : (
+                  <Feather name="check" size={14} color="#166534" />
+                )}
+                <Text style={[styles.actionPillText, { color: "#166534" }]}>Accept</Text>
+              </Pressable>
+            ) : null}
 
-          {canCounter ? (
-            <View style={styles.actionRowSecondary}>
-              <View style={styles.actionSecondaryCell}>
-                <Button
-                  label={showCounterForm ? "Hide counter" : "Counter offer"}
-                  variant="ghost"
-                  onPress={() => setShowCounterForm((prev) => !prev)}
-                />
-              </View>
-            </View>
-          ) : null}
+            {canActByTurn ? (
+              <Pressable
+                onPress={onReject}
+                disabled={rejectMutation.isPending}
+                style={[
+                  styles.actionPill,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceMuted,
+                  },
+                  rejectMutation.isPending ? styles.actionPillDisabled : null,
+                ]}
+              >
+                {rejectMutation.isPending ? (
+                  <Spinner size={12} />
+                ) : (
+                  <Feather name="x" size={14} color={theme.colors.textSecondary} />
+                )}
+                <Text style={[styles.actionPillText, { color: theme.colors.textPrimary }]}>Decline</Text>
+              </Pressable>
+            ) : null}
 
-          {canCancel ? (
-            <View style={styles.actionRowTertiary}>
-              <View style={styles.actionSecondaryCell}>
-                <Button
-                  label="Cancel request"
-                  variant="ghost"
-                  loading={cancelMutation.isPending}
-                  onPress={onCancel}
+            {canCounter ? (
+              <Pressable
+                onPress={() => setShowCounterForm((prev) => !prev)}
+                style={[
+                  styles.actionPill,
+                  {
+                    borderColor: showCounterForm ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: showCounterForm ? theme.colors.surfaceMuted : theme.colors.surfaceMuted,
+                  },
+                ]}
+              >
+                <Feather
+                  name={showCounterForm ? "chevron-up" : "repeat"}
+                  size={14}
+                  color={showCounterForm ? theme.colors.primary : theme.colors.textSecondary}
                 />
-              </View>
-            </View>
-          ) : null}
+                <Text
+                  style={[
+                    styles.actionPillText,
+                    { color: showCounterForm ? theme.colors.primary : theme.colors.textPrimary },
+                  ]}
+                >
+                  {showCounterForm ? "Hide" : "Counter"}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {canCancel ? (
+              <Pressable
+                onPress={onCancel}
+                disabled={cancelMutation.isPending}
+                style={[
+                  styles.actionPill,
+                  {
+                    borderColor: "#fecaca",
+                    backgroundColor: "#fff7f7",
+                  },
+                  cancelMutation.isPending ? styles.actionPillDisabled : null,
+                ]}
+              >
+                {cancelMutation.isPending ? (
+                  <Spinner size={12} />
+                ) : (
+                  <Feather name="slash" size={14} color="#dc2626" />
+                )}
+                <Text style={[styles.actionPillText, { color: "#b91c1c" }]}>Cancel</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
+        */}
 
       {showCounterForm && canCounter ? (
         <View style={[styles.counterCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
@@ -820,20 +1184,18 @@ function RequestItem({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  keyboardWrap: { flex: 1 },
-  content: { padding: 16, paddingBottom: 36, gap: 12 },
+  screen: { flex: 1, padding: 16, paddingBottom: 16, gap: 12 },
+  fixedTopContent: { gap: 10 },
+  scrollArea: { flex: 1, minHeight: 0 },
+  scrollAreaContent: { flexGrow: 1, paddingBottom: 20 },
   headerCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 6,
+    marginBottom: 0,
   },
-  title: { fontSize: 24, fontWeight: "800" },
-  subtitle: { fontSize: 14 },
   tabsCard: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 10,
+    gap: 10,
   },
   emptyCardGlobal: {
     borderWidth: 1,
@@ -844,12 +1206,21 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 15, fontWeight: "700" },
   sectionCard: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
     gap: 10,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   sectionTitle: { fontSize: 17, fontWeight: "700" },
+  sectionScroll: { flex: 1 },
+  sectionScrollContent: { paddingBottom: 24, gap: 8 },
   loadingWrap: { paddingVertical: 6 },
   errorCard: {
     borderWidth: 1,
@@ -867,17 +1238,71 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 13, textAlign: "center" },
   listWrap: { gap: 8 },
+  listWrapFlatlist: { flex: 1, minHeight: 0 },
+  groupList: {
+    gap: 8,
+  },
+  groupScrollContent: {
+    gap: 8,
+  },
+  productGroupHeader: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  productGroupHeaderWithTopBorder: {
+    // Gap is handled by FlatList contentContainerStyle
+  },
+  productGroupTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  productGroupCount: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
   itemCard: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    gap: 6,
+    gap: 8,
   },
   itemCardPressable: {
     opacity: 1,
   },
   itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
   itemTitle: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: "700" },
+  detailsBlock: {
+    gap: 7,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    width: 90,
+  },
+  statusLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+  },
   badgeWrap: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -911,6 +1336,27 @@ const styles = StyleSheet.create({
   },
   messageText: { marginTop: 2, fontSize: 13, fontStyle: "italic" },
   actions: { marginTop: 8, gap: 8 },
+  actionPillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  actionPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  actionPillDisabled: {
+    opacity: 0.6,
+  },
   actionRow: {
     flexDirection: "row",
     flexWrap: "nowrap",
@@ -964,4 +1410,59 @@ const styles = StyleSheet.create({
   },
   transactionTitle: { fontSize: 13, fontWeight: "700" },
   otpText: { fontSize: 15, fontWeight: "700" },
+  filterModalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  filterModalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 22,
+    gap: 10,
+  },
+  filterModalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  filterOption: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  filterOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  filterActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  filterActionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterActionText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
 });

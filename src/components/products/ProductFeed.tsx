@@ -8,8 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
 import type { NotificationSummary, RequestStatus } from "@barter/types";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
@@ -17,6 +18,7 @@ import { useProductsListController } from "@/hooks/queries/useProductsListContro
 import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
+  useClearAllNotificationsMutation,
 } from "@/hooks/mutations/useNotificationMutations";
 import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
@@ -32,39 +34,89 @@ import {
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AppCard } from "@/components/ui/AppCard";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { FilterChip } from "@/components/filters/FilterChip";
+import { ListControlsRow } from "@/components/filters/ListControlsRow";
+import { RangeSlider } from "../filters/RangeSlider";
+import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
-const PROXIMITY_OPTIONS_KM = [2, 5, 10, 25] as const;
+const MIN_PROXIMITY_KM = 2;
+const MAX_PROXIMITY_KM = 100;
+const DEFAULT_NEAREST_RADIUS_KM = 10;
+const LOCATION_RECALCULATE_THRESHOLD_KM = 5;
 
-type SortOption = "newest" | "oldest";
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function getDistanceKm(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+) {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLng = toRadians(to.longitude - from.longitude);
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
 
 interface ProductFeedProps {
   userId: string;
   userName: string;
 }
 
+type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
+
 export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { lastKnown, requestLocation } = useDeviceLocation();
+  const { permission, lastKnown, requestLocation } = useDeviceLocation();
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
   const dialog = useAppDialog();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
   const [freeOnly, setFreeOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [sortBy, setSortBy] = useState<SortOrder>("newest");
+  const [isDiscoveryReady, setIsDiscoveryReady] = useState(false);
+  const [showHeaderFilters, setShowHeaderFilters] = useState(true);
   const [draftCategoryId, setDraftCategoryId] = useState("");
   const [draftRadiusKm, setDraftRadiusKm] = useState<number | null>(null);
+  const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
+  const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
+  const [viewerLocation, setViewerLocation] = useState<{ latitude: number; longitude: number } | null>(
+    lastKnown
+      ? {
+          latitude: lastKnown.latitude,
+          longitude: lastKnown.longitude,
+        }
+      : null,
+  );
+  const lastRecalcLocationRef = useRef<{ latitude: number; longitude: number } | null>(
+    lastKnown
+      ? {
+          latitude: lastKnown.latitude,
+          longitude: lastKnown.longitude,
+        }
+      : null,
+  );
 
   const categoriesQuery = useCategoriesQuery();
-  const products = useProductsListController(filterState.filters);
+  const products = useProductsListController(filterState.filters, { enabled: isDiscoveryReady });
   const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
   const notificationsQuery = useNotificationsQuery({ limit: 20 });
   const markNotificationReadMutation = useMarkNotificationReadMutation();
   const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
+  const clearAllNotificationsMutation = useClearAllNotificationsMutation();
 
   const categories = categoriesQuery.data ?? [];
   const notifications = useMemo(
@@ -81,18 +133,162 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     );
   }, [sentRequestsQuery.data]);
 
-  const showInitialLoading = products.query.isPending && products.items.length === 0;
+  const showInitialLoading = !isDiscoveryReady || (products.query.isPending && products.items.length === 0);
   const showInitialError = Boolean(products.query.error) && products.items.length === 0;
 
   const visibleProducts = useMemo(() => {
-    const next = freeOnly ? products.items.filter((item) => item.isFree) : [...products.items];
+    const next = products.items.filter((item) => {
+      if (freeOnly && !item.isFree) {
+        return false;
+      }
+
+      if (selectedTradeType === "OPEN_FOR_MONEY" && !item.requestByMoney) {
+        return false;
+      }
+
+      if (selectedTradeType === "BARTER_ONLY" && (item.requestByMoney || item.isFree)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (sortBy === "nearest" && viewerLocation) {
+      next.sort((a, b) => {
+        const aDistance =
+          a.latitude != null && a.longitude != null
+            ? getDistanceKm(viewerLocation, { latitude: a.latitude, longitude: a.longitude })
+            : Number.POSITIVE_INFINITY;
+        const bDistance =
+          b.latitude != null && b.longitude != null
+            ? getDistanceKm(viewerLocation, { latitude: b.latitude, longitude: b.longitude })
+            : Number.POSITIVE_INFINITY;
+
+        if (aDistance !== bDistance) {
+          return aDistance - bDistance;
+        }
+
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      return next;
+    }
+
     next.sort((a, b) => {
       const aTime = new Date(a.createdAt).getTime();
       const bTime = new Date(b.createdAt).getTime();
       return sortBy === "newest" ? bTime - aTime : aTime - bTime;
     });
     return next;
-  }, [freeOnly, products.items, sortBy]);
+  }, [freeOnly, products.items, selectedTradeType, sortBy, viewerLocation]);
+
+  useEffect(() => {
+    if (!lastKnown) {
+      return;
+    }
+
+    const next = {
+      latitude: lastKnown.latitude,
+      longitude: lastKnown.longitude,
+    };
+    setViewerLocation(next);
+    lastRecalcLocationRef.current = next;
+  }, [lastKnown]);
+
+  useEffect(() => {
+    if (permission !== "denied") {
+      return;
+    }
+
+    if (filterState.proximity != null) {
+      filterState.setProximity(null);
+    }
+    setDraftRadiusKm(null);
+    setSortBy((current) => (current === "nearest" ? "newest" : current));
+    setIsDiscoveryReady(true);
+  }, [filterState.proximity, filterState.setProximity, permission]);
+
+  useEffect(() => {
+    if (isDiscoveryReady) {
+      return;
+    }
+
+    if (lastKnown) {
+      const next = { latitude: lastKnown.latitude, longitude: lastKnown.longitude };
+      setViewerLocation(next);
+      lastRecalcLocationRef.current = next;
+    }
+
+    setSortBy("newest");
+    setIsDiscoveryReady(true);
+  }, [isDiscoveryReady, lastKnown]);
+
+  useEffect(() => {
+    let active = true;
+    let subscription: Location.LocationSubscription | null = null;
+
+    const startLocationWatch = async () => {
+      if (permission !== "granted") {
+        return;
+      }
+
+      const snapshot = lastKnown ?? (await requestLocation());
+      if (!active || !snapshot) {
+        return;
+      }
+
+      const initial = { latitude: snapshot.latitude, longitude: snapshot.longitude };
+      setViewerLocation(initial);
+      lastRecalcLocationRef.current = initial;
+
+      subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 500,
+          timeInterval: 60_000,
+        },
+        (position) => {
+          if (!active) {
+            return;
+          }
+
+          const next = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+
+          const baseline = lastRecalcLocationRef.current;
+          if (!baseline) {
+            lastRecalcLocationRef.current = next;
+            setViewerLocation(next);
+            return;
+          }
+
+          const movedKm = getDistanceKm(baseline, next);
+          if (movedKm < LOCATION_RECALCULATE_THRESHOLD_KM) {
+            return;
+          }
+
+          lastRecalcLocationRef.current = next;
+          setViewerLocation(next);
+
+          if (filterState.proximity?.radiusKm != null) {
+            filterState.setProximity({
+              latitude: next.latitude,
+              longitude: next.longitude,
+              radiusKm: filterState.proximity.radiusKm,
+            });
+          }
+        },
+      );
+    };
+
+    void startLocationWatch();
+
+    return () => {
+      active = false;
+      subscription?.remove();
+    };
+  }, [filterState.proximity, filterState.setProximity, lastKnown, permission, requestLocation]);
 
   useEffect(() => {
     if (!showInitialLoading) {
@@ -139,8 +335,31 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
   const onOpenFilters = () => {
     setDraftCategoryId(filterState.categoryId);
-    setDraftRadiusKm(filterState.proximity?.radiusKm ?? null);
+    setDraftRadiusKm(permission === "granted" ? (filterState.proximity?.radiusKm ?? null) : null);
+    setDraftTradeType(selectedTradeType);
     setShowFilterModal(true);
+  };
+
+  const onRequestEnableNearby = async () => {
+    if (permission === "granted") {
+      setDraftRadiusKm((current) => current ?? DEFAULT_NEAREST_RADIUS_KM);
+      return;
+    }
+
+    const snapshot = await requestLocation();
+    if (!snapshot) {
+      setDraftRadiusKm(null);
+      await dialog.alert(
+        "Location required",
+        "Nearby needs location permission. Enable it to filter by distance.",
+      );
+      return;
+    }
+
+    const next = { latitude: snapshot.latitude, longitude: snapshot.longitude };
+    setViewerLocation(next);
+    lastRecalcLocationRef.current = next;
+    setDraftRadiusKm((current) => current ?? DEFAULT_NEAREST_RADIUS_KM);
   };
 
   const onApplyFilters = async () => {
@@ -158,9 +377,14 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         longitude: snapshot.longitude,
         radiusKm: draftRadiusKm,
       });
+      const next = { latitude: snapshot.latitude, longitude: snapshot.longitude };
+      setViewerLocation(next);
+      lastRecalcLocationRef.current = next;
+      setSortBy("nearest");
     }
 
     filterState.setCategoryId(draftCategoryId);
+    setSelectedTradeType(draftTradeType);
     setShowFilterModal(false);
   };
 
@@ -168,131 +392,115 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     setShowSortModal(true);
   };
 
-  const onSelectSort = (nextSort: SortOption) => {
+  const onSelectSort = async (nextSort: SortOrder) => {
+    if (nextSort === "nearest" && !viewerLocation) {
+      const snapshot = await requestLocation();
+      if (!snapshot) {
+        await dialog.alert("Location required", "Enable location to sort listings by nearest.");
+        return;
+      }
+
+      const next = { latitude: snapshot.latitude, longitude: snapshot.longitude };
+      setViewerLocation(next);
+      lastRecalcLocationRef.current = next;
+    }
+
     setSortBy(nextSort);
     setShowSortModal(false);
   };
 
   const activeFilterCount =
-    (filterState.categoryId ? 1 : 0) + (filterState.proximity?.radiusKm ? 1 : 0);
+    (filterState.categoryId ? 1 : 0) +
+    (filterState.proximity?.radiusKm ? 1 : 0) +
+    (selectedTradeType !== "ALL" ? 1 : 0);
 
   return (
     <>
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.listHeaderWrap}>
           <AppCard>
-            <View style={styles.greetingRow}>
-              <View style={styles.greetingContent}>
-                <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                  Hello, {userName}
-                </Text>
-                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                  Discover high-value listings near you
-                </Text>
-              </View>
-
-              <Pressable
-                onPress={() => void onOpenNotificationsPanel()}
-                style={[
-                  styles.notificationBell,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceMuted,
-                  },
-                ]}
-              >
-                <Feather name="bell" size={18} color={theme.colors.textPrimary} />
-                {unreadCount > 0 ? (
-                  <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}> 
-                    <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}> 
-                      {unreadCount > 9 ? "9+" : unreadCount}
+            <View style={[styles.headerContent, showHeaderFilters ? styles.headerContentExpanded : null]}>
+              <View style={styles.greetingRow}>
+                <View style={styles.greetingContent}>
+                  <View style={styles.greetingTitleRow}>
+                    <Text style={[styles.greeting, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                      Hello, {userName}
                     </Text>
+                    <Pressable
+                      onPress={() => setShowHeaderFilters((current) => !current)}
+                      style={[
+                        styles.headerToggleButton,
+                        {
+                          borderColor: theme.colors.border,
+                          backgroundColor: theme.colors.surfaceMuted,
+                        },
+                      ]}
+                    >
+                      <Feather
+                        name={showHeaderFilters ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={theme.colors.textSecondary}
+                      />
+                    </Pressable>
                   </View>
-                ) : null}
-              </Pressable>
-            </View>
+                  <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                    Discover high-value listings near you
+                  </Text>
+                </View>
 
-            <Input
-              label=""
-              placeholder="Try bicycle, books, guitar..."
-              value={filterState.search}
-              onChangeText={filterState.setSearch}
-            />
-            {filterState.isSearchDebouncing ? (
-              <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
-            ) : null}
-
-            <View style={styles.controlsWrap}>
-              <Pressable
-                onPress={onOpenFilters}
-                style={[
-                  styles.controlButton,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                  },
-                ]}
-              >
-                <Feather name="sliders" size={15} color={theme.colors.textSecondary} />
-                <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Filters</Text>
-                {activeFilterCount > 0 ? (
-                  <View style={[styles.activeCountPill, { backgroundColor: theme.colors.primary }]}> 
-                    <Text style={[styles.activeCountText, { color: theme.colors.onPrimary }]}> 
-                      {activeFilterCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-
-              <Pressable
-                onPress={onOpenSortPicker}
-                style={[
-                  styles.controlButton,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                  },
-                ]}
-              >
-                <Feather name="repeat" size={15} color={theme.colors.textSecondary} />
-                <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Sort</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setFreeOnly((current) => !current)}
-                style={[
-                  styles.controlButton,
-                  {
-                    borderColor: freeOnly ? theme.colors.primary : theme.colors.border,
-                    backgroundColor: freeOnly ? theme.colors.chipActiveBg : theme.colors.surface,
-                  },
-                ]}
-              >
-                <Feather
-                  name="gift"
-                  size={15}
-                  color={freeOnly ? theme.colors.chipActiveText : theme.colors.textSecondary}
-                />
-                <Text
+                <Pressable
+                  onPress={() => void onOpenNotificationsPanel()}
                   style={[
-                    styles.controlButtonText,
-                    { color: freeOnly ? theme.colors.chipActiveText : theme.colors.textPrimary },
+                    styles.notificationBell,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                    },
                   ]}
                 >
-                  Free
-                </Text>
-              </Pressable>
-            </View>
+                  <Feather name="bell" size={18} color={theme.colors.textPrimary} />
+                  {unreadCount > 0 ? (
+                    <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}> 
+                      <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}> 
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              </View>
 
-            <View style={styles.listSummaryRow}>
-              <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
-                Showing {visibleProducts.length} listings
-              </Text>
-              {filterState.proximity?.radiusKm ? (
-                <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
-                  Within {filterState.proximity.radiusKm} km
-                </Text>
-              ) : null}
+              <SmoothCollapse expanded={showHeaderFilters} maxHeight={340}>
+                <View style={styles.collapseContent}>
+                  <Input
+                    label=""
+                    placeholder="Try bicycle, books, guitar..."
+                    value={filterState.search}
+                    onChangeText={filterState.setSearch}
+                  />
+                  {filterState.isSearchDebouncing ? (
+                    <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
+                  ) : null}
+
+                  <ListControlsRow
+                    activeFilterCount={activeFilterCount}
+                    freeOnly={freeOnly}
+                    onOpenFilters={onOpenFilters}
+                    onOpenSort={onOpenSortPicker}
+                    onToggleFree={() => setFreeOnly((current) => !current)}
+                  />
+
+                  <View style={styles.listSummaryRow}>
+                    <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
+                      Showing {visibleProducts.length} listings
+                    </Text>
+                    {filterState.proximity?.radiusKm ? (
+                      <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
+                        Within {filterState.proximity.radiusKm} km
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </SmoothCollapse>
             </View>
           </AppCard>
         </View>
@@ -340,6 +548,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               }}
               showMeta
               isRequested={requestedProductIds.has(item.id)}
+              viewerLocation={permission === "granted" ? viewerLocation : null}
+              fallbackDistanceLabel={permission === "granted" ? null : ">100km away"}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -378,13 +588,13 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
               <View style={styles.filterOptionsWrap}>
-                <CategoryChip
+                <FilterChip
                   active={draftCategoryId === ""}
                   label="All"
                   onPress={() => setDraftCategoryId("")}
                 />
                 {categories.map((category) => (
-                  <CategoryChip
+                  <FilterChip
                     key={category.id}
                     active={draftCategoryId === category.id}
                     label={category.name}
@@ -397,19 +607,79 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Proximity</Text>
               <View style={styles.filterOptionsWrap}>
-                <CategoryChip
+                <FilterChip
                   active={draftRadiusKm == null}
                   label="Anywhere"
                   onPress={() => setDraftRadiusKm(null)}
                 />
-                {PROXIMITY_OPTIONS_KM.map((radius) => (
-                  <CategoryChip
-                    key={radius}
-                    active={draftRadiusKm === radius}
-                    label={`${radius} km`}
-                    onPress={() => setDraftRadiusKm(radius)}
+                <FilterChip
+                  active={draftRadiusKm != null}
+                  label="Nearby"
+                  onPress={() => {
+                    void onRequestEnableNearby();
+                  }}
+                />
+              </View>
+
+              {permission !== "granted" ? (
+                <Text style={[styles.sliderHintText, { color: theme.colors.textMuted }]}> 
+                  Nearby is disabled until location permission is granted.
+                </Text>
+              ) : null}
+
+              {draftRadiusKm != null && permission === "granted" ? (
+                <View
+                  style={[
+                    styles.radiusSliderWrap,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.radiusValueText, { color: theme.colors.textPrimary }]}> 
+                    Range: {Math.round(draftRadiusKm)} km
+                  </Text>
+                  <RangeSlider
+                    style={styles.radiusSlider}
+                    minimumValue={MIN_PROXIMITY_KM}
+                    maximumValue={MAX_PROXIMITY_KM}
+                    step={1}
+                    value={Math.round(draftRadiusKm)}
+                    disabled={false}
+                    minimumTrackTintColor={theme.colors.primary}
+                    maximumTrackTintColor={theme.colors.border}
+                    thumbTintColor={theme.colors.primary}
+                    onValueChange={(value: number) => {
+                      setDraftRadiusKm(Math.round(value));
+                    }}
                   />
-                ))}
+                  <View style={styles.radiusLabelsRow}>
+                    <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>{MIN_PROXIMITY_KM} km</Text>
+                    <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>{MAX_PROXIMITY_KM} km</Text>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Type</Text>
+              <View style={styles.filterOptionsWrap}>
+                <FilterChip
+                  active={draftTradeType === "ALL"}
+                  label="All"
+                  onPress={() => setDraftTradeType("ALL")}
+                />
+                <FilterChip
+                  active={draftTradeType === "BARTER_ONLY"}
+                  label="Barter only"
+                  onPress={() => setDraftTradeType("BARTER_ONLY")}
+                />
+                <FilterChip
+                  active={draftTradeType === "OPEN_FOR_MONEY"}
+                  label="Open for money"
+                  onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
+                />
               </View>
             </View>
 
@@ -425,6 +695,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 onPress={() => {
                   setDraftCategoryId("");
                   setDraftRadiusKm(null);
+                  setDraftTradeType("ALL");
                 }}
               >
                 <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
@@ -448,69 +719,13 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         </Pressable>
       </Modal>
 
-      <Modal
+      <SortBottomSheet
         visible={showSortModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSortModal(false)}
-      >
-        <Pressable
-          style={[styles.sortBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setShowSortModal(false)}
-        >
-          <Pressable
-            style={[
-              styles.sortSheet,
-              {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-            onPress={() => {
-              // Keep sheet open when tapping inside.
-            }}
-          >
-            <View style={styles.notificationsHeaderRow}>
-              <Text style={[styles.notificationsTitle, { color: theme.colors.textPrimary }]}>Sort by</Text>
-              <Pressable onPress={() => setShowSortModal(false)}>
-                <Feather name="x" size={18} color={theme.colors.textSecondary} />
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={[
-                styles.sortOption,
-                {
-                  borderColor: theme.colors.border,
-                  backgroundColor: sortBy === "newest" ? theme.colors.surfaceMuted : theme.colors.surface,
-                },
-              ]}
-              onPress={() => onSelectSort("newest")}
-            >
-              <Text style={[styles.sortOptionLabel, { color: theme.colors.textPrimary }]}>Newest first</Text>
-              {sortBy === "newest" ? (
-                <Feather name="check" size={16} color={theme.colors.primary} />
-              ) : null}
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sortOption,
-                {
-                  borderColor: theme.colors.border,
-                  backgroundColor: sortBy === "oldest" ? theme.colors.surfaceMuted : theme.colors.surface,
-                },
-              ]}
-              onPress={() => onSelectSort("oldest")}
-            >
-              <Text style={[styles.sortOptionLabel, { color: theme.colors.textPrimary }]}>Oldest first</Text>
-              {sortBy === "oldest" ? (
-                <Feather name="check" size={16} color={theme.colors.primary} />
-              ) : null}
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        value={sortBy}
+        onClose={() => setShowSortModal(false)}
+        onChange={onSelectSort}
+        canUseNearest={permission === "granted" && viewerLocation != null}
+      />
 
       <Modal
         visible={showNotifications}
@@ -549,14 +764,54 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                   )}
                 </Pressable>
 
-                <Pressable
-                  onPress={() => void markAllNotificationsReadMutation.mutateAsync()}
-                  disabled={unreadCount === 0 || markAllNotificationsReadMutation.isPending}
-                >
-                  <Text style={[styles.notificationsActionText, { color: theme.colors.textSecondary }]}>Mark all read</Text>
-                </Pressable>
+
+                {notifications.length > 0 ? (
+                  <>
+                    <Pressable
+                      onPress={() => {
+                        void clearAllNotificationsMutation.mutateAsync();
+                        setShowNotifications(false);
+                      }}
+                      disabled={clearAllNotificationsMutation.isPending}
+                      style={styles.notificationsActionButton}
+                    >
+                      <Text style={[styles.notificationsActionText, { color: theme.colors.textSecondary }]}>Clear all</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setShowNotificationsMenu((prev) => !prev)}
+                      style={styles.notificationsIconAction}
+                    >
+                      <Feather
+                        name={showNotificationsMenu ? "chevron-up" : "chevron-down"}
+                        size={15}
+                        color={theme.colors.textSecondary}
+                      />
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
+
+            {showNotificationsMenu ? (
+              <View style={[styles.notificationsMenu, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+                <Pressable
+                  onPress={() => {
+                    void markAllNotificationsReadMutation.mutateAsync();
+                    setShowNotificationsMenu(false);
+                  }}
+                  disabled={unreadCount === 0 || markAllNotificationsReadMutation.isPending}
+                  style={styles.notificationsMenuItem}
+                >
+                  {markAllNotificationsReadMutation.isPending ? (
+                    <ActivityIndicator size={14} color={theme.colors.textPrimary} />
+                  ) : (
+                    <Feather name="check" size={14} color={theme.colors.textPrimary} />
+                  )}
+                  <Text style={[styles.notificationsMenuItemText, { color: theme.colors.textPrimary }]}>Mark all read</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {notificationsQuery.isFetching && notifications.length === 0 ? (
               <View style={styles.notificationsLoadingWrap}>
@@ -610,42 +865,16 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   );
 }
 
-function CategoryChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        {
-          borderColor: active ? theme.colors.chipActiveBg : theme.colors.border,
-          backgroundColor: active ? theme.colors.chipActiveBg : theme.colors.chipBg,
-        },
-      ]}
-    >
-      <Text
-        numberOfLines={1}
-        style={[styles.chipText, { color: active ? theme.colors.chipActiveText : theme.colors.chipText }]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: 16, paddingBottom: 108, paddingTop: 2, gap: 2 },
   listHeaderWrap: { marginBottom: 10, paddingHorizontal: 16, paddingTop: 16 },
+  headerContent: {
+    gap: 0,
+  },
+  headerContentExpanded: {
+    gap: 10,
+  },
   headerSection: {
     gap: 14,
     marginBottom: 12,
@@ -658,6 +887,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   greetingContent: { flexGrow: 1, flexShrink: 1, minWidth: 180, paddingRight: 2 },
+  greetingTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerToggleButton: {
+    width: 30,
+    height: 30,
+    borderWidth: 1,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   notificationBell: {
     width: 40,
     height: 40,
@@ -683,41 +925,16 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 24, lineHeight: 29, fontWeight: "800" },
   subtitle: { fontSize: 14, marginTop: 3 },
-  searchHint: { fontSize: 12, marginTop: -4 },
-  controlsWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  collapseContent: {
+    gap: 10,
+    paddingBottom: 2,
   },
-  controlButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    height: 36,
-  },
-  controlButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  activeCountPill: {
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  activeCountText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  searchHint: { fontSize: 12, marginTop: 0 },
   listSummaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 2,
   },
   listSummaryText: {
     fontSize: 13,
@@ -725,47 +942,12 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
-  chip: {
-    maxWidth: 160,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderRadius: 999,
-  },
-  chipText: { fontSize: 12, fontWeight: "700" },
   notificationsBackdrop: {
     flex: 1,
     justifyContent: "flex-start",
     paddingHorizontal: 16,
     paddingTop: 96,
     paddingBottom: 24,
-  },
-  sortBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    paddingHorizontal: 0,
-    paddingTop: 24,
-  },
-  sortSheet: {
-    borderTopWidth: 1,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    gap: 10,
-    minHeight: 220,
-  },
-  sortOption: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sortOptionLabel: {
-    fontSize: 14,
-    fontWeight: "700",
   },
   notificationsPanel: {
     borderWidth: 1,
@@ -797,6 +979,25 @@ const styles = StyleSheet.create({
   notificationsActionText: {
     fontSize: 12,
     fontWeight: "700",
+  },
+  notificationsActionButton: {
+    paddingHorizontal: 4,
+  },
+  notificationsMenu: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  notificationsMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+  },
+  notificationsMenuItemText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   notificationsList: {
     paddingBottom: 6,
@@ -834,6 +1035,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  sliderHintText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  radiusSliderWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 4,
+  },
+  radiusValueText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  radiusSlider: {
+    width: "100%",
+    height: 34,
+  },
+  radiusLabelsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  radiusLabelText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   filterActionsRow: {
     flexDirection: "row",

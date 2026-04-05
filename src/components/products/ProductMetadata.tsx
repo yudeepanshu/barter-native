@@ -11,7 +11,40 @@ interface ProductMetadataProps {
   showCategory?: boolean;
   showProductType?: boolean;
   showLocation?: boolean;
+  viewerLocation?: { latitude: number; longitude: number } | null;
+  fallbackDistanceLabel?: string | null;
   locationLines?: number;
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function haversineDistanceKm(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+) {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLng = toRadians(to.longitude - from.longitude);
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+function formatDistanceLabel(distanceKm: number) {
+  if (!Number.isFinite(distanceKm) || distanceKm < 0) {
+    return null;
+  }
+  if (distanceKm > 100) {
+    return ">100km away";
+  }
+  const kmText = distanceKm < 10 ? distanceKm.toFixed(1) : Math.round(distanceKm).toString();
+  return `${kmText}km away`;
 }
 
 export function getProductTypeLabel(product: ProductSummary) {
@@ -63,16 +96,28 @@ export function ProductMetadata({
   showCategory,
   showProductType = true,
   showLocation,
+  viewerLocation,
+  fallbackDistanceLabel = null,
   locationLines = 2,
 }: ProductMetadataProps) {
   const { theme } = useAppTheme();
   const includeCategory = showCategory ?? variant === "detail";
   const includeLocation = showLocation ?? variant === "detail";
   const location = getLocationLabel(product);
+  const hasProductCoords = product.latitude != null && product.longitude != null;
+  const distanceLabel =
+    viewerLocation && hasProductCoords
+      ? formatDistanceLabel(
+          haversineDistanceKm(viewerLocation, {
+            latitude: product.latitude as number,
+            longitude: product.longitude as number,
+          }),
+        )
+      : fallbackDistanceLabel;
 
   const chips: Array<{
     key: string;
-    icon: "tag" | "package" | "map-pin";
+    icon: "tag" | "package" | "map-pin" | "navigation";
     value: string;
     chipStyle: object;
     textStyle: object;
@@ -118,6 +163,16 @@ export function ProductMetadata({
     });
   }
 
+  if (distanceLabel) {
+    chips.push({
+      key: "distance",
+      icon: "navigation",
+      value: distanceLabel,
+      chipStyle: styles.metaChipDistance,
+      textStyle: styles.metaChipTextDistance,
+    });
+  }
+
   if (chips.length === 0) {
     return null;
   }
@@ -125,11 +180,11 @@ export function ProductMetadata({
   return (
     <View style={[styles.container, variant === "compact" && styles.containerCompact]}>
       {chips.map((chip) => (
-        <View key={chip.key} style={[styles.metaChip, chip.chipStyle]}>
+        <View key={chip.key} style={[styles.metaChip, variant === "compact" && styles.metaChipCompact, chip.chipStyle]}>
           <Feather name={chip.icon} size={12} color={theme.colors.textMuted} style={styles.metaChipIcon} />
           <Text
             numberOfLines={chip.lines ?? 1}
-            style={[styles.metaChipText, chip.textStyle]}
+            style={[styles.metaChipText, variant === "compact" && styles.metaChipTextCompact, chip.textStyle]}
           >
             {chip.value}
           </Text>
@@ -158,11 +213,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderWidth: 1,
   },
+  metaChipCompact: {
+    paddingVertical: 3,
+    minHeight: 24,
+  },
   metaChipIcon: { marginTop: 0.5 },
   metaChipText: {
     fontSize: 12,
     fontWeight: "700",
     maxWidth: 230,
+  },
+  metaChipTextCompact: {
+    fontSize: 11,
   },
   metaChipCategory: { backgroundColor: "#f1f5f9", borderColor: "#cbd5e1" },
   metaChipTextCategory: { color: "#475569" },
@@ -174,4 +236,6 @@ const styles = StyleSheet.create({
   metaChipTextBarter: { color: "#4c1d95" },
   metaChipLocation: { backgroundColor: "#e0f2fe", borderColor: "#7dd3fc" },
   metaChipTextLocation: { color: "#0c4a6e" },
+  metaChipDistance: { backgroundColor: "#fef3c7", borderColor: "#fcd34d" },
+  metaChipTextDistance: { color: "#92400e" },
 });

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Platform } from "react-native";
 // Static import — expo-location is always available in Expo Go and dev builds.
 // Dynamic import() was hiding native module errors inside silent catch blocks.
@@ -137,6 +137,19 @@ export function useDeviceLocation() {
   const lastKnown = useDeviceLocationStore((state) => state.lastKnown);
   const setPermission = useDeviceLocationStore((state) => state.setPermission);
   const setLastKnown = useDeviceLocationStore((state) => state.setLastKnown);
+
+  // Sync permission state with the OS on mount so the UI reflects reality
+  // even when the user already granted permission in a previous session.
+  useEffect(() => {
+    void Location.getForegroundPermissionsAsync().then(({ status }) => {
+      if (status === "granted") {
+        setPermission("granted");
+      } else if (status === "denied") {
+        setPermission("denied");
+      }
+      // "undetermined" stays as-is — don't override with undetermined
+    });
+  }, [setPermission]);
 
   // requestForegroundPermissionsAsync is idempotent: if already granted the OS resolves
   // it instantly without showing a dialog again.

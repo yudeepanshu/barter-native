@@ -18,8 +18,10 @@ import { useProductsListController } from "@/hooks/queries/useProductsListContro
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
+import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory, getInactiveExpiryWarning } from "@/components/products/ProductMetadata";
+import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { ToggleChip } from "@/components/ui/ToggleChip";
@@ -27,16 +29,6 @@ import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
-
-function getStatusBadgeStyle(status: string): { bg: string; text: string } {
-  switch (status) {
-    case "ACTIVE": return { bg: "#dcfce7", text: "#15803d" };
-    case "RESERVED": return { bg: "#dbeafe", text: "#1d4ed8" };
-    case "EXCHANGED": return { bg: "#ccfbf1", text: "#0f766e" };
-    case "REMOVED": return { bg: "#fee2e2", text: "#b91c1c" };
-    default: return { bg: "#e2e8f0", text: "#334155" };
-  }
-}
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -60,6 +52,11 @@ export default function ProductDetailScreen() {
     router.back();
   };
   const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
+  const { permission, lastKnown } = useDeviceLocation();
+  const viewerLocation =
+    permission === "granted" && lastKnown
+      ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
+      : null;
   const activeRequest = useMemo(() => {
     if (isOwner || !productData) {
       return null;
@@ -100,7 +97,9 @@ export default function ProductDetailScreen() {
   const canEditListing =
     isOwner &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
-  const badgeStyle = getStatusBadgeStyle(product.status);
+  const isRequested = Boolean(activeRequest);
+  const typeTag = getTopTypeTag(product);
+  const contextTag = getContextTag(product, isRequested);
   const imageFrameSize = Math.max(220, Math.round(width - 68));
 
   return (
@@ -126,11 +125,7 @@ export default function ProductDetailScreen() {
             <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
               {product.title}
             </Text>
-            <View style={[styles.badgeWrap, { backgroundColor: badgeStyle.bg }]}>
-              <Text style={[styles.badgeText, { color: badgeStyle.text }]} numberOfLines={1}>
-                {product.status}
-              </Text>
-            </View>
+            <ProductTag tag={typeTag} variant="top-text" />
           </View>
 
           {product.owner ? (
@@ -267,7 +262,17 @@ export default function ProductDetailScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
-          <ProductMetadata product={product} variant="detail" />
+          <View style={styles.metaSection}>
+            {contextTag ? <ProductTag tag={contextTag} variant="bottom-chip" /> : null}
+            <ProductMetadata
+              product={product}
+              variant="detail"
+              showProductType={false}
+              showLocation={false}
+              viewerLocation={viewerLocation}
+              fallbackDistanceLabel={viewerLocation ? null : ">100km away"}
+            />
+          </View>
         </View>
 
         {activeRequest && !isOwner ? (
@@ -627,17 +632,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   title: { flex: 1, minWidth: 0, fontSize: 28, fontWeight: "800", lineHeight: 32 },
-  badgeWrap: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  badgeText: { fontSize: 12, fontWeight: "800" },
   description: { fontSize: 15, lineHeight: 22 },
   inactiveWarningBanner: {
     flexDirection: "row",
@@ -744,6 +741,9 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
+  },
+  metaSection: {
+    gap: 10,
   },
   activeRequestCard: {
     borderWidth: 2,

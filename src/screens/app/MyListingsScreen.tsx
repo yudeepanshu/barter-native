@@ -1,12 +1,13 @@
-import { FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import {
   toErrorMessage,
   useDeleteProductMutation,
@@ -25,12 +26,19 @@ import {
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
+import { Input } from "@/components/ui/Input";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { FilterChip } from "@/components/filters/FilterChip";
+import { ListControlsRow } from "@/components/filters/ListControlsRow";
+import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
+import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
+type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
 
 const LISTING_FILTERS: Array<{ key: ListingFilter; label: string }> = [
   { key: "ALL", label: "All" },
@@ -40,7 +48,7 @@ const LISTING_FILTERS: Array<{ key: ListingFilter; label: string }> = [
   { key: "EXCHANGED", label: "Exchanged" },
 ];
 
-const OPEN_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
+const OPEN_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 
 export default function MyListingsScreen() {
   const router = useRouter();
@@ -50,18 +58,67 @@ export default function MyListingsScreen() {
   const relistMutation = useRelistProductMutation();
   const unlistMutation = useUnlistProductMutation();
   const dialog = useAppDialog();
+  const categoriesQuery = useCategoriesQuery();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [relistingId, setRelistingId] = useState<string | null>(null);
   const [unlistingId, setUnlistingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOrder>("newest");
+  const [showHeaderFilters, setShowHeaderFilters] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<ListingFilter>("ALL");
   const [draftFilter, setDraftFilter] = useState<ListingFilter>("ALL");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [draftCategoryId, setDraftCategoryId] = useState("");
+  const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
+  const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const products = useProductsListController({ ownerId: session?.user.id, limit: 20 });
   const receivedRequestsQuery = useRequestsQuery("received", { limit: 100 });
+  const categories = categoriesQuery.data ?? [];
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const visibleItems = useMemo(
     () => products.items.filter((item) => item.status !== "REMOVED"),
     [products.items],
   );
+  const filteredWithoutType = useMemo(() => {
+    const normalizedQuery = debouncedSearch.trim().toLowerCase();
+
+    return visibleItems.filter((item) => {
+      if (freeOnly && !item.isFree) {
+        return false;
+      }
+
+      if (selectedTradeType === "OPEN_FOR_MONEY" && !item.requestByMoney) {
+        return false;
+      }
+
+      if (selectedTradeType === "BARTER_ONLY" && (item.requestByMoney || item.isFree)) {
+        return false;
+      }
+
+      if (selectedCategoryId && item.categoryId !== selectedCategoryId) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const haystack = `${item.title} ${item.description ?? ""} ${item.category?.name ?? ""}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [debouncedSearch, freeOnly, selectedCategoryId, selectedTradeType, visibleItems]);
   const statusCounts = useMemo(() => {
     const counts: Record<ProductSummary["status"], number> = {
       ACTIVE: 0,
@@ -71,66 +128,71 @@ export default function MyListingsScreen() {
       REMOVED: 0,
     };
 
-    for (const item of visibleItems) {
+    for (const item of filteredWithoutType) {
       counts[item.status] += 1;
     }
 
     return counts;
-  }, [visibleItems]);
+  }, [filteredWithoutType]);
   const filteredItems = useMemo(() => {
-    if (selectedFilter === "ALL") {
-      return visibleItems;
-    }
+    const byType =
+      selectedFilter === "ALL"
+        ? filteredWithoutType
+        : filteredWithoutType.filter((item) => item.status === selectedFilter);
 
-    return visibleItems.filter((item) => item.status === selectedFilter);
-  }, [visibleItems, selectedFilter]);
-  const openRequestByProductId = useMemo(() => {
+    return [...byType].sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return sortBy === "newest" ? bTime - aTime : aTime - bTime;
+    });
+  }, [filteredWithoutType, selectedFilter, sortBy]);
+  const openRequestCountByProductId = useMemo(() => {
     const requests = receivedRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
-    const map = new Map<string, { requestId: string; status: RequestStatus; count: number; updatedAtMs: number }>();
+    const map = new Map<string, number>();
 
     for (const request of requests) {
       if (!OPEN_REQUEST_STATUSES.includes(request.status)) {
         continue;
       }
 
-      const existing = map.get(request.productId);
-      const nextUpdatedAtMs = new Date(request.updatedAt).getTime();
-      if (!existing) {
-        map.set(request.productId, {
-          requestId: request.id,
-          status: request.status,
-          count: 1,
-          updatedAtMs: nextUpdatedAtMs,
-        });
-        continue;
-      }
-
-      if (nextUpdatedAtMs > existing.updatedAtMs) {
-        map.set(request.productId, {
-          requestId: request.id,
-          status: request.status,
-          count: existing.count + 1,
-          updatedAtMs: nextUpdatedAtMs,
-        });
-      } else {
-        map.set(request.productId, {
-          ...existing,
-          count: existing.count + 1,
-        });
-      }
+      map.set(request.productId, (map.get(request.productId) ?? 0) + 1);
     }
 
     return map;
   }, [receivedRequestsQuery.data]);
+
   const selectedFilterLabel = LISTING_FILTERS.find((item) => item.key === selectedFilter)?.label ?? "All";
+  const selectedCategoryLabel =
+    categories.find((category) => category.id === selectedCategoryId)?.name ?? "All";
+  const selectedTradeTypeLabel =
+    selectedTradeType === "BARTER_ONLY"
+      ? "Barter only"
+      : selectedTradeType === "OPEN_FOR_MONEY"
+        ? "Open for money"
+        : "All";
+  const activeFilterCount =
+    (selectedCategoryId ? 1 : 0) +
+    (selectedFilter !== "ALL" ? 1 : 0) +
+    (selectedTradeType !== "ALL" ? 1 : 0);
+  const selectedFilterSummary = [
+    selectedCategoryId ? selectedCategoryLabel : null,
+    selectedFilter !== "ALL" ? selectedFilterLabel : null,
+    selectedTradeType !== "ALL" ? selectedTradeTypeLabel : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   const onOpenFilterPicker = () => {
     setDraftFilter(selectedFilter);
+    setDraftCategoryId(selectedCategoryId);
+    setDraftTradeType(selectedTradeType);
     setShowFilterModal(true);
   };
 
   const onApplyFilter = () => {
     setSelectedFilter(draftFilter);
+    setSelectedCategoryId(draftCategoryId);
+    setSelectedTradeType(draftTradeType);
     setShowFilterModal(false);
   };
 
@@ -235,144 +297,206 @@ export default function MyListingsScreen() {
           />
         </View>
       ) : (
-        <FlatList
-          data={filteredItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={products.query.isRefetching} onRefresh={products.refresh} />
-          }
-          onEndReachedThreshold={0.35}
-          onEndReached={products.loadMore}
-          ListHeaderComponent={
-            <View style={[styles.headerCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.title, { color: theme.colors.textPrimary }]}>My Listings</Text>
-              <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-                You currently have {visibleItems.length} visible listings.
-              </Text>
-              <View style={styles.filterWrap}>
-                <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Filter by type</Text>
+        <>
+          <View style={styles.fixedTopContent}>
+            <PageHeaderCard
+              title="My Listings"
+              subtitle="Manage your active and past listings."
+              rightSlot={
                 <Pressable
-                  onPress={onOpenFilterPicker}
+                  onPress={() => setShowHeaderFilters((current) => !current)}
                   style={[
-                    styles.controlButton,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surface,
-                    },
+                    styles.collapseButton,
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
                   ]}
                 >
-                  <Feather name="sliders" size={15} color={theme.colors.textSecondary} />
-                  <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Type: {selectedFilterLabel}</Text>
-                  {selectedFilter !== "ALL" ? (
-                    <View style={[styles.activeCountPill, { backgroundColor: theme.colors.primary }]}> 
-                      <Text style={[styles.activeCountText, { color: theme.colors.onPrimary }]}>1</Text>
-                    </View>
+                  <Feather
+                    name={showHeaderFilters ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+              }
+            >
+              <SmoothCollapse expanded={showHeaderFilters} maxHeight={320}>
+                <View style={styles.collapseContent}>
+                  <Input
+                    label=""
+                    placeholder="Try bicycle, books, guitar..."
+                    value={search}
+                    onChangeText={setSearch}
+                  />
+
+                  <ListControlsRow
+                    activeFilterCount={activeFilterCount}
+                    freeOnly={freeOnly}
+                    onOpenFilters={onOpenFilterPicker}
+                    onOpenSort={() => setShowSortModal(true)}
+                    onToggleFree={() => setFreeOnly((current) => !current)}
+                  />
+
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryText, { color: theme.colors.textMuted }]}>Showing {filteredItems.length} listings</Text>
+                    {selectedFilterSummary ? (
+                      <Text style={[styles.summaryText, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                        {selectedFilterSummary}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </SmoothCollapse>
+            </PageHeaderCard>
+          </View>
+
+          <FlatList
+            data={filteredItems}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl refreshing={products.query.isRefetching} onRefresh={products.refresh} />
+            }
+            onEndReachedThreshold={0.35}
+            onEndReached={products.loadMore}
+            ListEmptyComponent={
+              <ProductListEmptyState
+                message={
+                  selectedFilter === "ALL"
+                    ? "You do not have any listings yet."
+                    : `No ${selectedFilter.toLowerCase()} listings found.`
+                }
+              />
+            }
+            ListFooterComponent={
+              products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
+            }
+            renderItem={({ item }) => {
+            const openRequestCount = openRequestCountByProductId.get(item.id) ?? 0;
+
+            return (
+              <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/products/[id]",
+                      params: { id: item.id, backTo: "my-listings" },
+                    })
+                  }
+                  style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.95 : 1 }]}
+                >
+                  <ListingPreview
+                    product={item}
+                  />
+                  {(item.status === "ACTIVE" || item.status === "EXCHANGED" || item.status === "INACTIVE") ? (
+                    <Pressable
+                      style={[
+                        styles.editIconButton,
+                        { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+                        hasExchangeHistory(item) && styles.editIconButtonBelowBadge,
+                      ]}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(app)/listings/[id]/edit",
+                          params: { id: item.id, returnTo: "my-listings" },
+                        })
+                      }
+                      hitSlop={8}
+                    >
+                      <Feather name="edit-2" size={16} color={theme.colors.textPrimary} />
+                    </Pressable>
                   ) : null}
                 </Pressable>
-              </View>
-            </View>
-          }
-          ListEmptyComponent={
-            <ProductListEmptyState
-              message={
-                selectedFilter === "ALL"
-                  ? "You do not have any listings yet."
-                  : `No ${selectedFilter.toLowerCase()} listings found.`
-              }
-            />
-          }
-          ListFooterComponent={
-            products.query.isFetchingNextPage ? <ProductListFooterLoadingState /> : null
-          }
-          renderItem={({ item }) => (
-            <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/(app)/products/[id]",
-                    params: { id: item.id, backTo: "my-listings" },
-                  })
-                }
-                style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.95 : 1 }]}
-              >
-                <ListingPreview
-                  product={item}
-                  openRequest={openRequestByProductId.get(item.id)}
-                  onOpenRequest={(requestId) => router.push(`/(app)/requests/${requestId}`)}
-                />
-                {(item.status === "ACTIVE" || item.status === "EXCHANGED" || item.status === "INACTIVE") ? (
+
+                {openRequestCount > 0 ? (
+                  <View
+                    style={[
+                      styles.openRequestCard,
+                      {
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surfaceMuted,
+                      },
+                    ]}
+                  >
+                    <View style={styles.openRequestInfoWrap}>
+                      <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Open requests</Text>
+                      <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted }]}> 
+                        {openRequestCount} active request{openRequestCount > 1 ? "s" : ""} for this listing.
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(app)/(tabs)/requests",
+                          params: { tab: "received", productId: item.id },
+                        })
+                      }
+                      style={[
+                        styles.openRequestViewButton,
+                        {
+                          borderColor: theme.colors.primary,
+                          backgroundColor: theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.openRequestViewButtonText, { color: theme.colors.onPrimary }]}>View</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                <View style={[styles.actionBar, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+                  {item.status === "ACTIVE" && (
+                    <Pressable
+                      style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
+                      onPress={() => onUnlist(item.id)}
+                      disabled={Boolean(unlistingId) && unlistingId !== item.id}
+                    >
+                      <Text style={[
+                        styles.actionBtnText,
+                        { color: theme.colors.textSecondary },
+                        unlistingId === item.id && unlistMutation.isPending && styles.actionBtnLoading,
+                      ]}>
+                        {unlistingId === item.id && unlistMutation.isPending ? "Unlisting…" : "Unlist"}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {(item.status === "EXCHANGED" || item.status === "REMOVED" || item.status === "INACTIVE") && (
+                    <Pressable
+                      style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
+                      onPress={() => onRelist(item.id)}
+                      disabled={Boolean(relistingId) && relistingId !== item.id}
+                    >
+                      <Text style={[
+                        styles.actionBtnText,
+                        { color: theme.colors.textSecondary },
+                        relistingId === item.id && relistMutation.isPending && styles.actionBtnLoading,
+                      ]}>
+                        {relistingId === item.id && relistMutation.isPending ? "Relisting…" : "Relist"}
+                      </Text>
+                    </Pressable>
+                  )}
                   <Pressable
                     style={[
-                      styles.editIconButton,
-                      { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-                      hasExchangeHistory(item) && styles.editIconButtonBelowBadge,
+                      styles.actionBtn,
+                      styles.actionBtnRight,
+                      { borderRightColor: theme.colors.border },
                     ]}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(app)/listings/[id]/edit",
-                        params: { id: item.id, returnTo: "my-listings" },
-                      })
-                    }
-                    hitSlop={8}
-                  >
-                    <Feather name="edit-2" size={16} color={theme.colors.textPrimary} />
-                  </Pressable>
-                ) : null}
-              </Pressable>
-              <View style={[styles.actionBar, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-                {item.status === "ACTIVE" && (
-                  <Pressable
-                    style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
-                    onPress={() => onUnlist(item.id)}
-                    disabled={Boolean(unlistingId) && unlistingId !== item.id}
+                    onPress={() => onDelete(item.id)}
+                    disabled={Boolean(deletingId) && deletingId !== item.id}
                   >
                     <Text style={[
                       styles.actionBtnText,
-                      { color: theme.colors.textSecondary },
-                      unlistingId === item.id && unlistMutation.isPending && styles.actionBtnLoading,
+                      styles.actionBtnTextDestructive,
+                      deletingId === item.id && deleteMutation.isPending && styles.actionBtnLoading,
                     ]}>
-                      {unlistingId === item.id && unlistMutation.isPending ? "Unlisting…" : "Unlist"}
+                      {deletingId === item.id && deleteMutation.isPending ? "Deleting…" : "Delete"}
                     </Text>
                   </Pressable>
-                )}
-                {(item.status === "EXCHANGED" || item.status === "REMOVED" || item.status === "INACTIVE") && (
-                  <Pressable
-                    style={[styles.actionBtn, { borderRightColor: theme.colors.border }]}
-                    onPress={() => onRelist(item.id)}
-                    disabled={Boolean(relistingId) && relistingId !== item.id}
-                  >
-                    <Text style={[
-                      styles.actionBtnText,
-                      { color: theme.colors.textSecondary },
-                      relistingId === item.id && relistMutation.isPending && styles.actionBtnLoading,
-                    ]}>
-                      {relistingId === item.id && relistMutation.isPending ? "Relisting…" : "Relist"}
-                    </Text>
-                  </Pressable>
-                )}
-                <Pressable
-                  style={[
-                    styles.actionBtn,
-                    styles.actionBtnRight,
-                    { borderRightColor: theme.colors.border },
-                  ]}
-                  onPress={() => onDelete(item.id)}
-                  disabled={Boolean(deletingId) && deletingId !== item.id}
-                >
-                  <Text style={[
-                    styles.actionBtnText,
-                    styles.actionBtnTextDestructive,
-                    deletingId === item.id && deleteMutation.isPending && styles.actionBtnLoading,
-                  ]}>
-                    {deletingId === item.id && deleteMutation.isPending ? "Deleting…" : "Delete"}
-                  </Text>
-                </Pressable>
+                </View>
               </View>
-            </View>
-          )}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        />
+            );
+            }}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          />
+        </>
       )}
 
       <Modal
@@ -404,31 +528,66 @@ export default function MyListingsScreen() {
               </Pressable>
             </View>
 
-            {LISTING_FILTERS.map((filter) => {
-              const count =
-                filter.key === "ALL"
-                  ? visibleItems.length
-                  : statusCounts[filter.key as ProductSummary["status"]];
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterOptionsWrap}
+              >
+                <FilterChip active={draftCategoryId === ""} label="All" onPress={() => setDraftCategoryId("")} />
+                {categories.map((category) => (
+                  <FilterChip
+                    key={category.id}
+                    active={draftCategoryId === category.id}
+                    label={category.name}
+                    onPress={() => setDraftCategoryId(category.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
 
-              return (
-                <Pressable
-                  key={filter.key}
-                  style={[
-                    styles.sortOption,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: draftFilter === filter.key ? theme.colors.surfaceMuted : theme.colors.surface,
-                    },
-                  ]}
-                  onPress={() => setDraftFilter(filter.key)}
-                >
-                  <Text style={[styles.sortOptionLabel, { color: theme.colors.textPrimary }]}>{filter.label} ({count})</Text>
-                  {draftFilter === filter.key ? (
-                    <Feather name="check" size={16} color={theme.colors.primary} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Types</Text>
+              <View style={styles.filterOptionsWrap}>
+                {LISTING_FILTERS.map((filter) => {
+                  const count =
+                    filter.key === "ALL"
+                      ? filteredWithoutType.length
+                      : statusCounts[filter.key as ProductSummary["status"]];
+
+                  return (
+                    <FilterChip
+                      key={filter.key}
+                      active={draftFilter === filter.key}
+                      label={`${filter.label} (${count})`}
+                      onPress={() => setDraftFilter(filter.key)}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Offer type</Text>
+              <View style={styles.filterOptionsWrap}>
+                <FilterChip
+                  active={draftTradeType === "ALL"}
+                  label="All"
+                  onPress={() => setDraftTradeType("ALL")}
+                />
+                <FilterChip
+                  active={draftTradeType === "BARTER_ONLY"}
+                  label="Barter only"
+                  onPress={() => setDraftTradeType("BARTER_ONLY")}
+                />
+                <FilterChip
+                  active={draftTradeType === "OPEN_FOR_MONEY"}
+                  label="Open for money"
+                  onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
+                />
+              </View>
+            </View>
 
             <View style={styles.filterActionsRow}>
               <Pressable
@@ -439,7 +598,11 @@ export default function MyListingsScreen() {
                     backgroundColor: theme.colors.surfaceMuted,
                   },
                 ]}
-                onPress={() => setDraftFilter("ALL")}
+                onPress={() => {
+                  setDraftFilter("ALL");
+                  setDraftCategoryId("");
+                  setDraftTradeType("ALL");
+                }}
               >
                 <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
               </Pressable>
@@ -459,18 +622,21 @@ export default function MyListingsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <SortBottomSheet
+        visible={showSortModal}
+        value={sortBy}
+        onClose={() => setShowSortModal(false)}
+        onChange={setSortBy}
+      />
     </SafeAreaView>
   );
 }
 
 function ListingPreview({
   product,
-  openRequest,
-  onOpenRequest,
 }: {
   product: ProductSummary;
-  openRequest?: { requestId: string; status: RequestStatus; count: number };
-  onOpenRequest: (requestId: string) => void;
 }) {
   const { theme } = useAppTheme();
   const primaryImage = product.productImages?.find((img) => img.isPrimary) || product.productImages?.[0];
@@ -521,24 +687,14 @@ function ListingPreview({
           {product.description || "No description added yet."}
         </Text>
 
-        {openRequest ? (
-          <Pressable
-            onPress={() => onOpenRequest(openRequest.requestId)}
-            style={[styles.openRequestPill, { borderColor: theme.colors.primary, backgroundColor: theme.colors.chipActiveBg }]}
-          >
-            <Feather name="inbox" size={13} color={theme.colors.chipActiveText} />
-            <Text style={[styles.openRequestPillText, { color: theme.colors.chipActiveText }]}> 
-              Open request {openRequest.count > 1 ? `(${openRequest.count})` : ""} - {openRequest.status}
-            </Text>
-          </Pressable>
-        ) : null}
-
-        <ProductMetadata
-          product={product}
-          variant="compact"
-          showCategory={false}
-          showLocation={false}
-        />
+        <View style={styles.previewTagsWrap}>
+          <ProductMetadata
+            product={product}
+            variant="compact"
+            showCategory={false}
+            showLocation={false}
+          />
+        </View>
       </View>
     </View>
   );
@@ -546,51 +702,33 @@ function ListingPreview({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  listContent: { padding: 16, paddingBottom: 110 },
-  headerCard: {
+  fixedTopContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
+  listContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110 },
+  collapseButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 6,
-    marginBottom: 12,
-  },
-  title: { fontSize: 24, fontWeight: "800" },
-  subtitle: { fontSize: 14 },
-  filterWrap: {
-    marginTop: 4,
-    gap: 8,
-  },
-  filterLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.35,
-  },
-  controlButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    minHeight: 38,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "flex-start",
-  },
-  controlButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  activeCountPill: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  activeCountText: {
-    fontSize: 11,
-    fontWeight: "700",
+  collapseContent: {
+    gap: 10,
+    paddingBottom: 2,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  summaryText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flexShrink: 1,
   },
   sortBackdrop: {
     flex: 1,
@@ -615,18 +753,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
   },
-  sortOption: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  filterSection: {
+    gap: 8,
   },
-  sortOptionLabel: {
-    fontSize: 14,
+  sectionLabel: {
+    fontSize: 13,
     fontWeight: "700",
+  },
+  filterOptionsWrap: {
+    gap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   filterActionsRow: {
     flexDirection: "row",
@@ -707,18 +844,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
   },
-  openRequestPill: {
-    marginTop: 2,
-    borderWidth: 1,
-    borderRadius: 999,
-    alignSelf: "flex-start",
+  previewTagsWrap: {
+    marginTop: 4,
+  },
+  openRequestCard: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    justifyContent: "space-between",
+    gap: 10,
   },
-  openRequestPillText: {
+  openRequestInfoWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  openRequestCardTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  openRequestCardSubtitle: {
+    fontSize: 12,
+  },
+  openRequestViewButton: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  openRequestViewButtonText: {
     fontSize: 12,
     fontWeight: "700",
   },

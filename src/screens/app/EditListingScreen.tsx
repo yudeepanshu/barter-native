@@ -14,6 +14,7 @@ import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
 import { useEditListingForm } from "@/hooks/useEditListingForm";
@@ -22,6 +23,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { ListingLocationSection } from "@/components/products/ListingLocationSection";
 import { ListingTextFields } from "@/components/products/ListingTextFields";
+import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
 export default function EditListingScreen() {
@@ -133,10 +135,11 @@ function EditListingFormSection({
         keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
       >
-        <View style={[styles.headerCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Edit Listing</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Update your listing details.</Text>
-        </View>
+        <PageHeaderCard
+          title="Edit Listing"
+          subtitle="Update your listing details."
+          style={styles.headerCard}
+        />
 
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <ListingTextFields
@@ -219,13 +222,13 @@ function EditListingFormSection({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chips}
             >
-              <CategoryChip
+              <FormCategoryChip
                 label="None"
                 active={form.state.categoryId === ""}
                 onPress={() => form.actions.setCategoryId("")}
               />
               {categories.map((category) => (
-                <CategoryChip
+                <FormCategoryChip
                   key={category.id}
                   label={category.name}
                   active={form.state.categoryId === category.id}
@@ -265,42 +268,6 @@ function EditListingFormSection({
   );
 }
 
-function CategoryChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-
-  return (
-    <Pressable onPress={onPress}>
-      <Text
-        style={[
-          styles.chip,
-          {
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.surfaceMuted,
-            color: theme.colors.textSecondary,
-          },
-          active
-            ? {
-                borderColor: theme.colors.primary,
-                backgroundColor: theme.colors.primary,
-                color: theme.colors.onPrimary,
-              }
-            : undefined,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
@@ -314,13 +281,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 4,
+    marginBottom: 0,
   },
   title: { fontSize: 24, fontWeight: "800" },
-  subtitle: { fontSize: 13 },
   description: { fontSize: 14 },
   sectionCard: {
     borderWidth: 1,
@@ -331,15 +294,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600" },
   categoryBlock: { gap: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  chipActive: {},
   switchBlock: {
     borderWidth: 1,
     borderRadius: 12,

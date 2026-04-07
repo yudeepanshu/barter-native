@@ -177,12 +177,13 @@ export function SelectableProductGrid({
                   <ProductMetadata
                     product={previewProduct}
                     variant="detail"
+                    showProductType={false}
                     showLocation
                   />
                 </>
               ) : null}
 
-              <Button label="Close" variant="ghost" onPress={() => setPreviewProduct(null)} />
+              <Button label="Close" onPress={() => setPreviewProduct(null)} />
             </View>
           </ScrollView>
         </Pressable>

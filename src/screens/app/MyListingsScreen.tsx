@@ -1,4 +1,4 @@
-import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState } from "react";
@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/Input";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { FilterChip } from "@/components/filters/FilterChip";
+import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
@@ -71,8 +72,8 @@ export default function MyListingsScreen() {
   const [showHeaderFilters, setShowHeaderFilters] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<ListingFilter>("ALL");
   const [draftFilter, setDraftFilter] = useState<ListingFilter>("ALL");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [draftCategoryId, setDraftCategoryId] = useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [draftCategoryIds, setDraftCategoryIds] = useState<string[]>([]);
   const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
   const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -115,7 +116,10 @@ export default function MyListingsScreen() {
         return false;
       }
 
-      if (selectedCategoryId && item.categoryId !== selectedCategoryId) {
+      if (
+        selectedCategoryIds.length > 0 &&
+        (typeof item.categoryId !== "string" || !selectedCategoryIds.includes(item.categoryId))
+      ) {
         return false;
       }
 
@@ -126,7 +130,7 @@ export default function MyListingsScreen() {
       const haystack = `${item.title} ${item.description ?? ""} ${item.category?.name ?? ""}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [debouncedSearch, freeOnly, selectedCategoryId, selectedTradeType, visibleItems]);
+  }, [debouncedSearch, freeOnly, selectedCategoryIds, selectedTradeType, visibleItems]);
   const statusCounts = useMemo(() => {
     const counts: Record<ProductSummary["status"], number> = {
       ACTIVE: 0,
@@ -176,7 +180,9 @@ export default function MyListingsScreen() {
 
   const selectedFilterLabel = LISTING_FILTERS.find((item) => item.key === selectedFilter)?.label ?? "All";
   const selectedCategoryLabel =
-    categories.find((category) => category.id === selectedCategoryId)?.name ?? "All";
+    selectedCategoryIds.length === 1
+      ? (categories.find((category) => category.id === selectedCategoryIds[0])?.name ?? "1 category")
+      : `${selectedCategoryIds.length} categories`;
   const selectedTradeTypeLabel =
     selectedTradeType === "BARTER_ONLY"
       ? "Barter only"
@@ -184,7 +190,7 @@ export default function MyListingsScreen() {
         ? "Open for money"
         : "All";
   const activeFilterCount =
-    (selectedCategoryId ? 1 : 0) +
+    (selectedCategoryIds.length > 0 ? 1 : 0) +
     (selectedFilter !== "ALL" ? 1 : 0) +
     (selectedTradeType !== "ALL" ? 1 : 0);
   const showListingsEndMessage =
@@ -194,7 +200,7 @@ export default function MyListingsScreen() {
     !products.query.isFetchingNextPage &&
     !products.query.hasNextPage;
   const selectedFilterSummary = [
-    selectedCategoryId ? selectedCategoryLabel : null,
+    selectedCategoryIds.length > 0 ? selectedCategoryLabel : null,
     selectedFilter !== "ALL" ? selectedFilterLabel : null,
     selectedTradeType !== "ALL" ? selectedTradeTypeLabel : null,
   ]
@@ -203,14 +209,14 @@ export default function MyListingsScreen() {
 
   const onOpenFilterPicker = () => {
     setDraftFilter(selectedFilter);
-    setDraftCategoryId(selectedCategoryId);
+    setDraftCategoryIds(selectedCategoryIds);
     setDraftTradeType(selectedTradeType);
     setShowFilterModal(true);
   };
 
   const onApplyFilter = () => {
     setSelectedFilter(draftFilter);
-    setSelectedCategoryId(draftCategoryId);
+    setSelectedCategoryIds(draftCategoryIds);
     setSelectedTradeType(draftTradeType);
     setShowFilterModal(false);
   };
@@ -556,21 +562,12 @@ export default function MyListingsScreen() {
 
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterOptionsWrap}
-              >
-                <FilterChip active={draftCategoryId === ""} label="All" onPress={() => setDraftCategoryId("")} />
-                {categories.map((category) => (
-                  <FilterChip
-                    key={category.id}
-                    active={draftCategoryId === category.id}
-                    label={category.name}
-                    onPress={() => setDraftCategoryId(category.id)}
-                  />
-                ))}
-              </ScrollView>
+              <CategoryMultiSelectChips
+                categories={categories}
+                selectedIds={draftCategoryIds}
+                onChangeSelectedIds={setDraftCategoryIds}
+                containerStyle={styles.filterOptionsWrap}
+              />
             </View>
 
             <View style={styles.filterSection}>
@@ -626,7 +623,7 @@ export default function MyListingsScreen() {
                 ]}
                 onPress={() => {
                   setDraftFilter("ALL");
-                  setDraftCategoryId("");
+                  setDraftCategoryIds([]);
                   setDraftTradeType("ALL");
                 }}
               >

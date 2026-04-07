@@ -102,6 +102,7 @@ export default function RequestDetailScreen() {
   const [showCounterOfferForm, setShowCounterOfferForm] = useState(false);
   const [considerationTab, setConsiderationTab] = useState<"yours" | "theirs">("yours");
   const [expandRequesterProducts, setExpandRequesterProducts] = useState(false);
+  const [expandYourProducts, setExpandYourProducts] = useState(false);
 
   if (!session) {
     return null;
@@ -565,9 +566,19 @@ export default function RequestDetailScreen() {
           )}
 
           {request.message && (
-            <View style={styles.detailRow}>
+            <View style={styles.messageSection}>
               <Text style={[styles.label, { color: theme.colors.textMuted }]}>Message</Text>
-              <Text style={[styles.value, { flex: 1, color: theme.colors.textPrimary }]}>{request.message}</Text>
+              <View
+                style={[
+                  styles.messageCard,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceMuted,
+                  },
+                ]}
+              >
+                <Text style={[styles.messageText, { color: theme.colors.textPrimary }]}>{request.message}</Text>
+              </View>
             </View>
           )}
         </View>
@@ -580,6 +591,9 @@ export default function RequestDetailScreen() {
               ? yourConsiderationProducts
               : theirConsiderationProducts;
           const singleSideLabel = yourConsiderationProducts.length > 0 ? "Yours" : "Requester's Products";
+          const showingYourProducts = showTabs
+            ? considerationTab === "yours"
+            : singleSideLabel === "Yours";
           const showingRequesterProducts = showTabs
             ? considerationTab === "theirs"
             : singleSideLabel === "Requester's Products";
@@ -587,7 +601,7 @@ export default function RequestDetailScreen() {
           return (
             <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
               <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Products for consideration</Text>
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>These products are offered by the requester and are available to include in your counter offer, if relevant.</Text>
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>These products are offered by the requester and are available to include in counter offer, if relevant.</Text>
               {showTabs ? (
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
                   <Pressable
@@ -618,11 +632,67 @@ export default function RequestDetailScreen() {
                   </Pressable>
                 </View>
               ) : (
-                singleSideLabel !== "Requester's Products" ? (
+                singleSideLabel !== "Requester's Products" && singleSideLabel !== "Yours" ? (
                   <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.textMuted, marginTop: 2 }}>{singleSideLabel}</Text>
                 ) : null
               )}
-              {showingRequesterProducts ? (
+              {showingYourProducts ? (
+                <>
+                  <Pressable
+                    onPress={() => setExpandYourProducts((current) => !current)}
+                    style={[
+                      styles.offerHistoryHeader,
+                      {
+                        marginTop: 4,
+                        paddingVertical: 6,
+                        paddingHorizontal: 2,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 }]}> 
+                      Yours ({activeProducts.length})
+                    </Text>
+                    <Feather
+                      name={expandYourProducts ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color={theme.colors.textSecondary}
+                    />
+                  </Pressable>
+                  <SmoothCollapse expanded={expandYourProducts} maxHeight={460}>
+                    {activeProducts.length > 2 ? (
+                      <ScrollView
+                        style={{ maxHeight: 440 }}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                      >
+                        <View style={styles.offeredProducts}>
+                          {activeProducts.map((product) => (
+                            <View key={product.id} style={{ marginTop: 8 }}>
+                              <ProductCard
+                                product={product}
+                                showMeta={false}
+                                onPress={() => router.push(`/(app)/products/${product.id}`)}
+                              />
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    ) : (
+                      <View style={styles.offeredProducts}>
+                        {activeProducts.map((product) => (
+                          <View key={product.id} style={{ marginTop: 8 }}>
+                            <ProductCard
+                              product={product}
+                              showMeta={false}
+                              onPress={() => router.push(`/(app)/products/${product.id}`)}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </SmoothCollapse>
+                </>
+              ) : showingRequesterProducts ? (
                 <>
                   <Pressable
                     onPress={() => setExpandRequesterProducts((current) => !current)}
@@ -1074,6 +1144,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     marginTop: 2,
+  },
+  messageSection: {
+    gap: 8,
+    marginTop: 2,
+  },
+  messageCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
   },
   label: { fontSize: 12, fontWeight: "600" },
   value: { fontSize: 14, fontWeight: "500" },

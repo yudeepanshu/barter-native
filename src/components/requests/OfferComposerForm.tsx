@@ -261,7 +261,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         value={message}
         onChangeText={onChangeMessage}
         placeholder={messagePlaceholder}
-        maxLength={120}
+        maxLength={60}
         showCharacterCount
       />
 

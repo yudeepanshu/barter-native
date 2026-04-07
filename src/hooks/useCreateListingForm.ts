@@ -7,11 +7,16 @@ import {
   type CreateListingValidationResult,
 } from "@barter/types";
 import { useRouter } from "expo-router";
-import { mobileApiClient } from "@/lib/api/client";
+import { useSession } from "@/hooks/useSession";
 import {
   useCreateProductMutation,
   toErrorMessage,
 } from "@/hooks/mutations/useCreateProductMutation";
+import {
+  MAX_PRODUCTS_PER_USER,
+  getProductCreationLimitMessage,
+  hasReachedProductCreationLimit,
+} from "@/lib/listings/productCreationLimit";
 import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
 import { useAppDialog } from "@/providers/AppDialogProvider";
@@ -31,6 +36,7 @@ interface UseCreateListingFormOptions {
 
 export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const router = useRouter();
+  const session = useSession();
   const createMutation = useCreateProductMutation();
   const { requestLocation } = useDeviceLocation();
   const dialog = useAppDialog();
@@ -110,6 +116,18 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     if (manualLatitude == null || manualLongitude == null) {
       setLocationWarning(LISTING_FORM_ERRORS.LOCATION_REQUIRED);
       return;
+    }
+
+    if (session?.user.id) {
+      try {
+        const atLimit = await hasReachedProductCreationLimit(session.user.id);
+        if (atLimit) {
+          setFormError(getProductCreationLimitMessage(MAX_PRODUCTS_PER_USER));
+          return;
+        }
+      } catch {
+        // If pre-check fails (network/transient), backend still enforces the hard limit.
+      }
     }
 
     const validation = validateCreateListingDraft({

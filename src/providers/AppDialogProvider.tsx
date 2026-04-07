@@ -15,6 +15,8 @@ export interface AppDialogOptions {
   message?: string;
   actions: AppDialogAction[];
   showCloseButton?: boolean;
+  disableDismiss?: boolean;
+  dismissOnBackdrop?: boolean;
 }
 
 interface PendingDialog extends AppDialogOptions {
@@ -108,10 +110,23 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
         visible={Boolean(pendingDialog)}
         transparent
         animationType="fade"
-        onRequestClose={() => onClose(null)}
+        onRequestClose={() => {
+          if (pendingDialog?.disableDismiss) {
+            return;
+          }
+          onClose(null);
+        }}
       >
-        <View style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}> 
-          <View
+        <Pressable
+          style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}
+          onPress={() => {
+            if (!pendingDialog || pendingDialog.disableDismiss || !pendingDialog.dismissOnBackdrop) {
+              return;
+            }
+            onClose(null);
+          }}
+        >
+          <Pressable
             style={[
               styles.dialogCard,
               {
@@ -119,6 +134,9 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 borderColor: theme.colors.border,
               },
             ]}
+            onPress={() => {
+              // Prevent backdrop press from firing when tapping inside dialog.
+            }}
           >
             {pendingDialog ? (
               <>
@@ -169,8 +187,8 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 </View>
               </>
             ) : null}
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </AppDialogContext.Provider>
   );

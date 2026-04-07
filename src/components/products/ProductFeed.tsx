@@ -37,6 +37,7 @@ import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { FilterChip } from "@/components/filters/FilterChip";
+import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { RangeSlider } from "../filters/RangeSlider";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
@@ -89,7 +90,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const [sortBy, setSortBy] = useState<SortOrder>("newest");
   const [isDiscoveryReady, setIsDiscoveryReady] = useState(false);
   const [showHeaderFilters, setShowHeaderFilters] = useState(true);
-  const [draftCategoryId, setDraftCategoryId] = useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [draftCategoryIds, setDraftCategoryIds] = useState<string[]>([]);
   const [draftRadiusKm, setDraftRadiusKm] = useState<number | null>(null);
   const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
   const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
@@ -138,6 +140,15 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
   const visibleProducts = useMemo(() => {
     const next = products.items.filter((item) => {
+      const categoryId = item.categoryId;
+
+      if (
+        selectedCategoryIds.length > 0 &&
+        (typeof categoryId !== "string" || !selectedCategoryIds.includes(categoryId))
+      ) {
+        return false;
+      }
+
       if (freeOnly && !item.isFree) {
         return false;
       }
@@ -179,7 +190,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
       return sortBy === "newest" ? bTime - aTime : aTime - bTime;
     });
     return next;
-  }, [freeOnly, products.items, selectedTradeType, sortBy, viewerLocation]);
+  }, [freeOnly, products.items, selectedCategoryIds, selectedTradeType, sortBy, viewerLocation]);
 
   useEffect(() => {
     if (!lastKnown) {
@@ -334,7 +345,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   };
 
   const onOpenFilters = () => {
-    setDraftCategoryId(filterState.categoryId);
+    setDraftCategoryIds(selectedCategoryIds);
     setDraftRadiusKm(permission === "granted" ? (filterState.proximity?.radiusKm ?? null) : null);
     setDraftTradeType(selectedTradeType);
     setShowFilterModal(true);
@@ -383,7 +394,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
       setSortBy("nearest");
     }
 
-    filterState.setCategoryId(draftCategoryId);
+    setSelectedCategoryIds(draftCategoryIds);
+    filterState.setCategoryId("");
     setSelectedTradeType(draftTradeType);
     setShowFilterModal(false);
   };
@@ -410,7 +422,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   };
 
   const activeFilterCount =
-    (filterState.categoryId ? 1 : 0) +
+    (selectedCategoryIds.length > 0 ? 1 : 0) +
     (filterState.proximity?.radiusKm ? 1 : 0) +
     (selectedTradeType !== "ALL" ? 1 : 0);
   const showFeedEndMessage =
@@ -614,21 +626,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
-              <View style={styles.filterOptionsWrap}>
-                <FilterChip
-                  active={draftCategoryId === ""}
-                  label="All"
-                  onPress={() => setDraftCategoryId("")}
-                />
-                {categories.map((category) => (
-                  <FilterChip
-                    key={category.id}
-                    active={draftCategoryId === category.id}
-                    label={category.name}
-                    onPress={() => setDraftCategoryId(category.id)}
-                  />
-                ))}
-              </View>
+              <CategoryMultiSelectChips
+                categories={categories}
+                selectedIds={draftCategoryIds}
+                onChangeSelectedIds={setDraftCategoryIds}
+                containerStyle={styles.filterOptionsWrap}
+              />
             </View>
 
             <View style={styles.filterSection}>
@@ -720,7 +723,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                   },
                 ]}
                 onPress={() => {
-                  setDraftCategoryId("");
+                  setDraftCategoryIds([]);
                   setDraftRadiusKm(null);
                   setDraftTradeType("ALL");
                 }}

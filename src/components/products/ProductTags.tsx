@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { Feather } from "@expo/vector-icons";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
 type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
 
@@ -15,37 +16,85 @@ export interface ProductTagSpec {
 const TAG_TONES: Record<
   ProductTagTone,
   {
-    top: { bg: string; border: string; text: string };
-    bottom: { bg: string; border: string; text: string };
+    top: {
+      light: { bg: string; border: string; text: string };
+      dark: { bg: string; border: string; text: string };
+    };
+    bottom: {
+      light: { bg: string; border: string; text: string };
+      dark: { bg: string; border: string; text: string };
+    };
   }
 > = {
   mint: {
-    top: { bg: "#f0fdf4", border: "#86efac", text: "#166534" },
-    bottom: { bg: "#dcfce7", border: "#86efac", text: "#166534" },
+    top: {
+      light: { bg: "#f0fdf4", border: "#86efac", text: "#166534" },
+      dark: { bg: "#052e1a", border: "#22c55e", text: "#4ade80" },
+    },
+    bottom: {
+      light: { bg: "#dcfce7", border: "#86efac", text: "#166534" },
+      dark: { bg: "#052e1a", border: "#22c55e", text: "#4ade80" },
+    },
   },
   amber: {
-    top: { bg: "#fffbeb", border: "#fbbf24", text: "#92400e" },
-    bottom: { bg: "#fef3c7", border: "#fcd34d", text: "#92400e" },
+    top: {
+      light: { bg: "#fffbeb", border: "#fbbf24", text: "#92400e" },
+      dark: { bg: "#3b2400", border: "#f59e0b", text: "#fbbf24" },
+    },
+    bottom: {
+      light: { bg: "#fef3c7", border: "#fcd34d", text: "#92400e" },
+      dark: { bg: "#3b2400", border: "#f59e0b", text: "#fbbf24" },
+    },
   },
   violet: {
-    top: { bg: "#f5f3ff", border: "#c4b5fd", text: "#5b21b6" },
-    bottom: { bg: "#ede9fe", border: "#c4b5fd", text: "#5b21b6" },
+    top: {
+      light: { bg: "#f5f3ff", border: "#c4b5fd", text: "#5b21b6" },
+      dark: { bg: "#2e1065", border: "#8b5cf6", text: "#a78bfa" },
+    },
+    bottom: {
+      light: { bg: "#ede9fe", border: "#c4b5fd", text: "#5b21b6" },
+      dark: { bg: "#2e1065", border: "#8b5cf6", text: "#a78bfa" },
+    },
   },
   blue: {
-    top: { bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
-    bottom: { bg: "#dbeafe", border: "#93c5fd", text: "#1d4ed8" },
+    top: {
+      light: { bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
+      dark: { bg: "#0c1b3b", border: "#3b82f6", text: "#93c5fd" },
+    },
+    bottom: {
+      light: { bg: "#dbeafe", border: "#93c5fd", text: "#1d4ed8" },
+      dark: { bg: "#0c1b3b", border: "#3b82f6", text: "#93c5fd" },
+    },
   },
   teal: {
-    top: { bg: "#f0fdfa", border: "#5eead4", text: "#0f766e" },
-    bottom: { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" },
+    top: {
+      light: { bg: "#f0fdfa", border: "#5eead4", text: "#0f766e" },
+      dark: { bg: "#042f2e", border: "#14b8a6", text: "#5eead4" },
+    },
+    bottom: {
+      light: { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" },
+      dark: { bg: "#042f2e", border: "#14b8a6", text: "#5eead4" },
+    },
   },
   slate: {
-    top: { bg: "#f8fafc", border: "#cbd5e1", text: "#475569" },
-    bottom: { bg: "#e2e8f0", border: "#cbd5e1", text: "#475569" },
+    top: {
+      light: { bg: "#f8fafc", border: "#cbd5e1", text: "#475569" },
+      dark: { bg: "#111827", border: "#475569", text: "#cbd5e1" },
+    },
+    bottom: {
+      light: { bg: "#e2e8f0", border: "#cbd5e1", text: "#475569" },
+      dark: { bg: "#111827", border: "#475569", text: "#cbd5e1" },
+    },
   },
   rose: {
-    top: { bg: "#fff1f2", border: "#fda4af", text: "#b91c1c" },
-    bottom: { bg: "#fee2e2", border: "#fda4af", text: "#b91c1c" },
+    top: {
+      light: { bg: "#fff1f2", border: "#fda4af", text: "#b91c1c" },
+      dark: { bg: "#3f0c17", border: "#fb7185", text: "#fda4af" },
+    },
+    bottom: {
+      light: { bg: "#fee2e2", border: "#fda4af", text: "#b91c1c" },
+      dark: { bg: "#3f0c17", border: "#fb7185", text: "#fda4af" },
+    },
   },
 };
 
@@ -87,13 +136,25 @@ export function getContextTag(product: ProductSummary, isRequested: boolean): Pr
 }
 
 export function ProductTag({ tag, variant }: { tag: ProductTagSpec; variant: "top-text" | "bottom-chip" }) {
-  const palette = variant === "top-text" ? TAG_TONES[tag.tone].top : TAG_TONES[tag.tone].bottom;
+  const { theme } = useAppTheme();
+  const mode = theme.mode === "dark" ? "dark" : "light";
+  const palette = variant === "top-text" ? TAG_TONES[tag.tone].top[mode] : TAG_TONES[tag.tone].bottom[mode];
 
   if (variant === "top-text") {
     return (
-      <Text style={[styles.topTypeText, { color: palette.text }]} numberOfLines={1}>
-        {tag.label}
-      </Text>
+      <View
+        style={[
+          styles.topTypeBadge,
+          {
+            borderColor: palette.border,
+            backgroundColor: palette.bg,
+          },
+        ]}
+      >
+        <Text style={[styles.topTypeText, { color: palette.text }]} numberOfLines={1}>
+          {tag.label}
+        </Text>
+      </View>
     );
   }
 
@@ -116,8 +177,15 @@ export function ProductTag({ tag, variant }: { tag: ProductTagSpec; variant: "to
 }
 
 const styles = StyleSheet.create({
+  topTypeBadge: {
+    maxWidth: 148,
+    borderWidth: 1.75,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+  },
   topTypeText: {
-    maxWidth: 132,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -128,7 +196,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 8,
     alignSelf: "flex-start",
     overflow: "hidden",
     paddingHorizontal: 8,

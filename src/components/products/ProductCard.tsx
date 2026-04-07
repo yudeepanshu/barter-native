@@ -2,7 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
-import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
+import { ProductMetadata, formatLocationBadgeLabel, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
 
 interface ProductCardProps {
@@ -67,7 +67,7 @@ export function ProductCard({
             showProductType={false}
             showLocation={false}
             viewerLocation={viewerLocation}
-            fallbackDistanceLabel={fallbackDistanceLabel}
+            fallbackDistanceLabel={fallbackDistanceLabel ?? formatLocationBadgeLabel(product.locationName)}
           />
         </View>
       ) : null}

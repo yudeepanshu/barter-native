@@ -3,6 +3,9 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -14,6 +17,9 @@ interface ButtonProps {
   variant?: Variant;
   loading?: boolean;
   disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
+  textColor?: string;
 }
 
 export function Button({
@@ -22,6 +28,9 @@ export function Button({
   variant = "primary",
   loading = false,
   disabled = false,
+  style,
+  labelStyle,
+  textColor,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const { theme } = useAppTheme();
@@ -34,13 +43,14 @@ export function Button({
         : theme.colors.primary;
   const borderColor = variant === "ghost" ? theme.colors.border : "transparent";
   const labelColor =
-    variant === "ghost"
+    textColor ??
+    (variant === "ghost"
       ? isDisabled
         ? theme.colors.textMuted
         : theme.colors.textPrimary
       : variant === "success"
         ? theme.colors.onSuccess
-        : theme.colors.onPrimary;
+        : theme.colors.onPrimary);
   const loadingColor = labelColor;
 
   return (
@@ -63,12 +73,13 @@ export function Button({
           borderColor,
           borderWidth: variant === "ghost" ? 1 : 0,
         },
+        style,
       ]}
     >
       {loading ? (
         <ActivityIndicator size={18} color={loadingColor} />
       ) : (
-        <Text style={[styles.label, { color: labelColor }]}>
+        <Text style={[styles.label, { color: labelColor }, labelStyle]}>
           {label}
         </Text>
       )}

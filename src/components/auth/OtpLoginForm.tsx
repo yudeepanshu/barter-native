@@ -18,7 +18,7 @@ export function OtpLoginForm() {
           setIdentifier(val);
           resetError();
         }}
-        placeholder="you@example.com or 9876543210"
+        placeholder="you@example.com or 98XXXXXX10"
         autoCapitalize="none"
         keyboardType="email-address"
         editable={step !== "code"}

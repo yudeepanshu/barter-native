@@ -44,6 +44,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const [categoryId, setCategoryId] = useState("");
   const [isFree, setIsFree] = useState(false);
   const [requestByMoney, setRequestByMoney] = useState(false);
+  const [minMoneyAmount, setMinMoneyAmount] = useState("");
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [fieldErrors, setFieldErrors] = useState<CreateListingValidationResult["fieldErrors"]>({});
   const [locationWarning, setLocationWarning] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     setCategoryId("");
     setIsFree(false);
     setRequestByMoney(false);
+    setMinMoneyAmount("");
     setImages([]);
     setFieldErrors({});
     setLocationWarning(null);
@@ -117,6 +119,9 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       categoryId,
       isFree,
       requestByMoney,
+      minMoneyAmount: requestByMoney
+        ? (minMoneyAmount.trim().length > 0 ? Number(minMoneyAmount) : null)
+        : null,
       imageFileNames: images.map(
         (asset, index) => asset.fileName ?? `mobile-image-${index + 1}.jpg`,
       ),
@@ -225,6 +230,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       categoryId,
       isFree,
       requestByMoney,
+      minMoneyAmount,
       images,
       fieldErrors,
       locationWarning,
@@ -247,6 +253,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       setCategoryId,
       setIsFree,
       setRequestByMoney,
+      setMinMoneyAmount,
       submit,
       pickImages,
       removeImageAt,

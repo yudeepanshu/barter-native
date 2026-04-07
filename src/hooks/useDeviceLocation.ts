@@ -18,20 +18,26 @@ function buildLocationName(
     subregion?: string | null;
     city?: string | null;
     region?: string | null;
+    country?: string | null;
     name?: string | null;
   } | null,
 ): string | undefined {
   if (!placemark) return undefined;
-  const picked = [
-    placemark.district,
-    placemark.subregion,
-    placemark.city,
-    placemark.region,
-    placemark.name,
-  ]
+
+  const city = [placemark.city, placemark.district, placemark.subregion, placemark.name]
     .map((value) => value?.trim())
     .find((value): value is string => Boolean(value));
-  return picked;
+  const state = placemark.region?.trim() || null;
+  const country = placemark.country?.trim() || null;
+
+  const parts = [city, state]
+    .filter((value, index, arr): value is string => Boolean(value) && arr.indexOf(value) === index);
+
+  if (country && country.toLowerCase() !== "india" && !parts.includes(country)) {
+    parts.push(country);
+  }
+
+  return parts.length > 0 ? parts.join(", ") : undefined;
 }
 
 export async function reverseGeocodeCoords(

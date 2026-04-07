@@ -46,6 +46,9 @@ export function useEditListingForm(
   const [categoryId, setCategoryId] = useState(() => product.categoryId ?? "");
   const [isFree, setIsFree] = useState(() => Boolean(product.isFree));
   const [requestByMoney, setRequestByMoney] = useState(() => Boolean(product.requestByMoney));
+  const [minMoneyAmount, setMinMoneyAmount] = useState(() =>
+    product.minMoneyAmount != null ? String(product.minMoneyAmount) : "",
+  );
   const [existingImages, setExistingImages] = useState<ProductImage[]>(() => product.productImages ?? []);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -111,6 +114,9 @@ export function useEditListingForm(
       categoryId,
       isFree,
       requestByMoney,
+      minMoneyAmount: requestByMoney
+        ? (minMoneyAmount.trim().length > 0 ? Number(minMoneyAmount) : null)
+        : null,
       imageFileNames: [
         ...Array.from({ length: existingImages.length }, (_, index) => `existing-image-${index + 1}.jpg`),
         ...newImages.map((asset, index) => asset.fileName ?? `mobile-image-${index + 1}.jpg`),
@@ -249,6 +255,7 @@ export function useEditListingForm(
       categoryId,
       isFree,
       requestByMoney,
+      minMoneyAmount,
       existingImages,
       newImages,
       fieldErrors,
@@ -266,6 +273,7 @@ export function useEditListingForm(
       setCategoryId,
       setIsFree,
       setRequestByMoney,
+      setMinMoneyAmount,
       setFormError,
       pickImages,
       removeExistingImage,
@@ -283,6 +291,7 @@ function buildUpdatePayload(
     description?: string;
     categoryId?: string;
     requestByMoney?: boolean;
+    minMoneyAmount?: number | null;
     isFree?: boolean;
     locationName?: string;
   },
@@ -321,6 +330,12 @@ function buildUpdatePayload(
   }
   if (Boolean(normalized.requestByMoney) !== Boolean(product.requestByMoney)) {
     payload.requestByMoney = Boolean(normalized.requestByMoney);
+  }
+  if (Boolean(normalized.requestByMoney)) {
+    const nextMinAmount = normalized.minMoneyAmount ?? 0;
+    if (Number(product.minMoneyAmount ?? 0) !== Number(nextMinAmount)) {
+      payload.minMoneyAmount = nextMinAmount;
+    }
   }
 
   return payload;

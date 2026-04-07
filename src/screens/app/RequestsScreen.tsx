@@ -18,18 +18,15 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { ToggleChip } from "@/components/ui/ToggleChip";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
-  useCreateCounterOfferMutation,
   useRejectRequestMutation,
   toErrorMessage as toRequestErrorMessage,
 } from "@/hooks/mutations/useRequestMutations";
 import { useActiveTransactionQuery } from "@/hooks/queries/useActiveTransactionQuery";
-import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -81,7 +78,7 @@ function getStatusBadgeStyle(status: string): { bg: string; text: string } {
     case "NEGOTIATING": return { bg: "#dbeafe", text: "#1d4ed8" };
     case "ACCEPTED": return { bg: "#dcfce7", text: "#15803d" };
     case "REJECTED": return { bg: "#fee2e2", text: "#b91c1c" };
-    case "CANCELLED": return { bg: "#f1f5f9", text: "#64748b" };
+    case "CANCELLED": return { bg: "#f1f5f9", text: "#111827" };
     case "COMPLETED": return { bg: "#ccfbf1", text: "#0f766e" };
     default: return { bg: "#e2e8f0", text: "#334155" };
   }
@@ -94,22 +91,14 @@ export default function RequestsScreen() {
   const session = useSession();
   const sentQuery = useRequestsQuery("sent", { limit: 20 });
   const receivedQuery = useRequestsQuery("received", { limit: 20 });
-  const ownProducts = useProductsListController({
-    ownerId: session?.user.id,
-    status: "ACTIVE",
-    limit: 60,
-  });
-
   const acceptMutation = useAcceptRequestMutation();
   const rejectMutation = useRejectRequestMutation();
   const cancelMutation = useCancelRequestMutation();
-  const counterOfferMutation = useCreateCounterOfferMutation();
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedGroups = useMemo(() => buildProductRequestGroups(receivedItems), [receivedItems]);
   const sentGroups = useMemo(() => buildProductRequestGroups(sentItems), [sentItems]);
-  const ownOfferableProducts = ownProducts.items;
   const [activeTab, setActiveTab] = useState<"received" | "sent">(
     params.tab === "sent" ? "sent" : "received",
   );
@@ -260,7 +249,6 @@ export default function RequestsScreen() {
     void Promise.all([
       sentQuery.refetch(),
       receivedQuery.refetch(),
-      ownProducts.query.refetch(),
     ]);
   };
 
@@ -301,9 +289,7 @@ export default function RequestsScreen() {
               contentContainerStyle={styles.scrollAreaContent}
               refreshControl={
                 <RefreshControl
-                  refreshing={
-                    sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching
-                  }
+                  refreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
                   onRefresh={onRefreshAll}
                 />
               }
@@ -335,10 +321,8 @@ export default function RequestsScreen() {
               acceptMutation={acceptMutation}
               rejectMutation={rejectMutation}
               cancelMutation={cancelMutation}
-              counterOfferMutation={counterOfferMutation}
               sessionUserId={session?.user.id ?? ""}
-              ownOfferableProducts={ownOfferableProducts}
-              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
+              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
               onRefresh={onRefreshAll}
             />
           ) : null}
@@ -361,10 +345,8 @@ export default function RequestsScreen() {
               acceptMutation={acceptMutation}
               rejectMutation={rejectMutation}
               cancelMutation={cancelMutation}
-              counterOfferMutation={counterOfferMutation}
               sessionUserId={session?.user.id ?? ""}
-              ownOfferableProducts={ownOfferableProducts}
-              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching || ownProducts.query.isRefetching}
+              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
               onRefresh={onRefreshAll}
             />
           ) : null}
@@ -474,9 +456,7 @@ function RequestSection({
   acceptMutation,
   rejectMutation,
   cancelMutation,
-  counterOfferMutation,
   sessionUserId,
-  ownOfferableProducts,
 }: {
   title: string;
   actorTurn: RequestTurn;
@@ -496,9 +476,7 @@ function RequestSection({
   acceptMutation: ReturnType<typeof useAcceptRequestMutation>;
   rejectMutation: ReturnType<typeof useRejectRequestMutation>;
   cancelMutation: ReturnType<typeof useCancelRequestMutation>;
-  counterOfferMutation: ReturnType<typeof useCreateCounterOfferMutation>;
   sessionUserId: string;
-  ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
   const flattenedRows = useMemo(() => {
@@ -595,9 +573,7 @@ function RequestSection({
                   acceptMutation={acceptMutation}
                   rejectMutation={rejectMutation}
                   cancelMutation={cancelMutation}
-                  counterOfferMutation={counterOfferMutation}
                   sessionUserId={sessionUserId}
-                  ownOfferableProducts={ownOfferableProducts}
                 />
               )
             }
@@ -620,9 +596,7 @@ function RequestItem({
   acceptMutation,
   rejectMutation,
   cancelMutation,
-  counterOfferMutation,
   sessionUserId,
-  ownOfferableProducts,
 }: {
   item: RequestSummary;
   router: ReturnType<typeof useRouter>;
@@ -630,9 +604,7 @@ function RequestItem({
   acceptMutation: ReturnType<typeof useAcceptRequestMutation>;
   rejectMutation: ReturnType<typeof useRejectRequestMutation>;
   cancelMutation: ReturnType<typeof useCancelRequestMutation>;
-  counterOfferMutation: ReturnType<typeof useCreateCounterOfferMutation>;
   sessionUserId: string;
-  ownOfferableProducts: ProductSummary[];
 }) {
   const { theme } = useAppTheme();
   const activeTransactionQuery = useActiveTransactionQuery(
@@ -640,21 +612,6 @@ function RequestItem({
     item.status === "ACCEPTED" && item.product.status !== "EXCHANGED",
   );
   const [txFeedback, setTxFeedback] = useState<string | null>(null);
-  const [showCounterForm, setShowCounterForm] = useState(false);
-  const [counterOfferType, setCounterOfferType] = useState<"PRODUCT" | "MONEY" | "MIXED" | "NONE">(
-    item.product.isFree ? "NONE" : item.product.requestByMoney ? "MONEY" : "PRODUCT",
-  );
-  const [counterAmount, setCounterAmount] = useState("");
-  const [counterOfferedProductIds, setCounterOfferedProductIds] = useState<string[]>([]);
-    const toggleCounterProduct = (productId: string) => {
-      setCounterOfferedProductIds((prev) =>
-        prev.includes(productId)
-          ? prev.filter((existingId) => existingId !== productId)
-          : [...prev, productId],
-      );
-    };
-
-  const [counterMessage, setCounterMessage] = useState("");
 
   const activeOffer = item.offers[item.offers.length - 1];
   const isExchangeFinalized = item.product.status === "EXCHANGED";
@@ -673,10 +630,6 @@ function RequestItem({
     canActByTurn;
   const isBuyer = sessionUserId === item.buyerId;
   const isSeller = sessionUserId === item.sellerId;
-  const hasInlineInputOpen = showCounterForm;
-  const selectableOwnProducts = ownOfferableProducts.filter(
-    (product) => product.id !== item.productId,
-  );
 
   const onAccept = () => {
     void acceptMutation.mutateAsync(item.id).catch(() => {
@@ -698,58 +651,25 @@ function RequestItem({
       });
   };
 
-  const onSubmitCounter = () => {
-    const payload: {
-      offerType: "PRODUCT" | "MONEY" | "MIXED" | "NONE";
-      offeredProducts?: string[];
-      amount?: number;
-      message?: string;
-    } = {
-      offerType: counterOfferType,
-      ...(counterMessage.trim() ? { message: counterMessage.trim() } : {}),
-    };
-
-    if (counterOfferType === "MONEY" || counterOfferType === "MIXED") {
-      const amountValue = Number(counterAmount);
-      if (!Number.isFinite(amountValue) || amountValue <= 0) {
-        setTxFeedback("Enter a valid positive amount.");
-        return;
-      }
-      payload.amount = amountValue;
-    }
-
-    if (counterOfferType === "PRODUCT" || counterOfferType === "MIXED") {
-      if (counterOfferedProductIds.length === 0) {
-        setTxFeedback("Select one or more listings for your counter offer.");
-        return;
-      }
-      payload.offeredProducts = counterOfferedProductIds;
-    }
-
-    void counterOfferMutation
-      .mutateAsync({ requestId: item.id, payload })
-      .then(() => {
-        setShowCounterForm(false);
-        setCounterAmount("");
-        setCounterMessage("");
-        setCounterOfferedProductIds([]);
-      })
-      .catch((error) => {
-        setTxFeedback(toRequestErrorMessage(error));
-      });
-  };
-
   return (
     <Pressable
       style={styles.itemCardPressable}
-      disabled={hasInlineInputOpen}
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
       <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}> 
         <View style={styles.detailsBlock}>
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, styles.statusLabel, { color: theme.colors.textMuted }]}>Status</Text>
-            <View style={[styles.badgeWrap, { backgroundColor: getStatusBadgeStyle(displayStatus).bg }]}> 
+            <View
+              style={[
+                styles.badgeWrap,
+                {
+                  backgroundColor: getStatusBadgeStyle(displayStatus).bg,
+                  borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
+                  borderColor: displayStatus === "CANCELLED" ? "#111827" : "transparent",
+                },
+              ]}
+            > 
               <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
                 {displayStatus}
               </Text>
@@ -761,10 +681,14 @@ function RequestItem({
               {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
             </Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest Offer</Text>
-            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>{activeOffer?.type ?? "NONE"}</Text>
-          </View>
+          {activeOffer?.type && activeOffer.type !== "NONE" ? (
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest Offer</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                {activeOffer.type === "MIXED" ? "PRODUCT + MONEY" : activeOffer.type}
+              </Text>
+            </View>
+          ) : null}
           {activeOffer?.offeredAmount != null ? (
             <View style={styles.detailRow}>
               <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Amount</Text>
@@ -875,105 +799,7 @@ function RequestItem({
         </View>
         */}
 
-      {showCounterForm && canCounter ? (
-        <View style={[styles.counterCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
-          <Text style={[styles.transactionTitle, { color: theme.colors.textPrimary }]}>Create Counter Offer</Text>
 
-          {!item.product.isFree ? (
-            <View style={styles.modeRow}>
-              {item.product.requestByMoney ? (
-                <>
-                  <ToggleChip
-                    label="MONEY"
-                    selected={counterOfferType === "MONEY"}
-                    style={styles.modeChip}
-                    onPress={() => setCounterOfferType("MONEY")}
-                  />
-                  <ToggleChip
-                    label="PRODUCT"
-                    selected={counterOfferType === "PRODUCT"}
-                    style={styles.modeChip}
-                    onPress={() => setCounterOfferType("PRODUCT")}
-                  />
-                  <ToggleChip
-                    label="MIXED"
-                    selected={counterOfferType === "MIXED"}
-                    style={styles.modeChip}
-                    onPress={() => setCounterOfferType("MIXED")}
-                  />
-                </>
-              ) : (
-                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>This request accepts product-only offers.</Text>
-              )}
-            </View>
-          ) : null}
-
-          {(counterOfferType === "MONEY" || counterOfferType === "MIXED") &&
-          !item.product.isFree ? (
-            <Input
-              label="Amount"
-              value={counterAmount}
-              onChangeText={setCounterAmount}
-              keyboardType="numeric"
-            />
-          ) : null}
-
-          {(counterOfferType === "PRODUCT" || counterOfferType === "MIXED") &&
-          !item.product.isFree ? (
-            <View style={styles.offerWrap}>
-              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>Select offered listing</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.offerList}
-              >
-                {selectableOwnProducts.map((product) => (
-                  <Pressable
-                    key={product.id}
-                    onPress={() => toggleCounterProduct(product.id)}
-                    style={[
-                      styles.offerChip,
-                      { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
-                      counterOfferedProductIds.includes(product.id)
-                        ? [styles.offerChipActive, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }]
-                        : undefined,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.offerChipText,
-                        { color: theme.colors.textSecondary },
-                        counterOfferedProductIds.includes(product.id)
-                          ? [styles.offerChipTextActive, { color: theme.colors.onPrimary }]
-                          : undefined,
-                      ]}
-                    >
-                      {product.title}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              {counterOfferedProductIds.length > 0 ? (
-                <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>
-                  {counterOfferedProductIds.length} listing(s) selected.
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          <Input
-            label="Message (optional)"
-            value={counterMessage}
-            onChangeText={setCounterMessage}
-          />
-
-          <Button
-            label="Submit counter"
-            loading={counterOfferMutation.isPending}
-            onPress={onSubmitCounter}
-          />
-        </View>
-      ) : null}
 
       </View>
     </Pressable>

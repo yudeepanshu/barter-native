@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
@@ -250,6 +251,16 @@ function EditListingFormSection({
                 onValueChange={form.actions.setRequestByMoney}
               />
             </View>
+            {form.state.requestByMoney ? (
+              <Input
+                label="Minimum amount (₹)"
+                value={form.state.minMoneyAmount}
+                onChangeText={form.actions.setMinMoneyAmount}
+                keyboardType="numeric"
+                placeholder="Enter minimum accepted amount"
+                error={form.state.fieldErrors.minMoneyAmount ?? null}
+              />
+            ) : null}
           </View>
         </View>
 

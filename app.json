@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Barter",
+    "name": "Xact",
     "slug": "barter-mobile",
-    "version": "1.0.0",
+    "version": "1.1.2-alpha.0",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Barter uses your location to auto-fill listing location details and show nearby listings."
+        "NSLocationWhenInUseUsageDescription": "Xact uses your location to auto-fill listing location details and show nearby listings."
       },
       "bundleIdentifier": "com.barter.app"
     },
@@ -42,7 +42,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Barter uses your location to auto-fill listing details and improve nearby feed results."
+          "locationWhenInUsePermission": "Xact uses your location to auto-fill listing details and improve nearby feed results."
         }
       ]
     ],

@@ -2,14 +2,18 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
+import type { NotificationsListResult } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryClient } from "@/lib/query/queryClient";
+import { queryKeys } from "@/lib/query/queryKeys";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
 import { AppDialogProvider } from "@/providers/AppDialogProvider";
+import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
+const NOTIFICATIONS_BOOTSTRAP_FILTERS = { limit: 20, unreadOnly: false } as const;
 
 function isAuthBootstrapFailure(error: unknown) {
   const apiError = ApiClient.toApiError(error);
@@ -244,12 +248,71 @@ function PushNotificationsBootstrap() {
   return null;
 }
 
+function NotificationsBootstrap() {
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
+  const lastLoadedUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+
+    if (lastLoadedUserIdRef.current === session.user.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const bootstrapNotifications = async () => {
+      try {
+        await queryClient.prefetchInfiniteQuery({
+          queryKey: queryKeys.notifications.infinite(NOTIFICATIONS_BOOTSTRAP_FILTERS),
+          queryFn: async ({ pageParam }) => {
+            const envelope = await mobileApiClient.getNotifications({
+              ...NOTIFICATIONS_BOOTSTRAP_FILTERS,
+              cursor: pageParam ?? undefined,
+            });
+
+            return envelope.data ?? { items: [], nextCursor: null, hasMore: false, unreadCount: 0 };
+          },
+          initialPageParam: null as string | null,
+          getNextPageParam: (lastPage: NotificationsListResult) =>
+            (lastPage.hasMore ? lastPage.nextCursor : undefined),
+        });
+
+        if (!cancelled) {
+          lastLoadedUserIdRef.current = session.user.id;
+        }
+      } catch {
+        // Best-effort bootstrap fetch; notification screen can still load on demand.
+      }
+    };
+
+    void bootstrapNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      lastLoadedUserIdRef.current = null;
+    }
+  }, [status]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthBootstrap>
         <AppDialogProvider>
+          <AppUpdateProvider />
           <PushNotificationsBootstrap />
+          <NotificationsBootstrap />
           {children}
         </AppDialogProvider>
       </AuthBootstrap>

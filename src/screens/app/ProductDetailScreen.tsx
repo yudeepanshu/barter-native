@@ -19,21 +19,24 @@ import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import {
   ProductMetadata,
   hasExchangeHistory,
   getInactiveExpiryWarning,
   formatDistanceLabel,
+  formatLocationBadgeLabel,
 } from "@/components/products/ProductMetadata";
 import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
-import { ToggleChip } from "@/components/ui/ToggleChip";
-import { Input } from "@/components/ui/Input";
+import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+
+const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -56,6 +59,7 @@ export default function ProductDetailScreen() {
   const query = useProductQuery(productId);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const productData = query.data ?? null;
+  const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
   const handleBack = () => {
     if (backTo === "my-listings") {
@@ -296,8 +300,8 @@ export default function ProductDetailScreen() {
               showProductType={false}
               showLocation={false}
               viewerLocation={viewerLocation}
-              fallbackDistanceLabel={viewerLocation ? null : ">100 km away"}
-              distanceOverrideLabel={routeDistanceLabel}
+              fallbackDistanceLabel={previewLocationLabel}
+              distanceOverrideLabel={previewLocationLabel ?? routeDistanceLabel}
             />
           </View>
         </View>
@@ -340,7 +344,7 @@ export default function ProductDetailScreen() {
           </View>
         ) : null}
 
-          {session ? (
+          {session && !activeRequest ? (
             <RequestComposer
               product={product}
               sessionUserId={session.user.id}
@@ -388,11 +392,12 @@ function RequestComposer({
     hasInactiveOrUnlistedProducts && ownOfferableProducts.length === 0;
 
   const { theme } = useAppTheme();
-  const [includeMoney, setIncludeMoney] = useState(!product.isFree && product.requestByMoney);
-  const [includeProduct, setIncludeProduct] = useState(!product.isFree && !product.requestByMoney);
+  const [includeMoney, setIncludeMoney] = useState(false);
+  const [includeProduct, setIncludeProduct] = useState(true);
   const [offeredProductIds, setOfferedProductIds] = useState<string[]>(() =>
     initialOfferedProductId ? [initialOfferedProductId] : [],
   );
+  const [visibleProductIds, setVisibleProductIds] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -401,9 +406,14 @@ function RequestComposer({
   const requestable =
     (product.status === "ACTIVE" || product.status === "RESERVED") && product.isListed;
   const supportsMixedOffers = product.requestByMoney || product.isFree;
+  const lockProductSelectionUntilMoney = Boolean(product.requestByMoney) && !product.isFree;
   const wantsMoney = supportsMixedOffers ? includeMoney : false;
   const wantsProduct = supportsMixedOffers ? includeProduct : true;
   const requiresExchangeOffer = !product.isFree;
+  const visibleOwnProducts = useMemo(
+    () => ownOfferableProducts.filter((item) => !offeredProductIds.includes(item.id)),
+    [ownOfferableProducts, offeredProductIds],
+  );
 
   useEffect(() => {
     if (!initialOfferedProductId) {
@@ -420,6 +430,12 @@ function RequestComposer({
     );
     setIncludeProduct(true);
   }, [initialOfferedProductId, ownOfferableProducts]);
+
+  useEffect(() => {
+    if (lockProductSelectionUntilMoney && !includeMoney && !includeProduct) {
+      setIncludeProduct(true);
+    }
+  }, [lockProductSelectionUntilMoney, includeMoney, includeProduct]);
 
   if (isOwner) {
     return null;
@@ -438,6 +454,17 @@ function RequestComposer({
         const parsedAmount = Number(amount);
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
           setFeedback("Enter a valid positive amount.");
+          return;
+        }
+
+        if (parsedAmount > MAX_REQUEST_OFFER_AMOUNT) {
+          setFeedback("Amount cannot exceed 15 crore.");
+          return;
+        }
+        
+        // Validate against minimum only when listing accepts money offers
+        if (product.requestByMoney && product.minMoneyAmount != null && parsedAmount < product.minMoneyAmount) {
+          setFeedback(`Minimum amount is ${formatCurrency(product.minMoneyAmount)}. Please enter a higher amount.`);
           return;
         }
       }
@@ -459,6 +486,7 @@ function RequestComposer({
         productId: product.id,
         offerType,
         offeredProducts: wantsProduct ? offeredProductIds : undefined,
+        visibleProducts: visibleProductIds.length > 0 ? visibleProductIds : undefined,
         amount: wantsMoney ? Number(amount) : undefined,
         contactPreference: "PHONE",
         message: message.trim() || undefined,
@@ -471,6 +499,14 @@ function RequestComposer({
 
   const toggleOfferedProduct = (nextProductId: string) => {
     setOfferedProductIds((prev) =>
+      prev.includes(nextProductId)
+        ? prev.filter((productId) => productId !== nextProductId)
+        : [...prev, nextProductId],
+    );
+  };
+
+  const toggleVisibleProduct = (nextProductId: string) => {
+    setVisibleProductIds((prev) =>
       prev.includes(nextProductId)
         ? prev.filter((productId) => productId !== nextProductId)
         : [...prev, nextProductId],
@@ -495,112 +531,81 @@ function RequestComposer({
       ) : null}
 
       {requestable ? (
-        <>
-          <View style={styles.modeRow}>
-            {supportsMixedOffers ? (
-              <>
-                <ToggleChip
-                  label="Include money"
-                  selected={includeMoney}
-                  style={styles.modeChip}
-                  onPress={() => setIncludeMoney((prev) => !prev)}
-                />
-                <ToggleChip
-                  label="Include product"
-                  selected={includeProduct}
-                  style={styles.modeChip}
-                  onPress={() => setIncludeProduct((prev) => !prev)}
-                />
-              </>
-            ) : (
-              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts product offers only.</Text>
-            )}
-          </View>
-
-          {wantsMoney ? (
-            <Input
-              label="Offer amount"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-            />
-          ) : null}
-
-          {wantsProduct ? (
-            <View style={styles.offerWrap}>
-              <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>Your listing to offer</Text>
-              {ownOfferableProducts.length > 0 ? (
-                <>
-                  <View style={styles.offerList}>
-                    {ownOfferableProducts.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => toggleOfferedProduct(item.id)}
-                        style={[
-                          styles.offerChip,
-                          {
-                            borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.surfaceMuted,
-                          },
-                          offeredProductIds.includes(item.id)
-                            ? [styles.offerChipActive, { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }]
-                            : undefined,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.offerChipText,
-                            { color: theme.colors.textSecondary },
-                            offeredProductIds.includes(item.id)
-                              ? [styles.offerChipTextActive, { color: theme.colors.onPrimary }]
-                              : undefined,
-                          ]}
-                        >
-                          {item.title}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {offeredProductIds.length > 0 ? (
-                    <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{offeredProductIds.length} listing(s) selected.</Text>
-                  ) : null}
-                </>
-              ) : ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? null : (
-                <View
-                  style={[
-                    styles.emptyOfferCard,
-                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
-                  ]}
-                >
-                  <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>No listing to offer yet.</Text>
-                  {hasOwnedProductsButNoneListed ? (
-                    <>
-                      <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
-                        You already have products, but none are currently listed.
-                      </Text>
-                      <View style={styles.emptyOfferActions}>
-                        <Button
-                          label="See listings"
-                          variant="ghost"
-                          onPress={() => router.push("/(app)/(tabs)/my-listings")}
-                        />
-                        <Button
-                          label="Create listing"
-                          variant="ghost"
-                          onPress={() =>
-                            router.push({
-                              pathname: "/(app)/(tabs)/create",
-                              params: { returnToProductId: product.id },
-                            })
-                          }
-                        />
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
-                        Create one first, then come back and include it in this request.
-                      </Text>
+        <OfferComposerForm
+          title="Send Request"
+          subtitle="Start a negotiation for this listing."
+          showHeader={false}
+          supportsMixedOffers={supportsMixedOffers}
+          includeMoney={includeMoney}
+          includeProduct={includeProduct}
+          includeProductFirst
+          onToggleIncludeMoney={() =>
+            setIncludeMoney((prev) => {
+              const next = !prev;
+              if (!next && lockProductSelectionUntilMoney) {
+                setIncludeProduct(true);
+              }
+              return next;
+            })
+          }
+          onToggleIncludeProduct={() => {
+            if (lockProductSelectionUntilMoney && !includeMoney && includeProduct) {
+              return;
+            }
+            setIncludeProduct((prev) => !prev);
+          }}
+          showAmountField={wantsMoney}
+          amountLabel={`Offer amount (${getCurrencySymbol()})`}
+          amount={amount}
+          onChangeAmount={setAmount}
+          amountPlaceholder="Enter amount"
+          amountHelperText={
+            product.requestByMoney && product.minMoneyAmount != null
+              ? `Minimum accepted: ${formatCurrency(product.minMoneyAmount)}`
+              : undefined
+          }
+          amountWarningText={
+            amount && Number.isFinite(Number(amount))
+              ? Number(amount) > MAX_REQUEST_OFFER_AMOUNT
+                ? "Amount cannot exceed 15 crore"
+                : product.requestByMoney &&
+                  product.minMoneyAmount != null &&
+                  Number(amount) < product.minMoneyAmount
+                  ? "Amount is below minimum"
+                  : undefined
+              : undefined
+          }
+          showProductSelector={wantsProduct}
+          productSelectorLabel="Your listing to offer"
+          offerableProducts={ownOfferableProducts}
+          selectedProductIds={offeredProductIds}
+          onToggleProduct={toggleOfferedProduct}
+          selectedProductsHint={offeredProductIds.length > 0 ? `${offeredProductIds.length} listing(s) selected.` : undefined}
+          showVisibleProductSelector={wantsProduct}
+          visibleProductSelectorLabel="Show for consideration"
+          visibleProducts={visibleOwnProducts}
+          selectedVisibleProductIds={visibleProductIds}
+          onToggleVisibleProduct={toggleVisibleProduct}
+          noProductsContent={
+            ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? null : (
+              <View
+                style={[
+                  styles.emptyOfferCard,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                ]}
+              >
+                <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>No listing to offer yet.</Text>
+                {hasOwnedProductsButNoneListed ? (
+                  <>
+                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
+                      You already have products, but none are currently listed.
+                    </Text>
+                    <View style={styles.emptyOfferActions}>
+                      <Button
+                        label="See listings"
+                        variant="ghost"
+                        onPress={() => router.push("/(app)/(tabs)/my-listings")}
+                      />
                       <Button
                         label="Create listing"
                         variant="ghost"
@@ -611,31 +616,44 @@ function RequestComposer({
                           })
                         }
                       />
-                    </>
-                  )}
-                </View>
-              )}
-              {ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? (
-                <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>Loading your listings...</Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          <Input
-            label="Message (optional)"
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Add details for the seller"
-          />
-
-          {feedback ? <Text style={[styles.feedback, { color: theme.colors.textSecondary }]}>{feedback}</Text> : null}
-
-          <Button
-            label="Send request"
-            loading={createRequestMutation.isPending}
-            onPress={() => void submit()}
-          />
-        </>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
+                      Create one first, then come back and include it in this request.
+                    </Text>
+                    <Button
+                      label="Create listing"
+                      variant="ghost"
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(app)/(tabs)/create",
+                          params: { returnToProductId: product.id },
+                        })
+                      }
+                    />
+                  </>
+                )}
+              </View>
+            )
+          }
+          loadingProductsText={
+            ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending
+              ? "Loading your listings..."
+              : undefined
+          }
+          message={message}
+          onChangeMessage={setMessage}
+          messagePlaceholder="Add details for the seller"
+          feedback={feedback}
+          feedbackColor={theme.colors.textSecondary}
+          submitLabel="Send request"
+          submitLoading={createRequestMutation.isPending}
+          onSubmit={() => {
+            void submit();
+          }}
+        />
       ) : null}
     </View>
   );
@@ -871,6 +889,10 @@ const styles = StyleSheet.create({
   },
   emptyOfferTitle: { fontSize: 13, fontWeight: "700" },
   emptyOfferText: { fontSize: 12, lineHeight: 18 },
+  moneyOfferWrap: { gap: 8 },
+  minAmountHint: { gap: 4 },
+  minAmountLabel: { fontSize: 12, fontWeight: "500" },
+  minAmountWarning: { fontSize: 12, fontWeight: "600", marginTop: 2 },
   feedback: { fontSize: 13, fontStyle: "italic" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
 });

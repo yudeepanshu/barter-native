@@ -5,6 +5,19 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 
 type ProductMetadataVariant = "detail" | "compact";
 
+const TRADE_TYPE_CHIP_COLORS = {
+  light: {
+    free: { bg: "#dcfce7", border: "#86efac", text: "#166534" },
+    money: { bg: "#fef3c7", border: "#fcd34d", text: "#92400e" },
+    barter: { bg: "#ede9fe", border: "#c4b5fd", text: "#4c1d95" },
+  },
+  dark: {
+    free: { bg: "#052e1a", border: "#22c55e", text: "#4ade80" },
+    money: { bg: "#3b2400", border: "#f59e0b", text: "#fbbf24" },
+    barter: { bg: "#2e1065", border: "#8b5cf6", text: "#a78bfa" },
+  },
+} as const;
+
 interface ProductMetadataProps {
   product: ProductSummary;
   variant?: ProductMetadataVariant;
@@ -90,6 +103,29 @@ function getLocationLabel(product: ProductSummary) {
   return value.length > 0 ? value : null;
 }
 
+export function formatLocationBadgeLabel(locationName?: string | null) {
+  const value = (locationName ?? "").trim().replace(/\s+/g, " ");
+  if (!value) {
+    return null;
+  }
+
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 2) {
+    return parts.join(", ");
+  }
+
+  const country = parts[parts.length - 1]?.toLowerCase();
+  if (country === "india") {
+    return parts.slice(-3, -1).join(", ");
+  }
+
+  return parts.slice(-3).join(", ");
+}
+
 export function hasExchangeHistory(product: ProductSummary) {
   return product.isPreOwned && product.exchangeCount > 0;
 }
@@ -106,20 +142,25 @@ export function ProductMetadata({
   locationLines = 2,
 }: ProductMetadataProps) {
   const { theme } = useAppTheme();
+  const tradeTypeColors = theme.mode === "dark" ? TRADE_TYPE_CHIP_COLORS.dark : TRADE_TYPE_CHIP_COLORS.light;
   const includeCategory = showCategory ?? variant === "detail";
   const includeLocation = showLocation ?? variant === "detail";
   const location = getLocationLabel(product);
   const hasProductCoords = product.latitude != null && product.longitude != null;
-  const computedDistanceLabel =
+  const computedDistanceKm =
     viewerLocation && hasProductCoords
-      ? formatDistanceLabel(
-          haversineDistanceKm(viewerLocation, {
-            latitude: product.latitude as number,
-            longitude: product.longitude as number,
-          }),
-        )
+      ? haversineDistanceKm(viewerLocation, {
+          latitude: product.latitude as number,
+          longitude: product.longitude as number,
+        })
       : null;
-  const distanceLabel = distanceOverrideLabel ?? computedDistanceLabel ?? fallbackDistanceLabel;
+  const computedDistanceLabel =
+    computedDistanceKm != null ? formatDistanceLabel(computedDistanceKm) : null;
+  const distanceLabel = distanceOverrideLabel ?? (
+    computedDistanceKm != null && computedDistanceKm > 100 && fallbackDistanceLabel
+      ? fallbackDistanceLabel
+      : computedDistanceLabel ?? fallbackDistanceLabel
+  );
 
   const chips: Array<{
     key: string;
@@ -131,20 +172,17 @@ export function ProductMetadata({
   }> = [];
 
   if (showProductType) {
+    const typeColors = product.isFree
+      ? tradeTypeColors.free
+      : product.requestByMoney
+        ? tradeTypeColors.money
+        : tradeTypeColors.barter;
     chips.push({
       key: "type",
       icon: "package",
       value: getProductTypeLabel(product),
-      chipStyle: product.isFree
-        ? styles.metaChipFree
-        : product.requestByMoney
-          ? styles.metaChipMoney
-          : styles.metaChipBarter,
-      textStyle: product.isFree
-        ? styles.metaChipTextFree
-        : product.requestByMoney
-          ? styles.metaChipTextMoney
-          : styles.metaChipTextBarter,
+      chipStyle: { backgroundColor: typeColors.bg, borderColor: typeColors.border },
+      textStyle: { color: typeColors.text },
     });
   }
 
@@ -214,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
@@ -234,12 +272,6 @@ const styles = StyleSheet.create({
   },
   metaChipCategory: { backgroundColor: "#f1f5f9", borderColor: "#cbd5e1" },
   metaChipTextCategory: { color: "#475569" },
-  metaChipFree: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
-  metaChipTextFree: { color: "#166534" },
-  metaChipMoney: { backgroundColor: "#fef3c7", borderColor: "#fcd34d" },
-  metaChipTextMoney: { color: "#92400e" },
-  metaChipBarter: { backgroundColor: "#ede9fe", borderColor: "#c4b5fd" },
-  metaChipTextBarter: { color: "#4c1d95" },
   metaChipLocation: { backgroundColor: "#e0f2fe", borderColor: "#7dd3fc" },
   metaChipTextLocation: { color: "#0c4a6e" },
   metaChipDistance: { backgroundColor: "#fef3c7", borderColor: "#fcd34d" },

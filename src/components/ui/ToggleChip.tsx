@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { StyleProp, TextStyle, ViewStyle } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface ToggleChipProps {
@@ -37,6 +38,11 @@ export function ToggleChip({
         },
       ]}
     >
+      {selected ? (
+        <View style={[styles.checkWrap, { backgroundColor: theme.colors.chipActiveText }]}>
+          <Feather name="check" size={10} color={theme.colors.chipActiveBg} />
+        </View>
+      ) : null}
       <Text
         style={[
           styles.label,
@@ -57,6 +63,17 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderWidth: 1,
     paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  checkWrap: {
+    position: "absolute",
+    top: 5,
+    right: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -1,0 +1,318 @@
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import type { ProductSummary } from "@barter/types";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { ToggleChip } from "@/components/ui/ToggleChip";
+import { useAppTheme } from "@/hooks/useAppTheme";
+import { SelectableProductGrid } from "@/components/requests/SelectableProductGrid";
+
+interface OfferComposerFormProps {
+  title: string;
+  subtitle?: string;
+  showHeader?: boolean;
+  showModeSelector?: boolean;
+  disabled?: boolean;
+  turnStatus?: "WAITING" | "ERROR";
+  supportsMixedOffers: boolean;
+  includeMoney: boolean;
+  includeProduct: boolean;
+  moneyModeLabel?: string;
+  productModeLabel?: string;
+  includeProductFirst?: boolean;
+  disableIncludeProductToggle?: boolean;
+  onToggleIncludeMoney: () => void;
+  onToggleIncludeProduct: () => void;
+  showAmountField: boolean;
+  amountLabel: string;
+  amount: string;
+  onChangeAmount: (value: string) => void;
+  amountPlaceholder?: string;
+  amountHelperText?: string;
+  amountWarningText?: string;
+  showProductSelector: boolean;
+  productSelectorLabel: string;
+  offerableProducts: ProductSummary[];
+  selectedProductIds: string[];
+  onToggleProduct: (productId: string) => void;
+  selectedProductsHint?: string;
+  noProductsContent?: React.ReactNode;
+  loadingProductsText?: string;
+  showVisibleProductSelector?: boolean;
+  visibleProductSelectorLabel?: string;
+  visibleProducts?: ProductSummary[];
+  selectedVisibleProductIds?: string[];
+  onToggleVisibleProduct?: (productId: string) => void;
+  showRequestedProductSelector?: boolean;
+  requestedProductSelectorLabel?: string;
+  requestedProducts?: ProductSummary[];
+  requestedProductsOwner?: { userName: string; profilePicture?: string | null };
+  selectedRequestedProductIds?: string[];
+  onToggleRequestedProduct?: (productId: string) => void;
+  comparisonSnapshot?: React.ReactNode;
+  message: string;
+  onChangeMessage: (value: string) => void;
+  messageLabel?: string;
+  messagePlaceholder?: string;
+  feedback?: string | null;
+  feedbackColor?: string;
+  warning?: string | null;
+  warningColor?: string;
+  nudge?: string | null;
+  nudgeColor?: string;
+  submitLabel: string;
+  submitLoading?: boolean;
+  onSubmit: () => void;
+  onCancel?: () => void;
+  cancelLabel?: string;
+}
+
+export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
+  title,
+  subtitle,
+  showHeader = true,
+  showModeSelector = true,
+  disabled = false,
+  turnStatus,
+  supportsMixedOffers,
+  includeMoney,
+  includeProduct,
+  moneyModeLabel = "Offer money",
+  productModeLabel = "Offer product",
+  includeProductFirst = false,
+  disableIncludeProductToggle = false,
+  onToggleIncludeMoney,
+  onToggleIncludeProduct,
+  showAmountField,
+  amountLabel,
+  amount,
+  onChangeAmount,
+  amountPlaceholder,
+  amountHelperText,
+  amountWarningText,
+  showProductSelector,
+  productSelectorLabel,
+  offerableProducts,
+  selectedProductIds,
+  onToggleProduct,
+  selectedProductsHint,
+  noProductsContent,
+  loadingProductsText,
+  showVisibleProductSelector,
+  visibleProductSelectorLabel,
+  visibleProducts = [],
+  selectedVisibleProductIds = [],
+  onToggleVisibleProduct,
+  showRequestedProductSelector,
+  requestedProductSelectorLabel,
+  requestedProducts = [],
+  requestedProductsOwner,
+  selectedRequestedProductIds = [],
+  onToggleRequestedProduct,
+  comparisonSnapshot,
+  message,
+  onChangeMessage,
+  messageLabel = "Message (optional)",
+  messagePlaceholder,
+  feedback,
+  feedbackColor,
+  warning,
+  warningColor = "#f59e0b",
+  nudge,
+  nudgeColor = "#3b82f6",
+  submitLabel,
+  submitLoading,
+  onSubmit,
+  onCancel,
+  cancelLabel = "Cancel",
+}) => {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={styles.container}>
+      {showHeader ? (
+        <>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
+          {subtitle ? <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{subtitle}</Text> : null}
+          {turnStatus === "WAITING" ? (
+            <Text style={[styles.turnStatus, { color: theme.colors.textMuted }]}>Waiting for their response...</Text>
+          ) : null}
+        </>
+      ) : null}
+
+      {disabled && turnStatus === "WAITING" ? (
+        <Text style={[styles.disabledMessage, { color: theme.colors.textMuted }]}>Your counter offer will be available once they respond.</Text>
+      ) : (
+        showModeSelector ? (
+          <View style={styles.modeRow}>
+            {supportsMixedOffers ? (
+              <>
+                {includeProductFirst ? (
+                  <>
+                    <ToggleChip
+                      label={productModeLabel}
+                      selected={includeProduct}
+                      style={styles.modeChip}
+                      onPress={onToggleIncludeProduct}
+                      disabled={disableIncludeProductToggle}
+                    />
+                    <ToggleChip
+                      label={moneyModeLabel}
+                      selected={includeMoney}
+                      style={styles.modeChip}
+                      onPress={onToggleIncludeMoney}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <ToggleChip
+                      label={moneyModeLabel}
+                      selected={includeMoney}
+                      style={styles.modeChip}
+                      onPress={onToggleIncludeMoney}
+                    />
+                    <ToggleChip
+                      label={productModeLabel}
+                      selected={includeProduct}
+                      style={styles.modeChip}
+                      onPress={onToggleIncludeProduct}
+                      disabled={disableIncludeProductToggle}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts product offers only.</Text>
+            )}
+          </View>
+        ) : null
+      )}
+
+      {comparisonSnapshot}
+
+      {showAmountField ? (
+        <View style={styles.moneyOfferWrap}>
+          <Input
+            label={amountLabel}
+            value={amount}
+            onChangeText={onChangeAmount}
+            keyboardType="numeric"
+            placeholder={amountPlaceholder}
+          />
+
+          {amountHelperText ? (
+            <View style={styles.minAmountHint}>
+              <Text style={[styles.minAmountLabel, { color: theme.colors.textMuted }]}>{amountHelperText}</Text>
+              {amountWarningText ? <Text style={[styles.minAmountWarning, { color: "#dc2626" }]}>{amountWarningText}</Text> : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {showProductSelector ? (
+        <View style={styles.offerWrap}>
+          <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{productSelectorLabel}</Text>
+          {offerableProducts.length > 0 ? (
+            <>
+              <SelectableProductGrid
+                products={offerableProducts}
+                selectedProductIds={selectedProductIds}
+                onToggleProduct={onToggleProduct}
+                emptyText="No listings available."
+              />
+              {selectedProductsHint ? (
+                <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{selectedProductsHint}</Text>
+              ) : null}
+            </>
+          ) : (
+            noProductsContent ?? null
+          )}
+          {loadingProductsText ? <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{loadingProductsText}</Text> : null}
+        </View>
+      ) : null}
+
+      {showVisibleProductSelector ? (
+        <View style={styles.offerWrap}>
+          <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{visibleProductSelectorLabel ?? "Show for consideration (optional)"}</Text>
+          <SelectableProductGrid
+            products={visibleProducts}
+            selectedProductIds={selectedVisibleProductIds}
+            onToggleProduct={(productId) => onToggleVisibleProduct?.(productId)}
+            emptyText="No additional listings available."
+          />
+        </View>
+      ) : null}
+
+      {showRequestedProductSelector ? (
+        <View style={styles.offerWrap}>
+          <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{requestedProductSelectorLabel ?? "Request in return (optional)"}</Text>
+          <SelectableProductGrid
+            products={requestedProducts}
+            selectedProductIds={selectedRequestedProductIds}
+            onToggleProduct={(productId) => onToggleRequestedProduct?.(productId)}
+            owner={requestedProductsOwner}
+            emptyText="No products available from this request history yet."
+          />
+        </View>
+      ) : null}
+
+      <Input
+        label={messageLabel}
+        value={message}
+        onChangeText={onChangeMessage}
+        placeholder={messagePlaceholder}
+        maxLength={120}
+        showCharacterCount
+      />
+
+      {warning ? (
+        <Text style={[styles.warning, { color: warningColor }]}>{warning}</Text>
+      ) : null}
+
+      {nudge ? (
+        <Text style={[styles.nudge, { color: nudgeColor }]}>{nudge}</Text>
+      ) : null}
+
+      {feedback ? (
+        <Text style={[styles.feedback, { color: feedbackColor ?? theme.colors.textSecondary }]}>{feedback}</Text>
+      ) : null}
+
+      <Button
+        label={submitLabel}
+        loading={submitLoading}
+        onPress={onSubmit}
+        disabled={disabled}
+      />
+
+      {onCancel ? <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={disabled} /> : null}
+
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { gap: 12 },
+  title: { fontSize: 16, fontWeight: "700" },
+  subtitle: { fontSize: 13 },
+  turnStatus: { fontSize: 12, fontStyle: "italic", marginTop: -4 },
+  disabledMessage: { fontSize: 13, lineHeight: 18, marginVertical: 8 },
+  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  modeInfo: { fontSize: 13 },
+  modeChip: { flex: 1, minWidth: 0 },
+  moneyOfferWrap: { gap: 8 },
+  minAmountHint: { gap: 4 },
+  minAmountLabel: { fontSize: 12, fontWeight: "500" },
+  minAmountWarning: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  offerWrap: { gap: 8 },
+  offerLabel: { fontSize: 13, fontWeight: "600" },
+  offerList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  offerHint: { fontSize: 12 },
+  warning: { fontSize: 13, fontWeight: "600", marginVertical: 6 },
+  nudge: { fontSize: 12, fontWeight: "500", marginVertical: 4, fontStyle: "italic" },
+  feedback: { fontSize: 13, fontStyle: "italic" },
+});

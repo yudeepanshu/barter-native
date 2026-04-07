@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams } from "expo-router";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useCreateListingForm } from "@/hooks/useCreateListingForm";
@@ -44,6 +45,7 @@ export default function CreateListingScreen() {
     form.state.categoryId.length > 0 ||
     form.state.isFree ||
     form.state.requestByMoney ||
+    form.state.minMoneyAmount.trim().length > 0 ||
     form.state.images.length > 0;
   const setHasUnsavedChanges = useCreateListingDraftGuardStore((state) => state.setHasUnsavedChanges);
   const setResetDraft = useCreateListingDraftGuardStore((state) => state.setResetDraft);
@@ -144,6 +146,16 @@ export default function CreateListingScreen() {
                 onValueChange={form.actions.setRequestByMoney}
               />
             </View>
+            {form.state.requestByMoney ? (
+              <Input
+                label="Minimum amount (₹)"
+                value={form.state.minMoneyAmount}
+                onChangeText={form.actions.setMinMoneyAmount}
+                keyboardType="numeric"
+                placeholder="Enter minimum accepted amount"
+                error={form.state.fieldErrors.minMoneyAmount ?? null}
+              />
+            ) : null}
           </View>
         </View>
 

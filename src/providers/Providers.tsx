@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
-import type { NotificationsListResult } from "@barter/types";
+import type { NotificationsListResult, ProductsListResult } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryClient } from "@/lib/query/queryClient";
 import { queryKeys } from "@/lib/query/queryKeys";
@@ -14,6 +14,7 @@ import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
 const NOTIFICATIONS_BOOTSTRAP_FILTERS = { limit: 20, unreadOnly: false } as const;
+const USER_LISTINGS_BOOTSTRAP_LIMIT = 40;
 
 function isAuthBootstrapFailure(error: unknown) {
   const apiError = ApiClient.toApiError(error);
@@ -305,6 +306,64 @@ function NotificationsBootstrap() {
   return null;
 }
 
+function UserListingsBootstrap() {
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
+  const lastLoadedUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+
+    if (lastLoadedUserIdRef.current === session.user.id) {
+      return;
+    }
+
+    const userId = session.user.id;
+    let cancelled = false;
+
+    const bootstrapListings = async () => {
+      try {
+        await queryClient.prefetchInfiniteQuery({
+          queryKey: queryKeys.products.infinite({ ownerId: userId, limit: USER_LISTINGS_BOOTSTRAP_LIMIT }),
+          queryFn: async ({ pageParam }) => {
+            const envelope = await mobileApiClient.getProducts({
+              ownerId: userId,
+              limit: USER_LISTINGS_BOOTSTRAP_LIMIT,
+              cursor: pageParam ?? undefined,
+            });
+            return envelope.data ?? ({ items: [], nextCursor: null, hasMore: false } as ProductsListResult);
+          },
+          initialPageParam: null as string | null,
+          getNextPageParam: (lastPage: ProductsListResult) =>
+            lastPage.hasMore ? lastPage.nextCursor : undefined,
+        });
+
+        if (!cancelled) {
+          lastLoadedUserIdRef.current = userId;
+        }
+      } catch {
+        // Best-effort; screens can still fetch on demand.
+      }
+    };
+
+    void bootstrapListings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      lastLoadedUserIdRef.current = null;
+    }
+  }, [status]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -313,6 +372,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <AppUpdateProvider />
           <PushNotificationsBootstrap />
           <NotificationsBootstrap />
+          <UserListingsBootstrap />
           {children}
         </AppDialogProvider>
       </AuthBootstrap>

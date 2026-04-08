@@ -2,12 +2,6 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { useSession } from "@/hooks/useSession";
-import {
-  MAX_PRODUCTS_PER_USER,
-  getProductCreationLimitMessage,
-  hasReachedProductCreationLimit,
-} from "@/lib/listings/productCreationLimit";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
@@ -20,7 +14,6 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const session = useSession();
   const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
   const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
   const dialog = useAppDialog();
@@ -37,30 +30,7 @@ export default function AppTabsLayout() {
           const openingCreateTab = currentRouteName !== "create" && route.name === "create";
 
           if (openingCreateTab) {
-            event.preventDefault();
-            void (async () => {
-              try {
-                const userId = session?.user.id;
-                const atLimit = userId ? await hasReachedProductCreationLimit(userId) : false;
-                if (!atLimit) {
-                  navigation.navigate("create");
-                  return;
-                }
-
-                const action = await dialog.show({
-                  title: "Limit reached",
-                  message: getProductCreationLimitMessage(MAX_PRODUCTS_PER_USER),
-                  actions: [{ key: "see-listings", label: "See current listings" }],
-                  dismissOnBackdrop: true,
-                });
-
-                if (action === "see-listings") {
-                  navigation.navigate("my-listings");
-                }
-              } catch {
-                navigation.navigate("create");
-              }
-            })();
+            navigation.navigate("create");
             return;
           }
 

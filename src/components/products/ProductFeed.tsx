@@ -8,8 +8,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
 import type { NotificationSummary, RequestStatus } from "@barter/types";
@@ -119,6 +119,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const markNotificationReadMutation = useMarkNotificationReadMutation();
   const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
   const clearAllNotificationsMutation = useClearAllNotificationsMutation();
+  const refetchNotifications = notificationsQuery.refetch;
 
   const categories = categoriesQuery.data ?? [];
   const notifications = useMemo(
@@ -313,6 +314,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
 
     return () => clearTimeout(timer);
   }, [showInitialLoading]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchNotifications();
+    }, [refetchNotifications]),
+  );
 
   const onRefreshNotifications = async () => {
     await notificationsQuery.refetch();

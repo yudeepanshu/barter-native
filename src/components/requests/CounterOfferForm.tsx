@@ -65,10 +65,13 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   initialAmount,
 }) => {
   const { theme } = useAppTheme();
-  const supportsMixedOffers = !product.isFree && Boolean(product.requestByMoney);
   const canOfferOwnProducts = isBuyer;
+  const canRequestCounterpartyProducts = counterpartyProducts.length > 0;
+  const canUseProductMode =
+    canOfferOwnProducts || canRequestCounterpartyProducts || !Boolean(product.requestByMoney);
+  const supportsMixedOffers = !product.isFree && Boolean(product.requestByMoney) && canUseProductMode;
   const [includeMoney, setIncludeMoney] = useState(!product.isFree && Boolean(product.requestByMoney));
-  const [includeProduct, setIncludeProduct] = useState(!product.isFree);
+  const [includeProduct, setIncludeProduct] = useState(!product.isFree && canUseProductMode);
   const [counterAmount, setCounterAmount] = useState(
     initialAmount != null && Number.isFinite(Number(initialAmount)) ? String(Number(initialAmount)) : ""
   );
@@ -78,8 +81,14 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   const [counterMessage, setCounterMessage] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const wantsMoney = supportsMixedOffers ? includeMoney : false;
-  const wantsProduct = product.isFree ? false : supportsMixedOffers ? includeProduct : true;
+  const moneyOnlyCounterMode = !product.isFree && !canUseProductMode && Boolean(product.requestByMoney);
+  const wantsMoney = moneyOnlyCounterMode ? true : supportsMixedOffers ? includeMoney : false;
+  const wantsProduct =
+    product.isFree || moneyOnlyCounterMode
+      ? false
+      : supportsMixedOffers
+        ? includeProduct
+        : canUseProductMode;
 
   const showsAmountField = wantsMoney;
   const parsedAmount = Number(counterAmount);
@@ -126,10 +135,21 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   }, [initialAmount]);
 
   useEffect(() => {
-    if (!product.isFree && !includeMoney && !includeProduct) {
+    if (!product.isFree && canUseProductMode && !includeMoney && !includeProduct) {
       setIncludeProduct(true);
     }
-  }, [product.isFree, includeMoney, includeProduct]);
+  }, [product.isFree, includeMoney, includeProduct, canUseProductMode]);
+
+  useEffect(() => {
+    if (canUseProductMode) {
+      return;
+    }
+
+    setIncludeProduct(false);
+    if (product.requestByMoney) {
+      setIncludeMoney(true);
+    }
+  }, [canUseProductMode, product.requestByMoney]);
 
   // Comparison snapshot for offer negotiation
   const comparisonSnapshot = previousOffer ? (
@@ -301,8 +321,14 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     ? `Minimum expected: ₹${effectiveMinAmount}`
     : undefined;
 
-  const amountWarningText = isBelowMin
-    ? `Below the negotiated minimum of ₹${effectiveMinAmount}. The seller may reject this offer.`
+  const amountWarningText = counterAmount
+    ? Number.isFinite(parsedAmount)
+      ? parsedAmount <= 0
+        ? "Amount must be greater than zero"
+        : isBelowMin
+          ? `Below the minimum of ₹${effectiveMinAmount}. The seller may reject this offer.`
+          : undefined
+      : "Please enter a valid amount"
     : undefined;
 
   const selectedProductsHint = counterOfferedProductIds.length > 0
@@ -328,7 +354,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     <OfferComposerForm
       title="Create Counter Offer"
       showHeader={false}
-      showModeSelector={!product.isFree && canCounter}
+      showModeSelector={!product.isFree && canCounter && canUseProductMode}
       subtitle={undefined}
       disabled={!canCounter}
       turnStatus={canCounter ? undefined : "WAITING"}
@@ -374,7 +400,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
       visibleProducts={visibleOwnProducts}
       selectedVisibleProductIds={counterVisibleProductIds}
       onToggleVisibleProduct={toggleCounterVisibleProduct}
-      showRequestedProductSelector={wantsProduct}
+      showRequestedProductSelector={wantsProduct && canRequestCounterpartyProducts}
       requestedProductSelectorLabel="Other products available from requester"
       requestedProducts={selectableCounterpartyProducts}
       requestedProductsOwner={requesterProfile}

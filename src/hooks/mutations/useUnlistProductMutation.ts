@@ -3,11 +3,14 @@ import type { InfiniteData } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape, ProductSummary } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { queryKeys } from "@/lib/query/queryKeys";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 
 type ProductPage = { items: ProductSummary[]; nextCursor: string | null; hasMore: boolean };
 
 export function useUnlistProductMutation() {
   const queryClient = useQueryClient();
+  const upsertProduct = useAppDataStore((state) => state.upsertProduct);
 
   return useMutation({
     mutationFn: async (productId: string) => {
@@ -17,11 +20,14 @@ export function useUnlistProductMutation() {
     onSuccess: async (updated) => {
       if (!updated) {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["products"] }),
+          queryClient.invalidateQueries({ queryKey: ["products", "infinite"] }),
           queryClient.invalidateQueries({ queryKey: ["requests"] }),
         ]);
         return;
       }
+
+      upsertProduct(updated);
+      queryClient.setQueryData(queryKeys.products.detail(updated.id), updated);
 
       queryClient.setQueriesData<InfiniteData<ProductPage>>(
         { queryKey: ["products"] },

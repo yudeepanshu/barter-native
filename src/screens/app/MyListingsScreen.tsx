@@ -79,7 +79,7 @@ export default function MyListingsScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [contextMenuProductId, setContextMenuProductId] = useState<string | null>(null);
   const [contextMenuAnchor, setContextMenuAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
-  const products = useProductsListController({ ownerId: session?.user.id, limit: 20 });
+  const products = useProductsListController({ ownerId: session?.user.id, limit: 40 });
   const receivedRequestsQuery = useRequestsQuery("received", { limit: 100 });
   const categories = categoriesQuery.data ?? [];
 

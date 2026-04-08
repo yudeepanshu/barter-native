@@ -12,7 +12,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
@@ -25,9 +25,23 @@ import { ListingTextFields } from "@/components/products/ListingTextFields";
 import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { useUnsavedChangesPrompt } from "@/hooks/useUnsavedChangesPrompt";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
+import { useSession } from "@/hooks/useSession";
+import { useAppDialog } from "@/providers/AppDialogProvider";
+import {
+  hasReachedProductCreationLimit,
+  getProductCreationLimitMessage,
+  MAX_PRODUCTS_PER_USER,
+} from "@/lib/listings/productCreationLimit";
+import { queryClient } from "@/lib/query/queryClient";
+import { queryKeys } from "@/lib/query/queryKeys";
+import type { InfiniteData } from "@tanstack/react-query";
+import type { ProductsListResult } from "@barter/types";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
+  const router = useRouter();
+  const session = useSession();
+  const dialog = useAppDialog();
   const params = useLocalSearchParams<{ returnToProductId?: string }>();
   const returnToProductId = typeof params.returnToProductId === "string" ? params.returnToProductId : undefined;
   const categoriesQuery = useCategoriesQuery();
@@ -65,6 +79,42 @@ export default function CreateListingScreen() {
       setResetDraft(null);
     };
   }, [form.actions.resetDraft, setResetDraft]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+
+    void (async () => {
+      // Check the query cache first — populated by UserListingsBootstrap at login.
+      const cached = queryClient.getQueryData<InfiniteData<ProductsListResult>>(
+        queryKeys.products.infinite({ ownerId: userId, limit: 40 }),
+      );
+
+      let atLimit: boolean;
+      if (cached) {
+        const allItems = cached.pages.flatMap((p) => p.items);
+        atLimit = allItems.filter((p) => p.status !== "REMOVED").length >= MAX_PRODUCTS_PER_USER;
+      } else {
+        atLimit = await hasReachedProductCreationLimit(userId);
+      }
+
+      if (!atLimit) return;
+
+      const action = await dialog.show({
+        title: "Limit reached",
+        message: getProductCreationLimitMessage(MAX_PRODUCTS_PER_USER),
+        actions: [{ key: "see-listings", label: "See current listings" }],
+        dismissOnBackdrop: true,
+      });
+
+      if (action === "see-listings") {
+        router.replace("/(app)/(tabs)/my-listings");
+      } else {
+        router.back();
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useUnsavedChangesPrompt({
     enabled: hasUnsavedChanges && !form.state.isSubmitting,
@@ -196,10 +246,10 @@ export default function CreateListingScreen() {
                             setPreviewImageUri(null);
                           }
                         }}
-                        style={[styles.removeImageButton, { backgroundColor: theme.colors.overlay }]}
+                        style={styles.removeImageButton}
                         hitSlop={8}
                       >
-                        <Feather name="x" size={12} color={theme.colors.onPrimary} />
+                        <Feather name="x" size={12} color="#F8FAFC" />
                       </Pressable>
                     </View>
                   ))}
@@ -311,6 +361,9 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
+    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(248, 250, 252, 0.24)",
     alignItems: "center",
     justifyContent: "center",
   },

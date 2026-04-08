@@ -69,7 +69,7 @@ export function SelectableProductGrid({
                   hitSlop={8}
                   style={[styles.previewEyeButton, { backgroundColor: "rgba(15,23,42,0.7)" }]}
                 >
-                  <Feather name="eye" size={12} color="#fff" />
+                  <Feather name="eye" size={12} color="#F5A623" />
                 </Pressable>
               </View>
               <Text

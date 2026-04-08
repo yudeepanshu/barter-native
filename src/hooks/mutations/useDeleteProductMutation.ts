@@ -3,6 +3,7 @@ import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/queryKeys";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 
 type ProductsPage = {
   items: Array<{ id: string }>;
@@ -17,6 +18,7 @@ type ProductsInfiniteData = {
 
 export function useDeleteProductMutation() {
   const queryClient = useQueryClient();
+  const removeProduct = useAppDataStore((state) => state.removeProduct);
 
   return useMutation({
     mutationFn: async (productId: string) => {
@@ -42,9 +44,10 @@ export function useDeleteProductMutation() {
       );
 
       queryClient.removeQueries({ queryKey: queryKeys.products.detail(deletedProductId) });
+      removeProduct(deletedProductId);
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["products", "infinite"] }),
         queryClient.invalidateQueries({ queryKey: ["requests"] }),
       ]);
     },

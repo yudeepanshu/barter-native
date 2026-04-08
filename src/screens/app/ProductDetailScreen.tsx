@@ -19,6 +19,7 @@ import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import {
@@ -69,7 +70,12 @@ export default function ProductDetailScreen() {
 
     router.back();
   };
-  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
+  const requestsById = useAppDataStore((state) => state.requestsById);
+  const cachedSentRequests = useMemo(
+    () => Object.values(requestsById).filter((request) => request.buyerId === session?.user.id),
+    [requestsById, session?.user.id],
+  );
+  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
   const { permission, lastKnown } = useDeviceLocation();
   const viewerLocation =
     permission === "granted" && lastKnown
@@ -80,11 +86,11 @@ export default function ProductDetailScreen() {
       return null;
     }
 
-    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? cachedSentRequests;
     return requests.find(
       (req) => req.productId === productData.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status),
     );
-  }, [sentRequestsQuery.data, productData, isOwner]);
+  }, [sentRequestsQuery.data, cachedSentRequests, productData, isOwner]);
 
   if (query.isPending) {
     return (
@@ -369,21 +375,19 @@ function RequestComposer({
   const createRequestMutation = useCreateRequestMutation();
   const ownProductsQuery = useProductsListController({
     ownerId: sessionUserId,
-    status: "ACTIVE",
-    limit: 40,
-  });
-  const ownAllProductsQuery = useProductsListController({
-    ownerId: sessionUserId,
     limit: 40,
   });
 
   const ownOfferableProducts = useMemo(
-    () => ownProductsQuery.items.filter((item) => item.id !== product.id && item.isListed),
+    () =>
+      ownProductsQuery.items.filter(
+        (item) => item.id !== product.id && item.status === "ACTIVE" && item.isListed,
+      ),
     [ownProductsQuery.items, product.id],
   );
   const ownNonCurrentProducts = useMemo(
-    () => ownAllProductsQuery.items.filter((item) => item.id !== product.id),
-    [ownAllProductsQuery.items, product.id],
+    () => ownProductsQuery.items.filter((item) => item.id !== product.id),
+    [ownProductsQuery.items, product.id],
   );
   const hasInactiveOrUnlistedProducts = ownNonCurrentProducts.some(
     (item) => item.status === "INACTIVE" || (item.status !== "REMOVED" && !item.isListed),
@@ -409,6 +413,14 @@ function RequestComposer({
   const lockProductSelectionUntilMoney = Boolean(product.requestByMoney) && !product.isFree;
   const wantsMoney = supportsMixedOffers ? includeMoney : false;
   const wantsProduct = supportsMixedOffers ? includeProduct : true;
+  const normalizedMinMoneyAmount =
+    product.minMoneyAmount != null && Number.isFinite(Number(product.minMoneyAmount))
+      ? Number(product.minMoneyAmount)
+      : null;
+  const effectiveMinMoneyAmount =
+    normalizedMinMoneyAmount != null && normalizedMinMoneyAmount > 0
+      ? normalizedMinMoneyAmount
+      : null;
   const requiresExchangeOffer = !product.isFree;
   const visibleOwnProducts = useMemo(
     () => ownOfferableProducts.filter((item) => !offeredProductIds.includes(item.id)),
@@ -463,8 +475,14 @@ function RequestComposer({
         }
         
         // Validate against minimum only when listing accepts money offers
-        if (product.requestByMoney && product.minMoneyAmount != null && parsedAmount < product.minMoneyAmount) {
-          setFeedback(`Minimum amount is ${formatCurrency(product.minMoneyAmount)}. Please enter a higher amount.`);
+        if (
+          product.requestByMoney &&
+          effectiveMinMoneyAmount != null &&
+          parsedAmount < effectiveMinMoneyAmount
+        ) {
+          setFeedback(
+            `Minimum amount is ${formatCurrency(effectiveMinMoneyAmount)}. Please enter a higher amount.`,
+          );
           return;
         }
       }
@@ -560,19 +578,25 @@ function RequestComposer({
           onChangeAmount={setAmount}
           amountPlaceholder="Enter amount"
           amountHelperText={
-            product.requestByMoney && product.minMoneyAmount != null
-              ? `Minimum accepted: ${formatCurrency(product.minMoneyAmount)}`
-              : undefined
+            product.requestByMoney && effectiveMinMoneyAmount != null
+              ? `Minimum accepted: ${formatCurrency(effectiveMinMoneyAmount)}`
+              : product.requestByMoney && normalizedMinMoneyAmount != null
+                ? `Minimum accepted: ${formatCurrency(normalizedMinMoneyAmount)}`
+                : undefined
           }
           amountWarningText={
-            amount && Number.isFinite(Number(amount))
-              ? Number(amount) > MAX_REQUEST_OFFER_AMOUNT
-                ? "Amount cannot exceed 15 crore"
-                : product.requestByMoney &&
-                  product.minMoneyAmount != null &&
-                  Number(amount) < product.minMoneyAmount
-                  ? "Amount is below minimum"
-                  : undefined
+            amount
+              ? Number.isFinite(Number(amount))
+                ? Number(amount) > MAX_REQUEST_OFFER_AMOUNT
+                  ? "Amount cannot exceed 15 crore"
+                  : Number(amount) <= 0
+                    ? "Amount must be greater than zero"
+                    : product.requestByMoney &&
+                      effectiveMinMoneyAmount != null &&
+                      Number(amount) < effectiveMinMoneyAmount
+                      ? `Amount is below the minimum of ${formatCurrency(effectiveMinMoneyAmount)}`
+                      : undefined
+                : "Please enter a valid amount"
               : undefined
           }
           showProductSelector={wantsProduct}
@@ -587,7 +611,7 @@ function RequestComposer({
           selectedVisibleProductIds={visibleProductIds}
           onToggleVisibleProduct={toggleVisibleProduct}
           noProductsContent={
-            ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending ? null : (
+            ownProductsQuery.query.isPending ? null : (
               <View
                 style={[
                   styles.emptyOfferCard,
@@ -639,7 +663,7 @@ function RequestComposer({
             )
           }
           loadingProductsText={
-            ownProductsQuery.query.isPending || ownAllProductsQuery.query.isPending
+            ownProductsQuery.query.isPending
               ? "Loading your listings..."
               : undefined
           }

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 import type { AuthSession, AuthStatus } from "@barter/types";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 
 /**
  * Custom storage adapter that delegates to expo-secure-store.
@@ -26,8 +27,14 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       // Starts loading until SecureStore async rehydration completes
       status: "loading" as AuthStatus,
-      setSession: (session) => set({ session, status: "authenticated" }),
-      clearSession: () => set({ session: null, status: "unauthenticated" }),
+      setSession: (session) => {
+        useAppDataStore.getState().reset();
+        set({ session, status: "authenticated" });
+      },
+      clearSession: () => {
+        useAppDataStore.getState().reset();
+        set({ session: null, status: "unauthenticated" });
+      },
     }),
     {
       name: "barter-auth",

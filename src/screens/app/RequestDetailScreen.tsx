@@ -157,7 +157,6 @@ export default function RequestDetailScreen() {
 
   const ownOfferableProducts = ownProducts.items;
   const canActByTurn = OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
-  const canCancel = OPEN_STATUSES.includes(request.status);
   const canCounter = !request.product.isFree && OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
   const orderedOffers = offersQuery.data?.offers ?? [];
   const activeOffer = orderedOffers[0] ?? request.offers[request.offers.length - 1];
@@ -169,14 +168,19 @@ export default function RequestDetailScreen() {
   // If the seller has already countered with a lower amount, the floor drops to that value,
   // because the seller has implicitly signalled they'll accept less.
   // Sellers have no minimum — they define the terms.
-  const productMinAmount = request.product.minMoneyAmount != null ? Number(request.product.minMoneyAmount) : null;
+  const parsedProductMinAmount =
+    request.product.minMoneyAmount != null && Number.isFinite(Number(request.product.minMoneyAmount))
+      ? Number(request.product.minMoneyAmount)
+      : null;
+  const productMinAmount =
+    parsedProductMinAmount != null && parsedProductMinAmount > 0 ? parsedProductMinAmount : null;
   const lastSellerOfferAmount = isBuyer
     ? orderedOffers
         .filter((o) => o.offeredById === request.sellerId)
         .map((o) => (o.offeredAmount != null ? Number(o.offeredAmount) : null))
         .find((v): v is number => v !== null) ?? null
     : null;
-  const effectiveMinAmount: number | null = isBuyer && productMinAmount != null && productMinAmount > 0
+  const effectiveMinAmount: number | null = isBuyer && productMinAmount != null
     ? lastSellerOfferAmount != null
       ? Math.min(productMinAmount, lastSellerOfferAmount)
       : productMinAmount
@@ -193,6 +197,7 @@ export default function RequestDetailScreen() {
   const isRequestCompleted =
     request.status === "COMPLETED" ||
     (request.status === "ACCEPTED" && (isExchangeFinalized || (!transactionQuery.isPending && !tx)));
+  const canCancel = OPEN_STATUSES.includes(request.status) || (request.status === "ACCEPTED" && !isRequestCompleted);
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : request.status;
   const showTransactionSection =
     request.status === "ACCEPTED" && !isRequestCompleted && (transactionQuery.isPending || Boolean(tx));
@@ -207,10 +212,9 @@ export default function RequestDetailScreen() {
         payload: {},
       });
       await dialog.alert(
-        "Request sent",
-        "Contact reveal request was sent. If approved, both parties will be able to see each other's contact details.",
+        "Contact Reveal Request Sent",
+        "Your request has been sent to the other party. Once approved, both of you will be able to view each other's contact details.",
       );
-      void requestQuery.refetch();
     } catch (error) {
       await dialog.alert("Request failed", toRequestErrorMessage(error));
     }
@@ -230,12 +234,11 @@ export default function RequestDetailScreen() {
         payload: { approve },
       });
       await dialog.alert(
-        approve ? "Reveal approved" : "Reveal rejected",
+        approve ? "Contact Details Revealed" : "Request Declined",
         approve
-          ? "Contact info is now revealed to both parties."
-          : "Reveal request was rejected.",
+          ? "Contact details are now visible to both parties."
+          : "The contact reveal request has been declined. Either party may submit a new request at any time.",
       );
-      void requestQuery.refetch();
     } catch (error) {
       await dialog.alert("Action failed", toRequestErrorMessage(error));
     }
@@ -252,7 +255,6 @@ export default function RequestDetailScreen() {
     try {
       await counterOfferMutation.mutateAsync({ requestId: request.id, payload });
       setShowCounterOfferForm(false);
-      void requestQuery.refetch();
     } catch (error) {
       throw new Error(toRequestErrorMessage(error));
     }
@@ -787,7 +789,9 @@ export default function RequestDetailScreen() {
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Contact Info</Text>
             {!revealState?.contactVisible ? (
-              <Text style={[styles.contactInfoHint, { color: theme.colors.textMuted }]}>Request approval will reveal contact details for both parties.</Text>
+              <View>
+                <Text style={[styles.contactInfoHint, { color: theme.colors.textMuted }]}>Contact details are not yet visible. Either party can initiate a reveal request. Once approved, both parties will be able to view each other's contact information.</Text>
+              </View>
             ) : null}
 
             <View style={styles.contactRow}>
@@ -812,14 +816,14 @@ export default function RequestDetailScreen() {
             <View style={styles.contactActionsRow}>
               {revealState?.canRequestReveal ? (
                 <Button
-                  label="Request contact reveal (both sides)"
+                  label="Request Contact Details Reveal"
                   onPress={() => {
                     void (async () => {
                       const shouldRequest = await dialog.confirm(
-                        "Reveal contact info",
-                        "Send a reveal request? If approved, contact details will be visible to both parties.",
+                        "Request Contact Reveal",
+                        "Send a contact reveal request to the other party? Once they approve, both of you will be able to see each other's contact details.",
                         {
-                          confirmLabel: "Request",
+                          confirmLabel: "Send Request",
                           cancelLabel: "Cancel",
                         },
                       );
@@ -835,13 +839,16 @@ export default function RequestDetailScreen() {
 
               {revealState?.canApproveIncoming && revealState.incomingRequestId ? (
                 <View style={styles.contactApproveRow}>
+                  <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginBottom: 4 }]}>
+                    The other party has requested to reveal contact details. Once approved, both of you will be able to view each other's contact information.
+                  </Text>
                   <Button
-                    label="Approve reveal"
+                    label="Approve Reveal"
                     onPress={() => void onRespondContactReveal(true)}
                     loading={respondContactRevealMutation.isPending}
                   />
                   <Button
-                    label="Reject reveal"
+                    label="Decline"
                     variant="ghost"
                     onPress={() => void onRespondContactReveal(false)}
                     loading={respondContactRevealMutation.isPending}
@@ -852,16 +859,60 @@ export default function RequestDetailScreen() {
 
             {revealState?.viewerRequestStatus === "PENDING" ? (
               <View style={styles.revealInfoRow}>
-                <Feather name="eye" size={14} color={theme.colors.textMuted} />
-                <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Reveal request pending approval. Approval reveals contact details to both parties.</Text>
+                <Feather name="clock" size={14} color={theme.colors.textMuted} style={{ marginTop: 2 }} />
+                <Text style={[styles.revealInfoText, { color: theme.colors.textMuted }]}>Contact reveal request sent. Awaiting a response from the other party.</Text>
               </View>
             ) : null}
 
-            {revealState?.viewerRequestStatus === "REJECTED" ? (
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Your reveal request was rejected.</Text>
+            {revealState?.viewerRequestStatus === "REJECTED" && revealState?.canRequestReveal ? (
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginBottom: 4 }]}>Your previous contact reveal request was declined. You may send a new request.</Text>
             ) : null}
           </View>
         ) : null}
+
+        {/* Transaction / OTP Section */}
+        {showTransactionSection && tx && (
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
+
+            {isBuyer ? (
+              <>
+                <Button
+                  label={tx.status === "IN_PROGRESS" ? "Regenerate OTP" : "Generate OTP"}
+                  onPress={onGenerateOtp}
+                  loading={generateOtpMutation.isPending}
+                />
+
+                {generatedOtp ? (
+                  <View style={styles.otpBox}>
+                    <Text style={styles.otpLabel}>OTP: {generatedOtp}</Text>
+                  </View>
+                ) : null}
+              </>
+            ) : isSeller && tx.status === "IN_PROGRESS" ? (
+              <>
+                <Input
+                  label="Verification OTP"
+                  placeholder="Enter OTP from the other party"
+                  value={otpInput}
+                  onChangeText={setOtpInput}
+                />
+
+                <Button
+                  label="Verify OTP & Complete"
+                  onPress={onVerifyOtp}
+                  loading={verifyOtpMutation.isPending}
+                />
+              </>
+            ) : (
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
+            )}
+
+            {txFeedback && (
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>{txFeedback}</Text>
+            )}
+          </View>
+        )}
 
         {/* Offer History */}
         {offersQuery.data?.offers && (
@@ -957,50 +1008,6 @@ export default function RequestDetailScreen() {
                   );
                 })}
               </View>
-            )}
-          </View>
-        )}
-
-        {/* Transaction / OTP Section */}
-        {showTransactionSection && tx && (
-          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
-
-            {isBuyer ? (
-              <>
-                <Button
-                  label={tx.status === "IN_PROGRESS" ? "Regenerate OTP" : "Generate OTP"}
-                  onPress={onGenerateOtp}
-                  loading={generateOtpMutation.isPending}
-                />
-
-                {generatedOtp ? (
-                  <View style={styles.otpBox}>
-                    <Text style={styles.otpLabel}>OTP: {generatedOtp}</Text>
-                  </View>
-                ) : null}
-              </>
-            ) : isSeller && tx.status === "IN_PROGRESS" ? (
-              <>
-                <Input
-                  label="Verification OTP"
-                  placeholder="Enter OTP from the other party"
-                  value={otpInput}
-                  onChangeText={setOtpInput}
-                />
-
-                <Button
-                  label="Verify OTP & Complete"
-                  onPress={onVerifyOtp}
-                  loading={verifyOtpMutation.isPending}
-                />
-              </>
-            ) : (
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
-            )}
-
-            {txFeedback && (
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>{txFeedback}</Text>
             )}
           </View>
         )}
@@ -1141,9 +1148,14 @@ const styles = StyleSheet.create({
   },
   revealInfoRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 6,
     marginTop: 2,
+  },
+  revealInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
   },
   messageSection: {
     gap: 8,
@@ -1210,7 +1222,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   otpLabel: { fontSize: 14, fontWeight: "600", color: "#1e40af" },
-  feedbackText: { fontSize: 13, marginTop: 8 },
+  feedbackText: { fontSize: 13, lineHeight: 19, marginTop: 8 },
   bottomSheetContent: {
     paddingHorizontal: 16,
     paddingBottom: 12,

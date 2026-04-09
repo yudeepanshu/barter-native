@@ -620,6 +620,7 @@ function RequestItem({
     item.status === "COMPLETED" ||
     (item.status === "ACCEPTED" && (isExchangeFinalized || (!activeTransactionQuery.isPending && !tx)));
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : item.status;
+  const showTurn = OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
   const showTransactionSection =
     item.status === "ACCEPTED" && !isRequestCompleted && (activeTransactionQuery.isPending || Boolean(tx));
   const canActByTurn = !showTransactionSection && OPEN_STATUSES.includes(item.status) && item.currentTurn === actorTurn;
@@ -630,6 +631,7 @@ function RequestItem({
     canActByTurn;
   const isBuyer = sessionUserId === item.buyerId;
   const isSeller = sessionUserId === item.sellerId;
+  const requestedByLabel = isBuyer ? "You" : (item.buyer.userName?.trim() || "Unknown");
 
   const onAccept = () => {
     void acceptMutation.mutateAsync(item.id).catch(() => {
@@ -675,10 +677,18 @@ function RequestItem({
               </Text>
             </View>
           </View>
+          {showTurn ? (
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
+            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Requested by</Text>
             <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-              {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
+              {requestedByLabel}
             </Text>
           </View>
           {activeOffer?.type && activeOffer.type !== "NONE" ? (

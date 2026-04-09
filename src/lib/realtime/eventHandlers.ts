@@ -38,6 +38,13 @@ function shouldRefetchRequestOffers(action: DomainEvent<"request.updated">["payl
   );
 }
 
+function shouldRefetchRequestDetail(action: DomainEvent<"request.updated">["payload"]["action"]) {
+  return (
+    action === "CONTACT_REVEAL_REQUESTED" ||
+    action === "CONTACT_REVEAL_RESPONDED"
+  );
+}
+
 function shouldRefetchProductCollections(action: DomainEvent<"product.updated">["payload"]["action"]) {
   return (
     action === "CREATED" ||
@@ -302,7 +309,7 @@ function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient
   const foundInActiveCache = detailMatched || sentMatched || receivedMatched;
   const shouldRefetchCollections = action === "CREATED" || !foundInActiveCache;
 
-  if (!detailMatched) {
+  if (!detailMatched || shouldRefetchRequestDetail(action)) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.requests.detail(requestId) });
   }
 

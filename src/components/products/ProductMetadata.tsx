@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   containerCompact: {
-    marginTop: 2,
+    marginTop: 0,
   },
   metaChip: {
     flexDirection: "row",

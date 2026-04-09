@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cardTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "800" },
-  metaWrap: { gap: 6, flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
+  metaWrap: { gap: 6, flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" },
 });

@@ -17,6 +17,7 @@ interface CollapsibleSectionProps {
   testID?: string;
   rightElement?: React.ReactNode;
   subtitle?: string;
+  leftElement?: React.ReactNode;
 }
 
 export function CollapsibleSection({
@@ -28,6 +29,7 @@ export function CollapsibleSection({
   testID,
   rightElement,
   subtitle,
+  leftElement,
 }: CollapsibleSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -38,6 +40,7 @@ export function CollapsibleSection({
         style={[styles.header, { borderBottomWidth: expanded ? 1 : 0, borderColor: themeColors.border }]}
         testID={testID}
       >
+        {leftElement ? <View style={styles.headerLeading}>{leftElement}</View> : null}
         <View style={styles.headerLeft}>
           <Text style={[styles.title, { color: themeColors.textPrimary }]}>{title}</Text>
           {subtitle ? (
@@ -78,6 +81,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
     gap: 2,
+  },
+  headerLeading: {
+    marginRight: 10,
   },
   headerRight: {
     flexDirection: "row",

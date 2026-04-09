@@ -1,46 +1,42 @@
-import { StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { OtpLoginForm } from "@/components/auth/OtpLoginForm";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { AppCard } from "@/components/ui/AppCard";
-import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 export default function LoginScreen() {
   const { theme, statusBarStyle } = useAppTheme();
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAwareScrollView
-        containerStyle={styles.keyboardWrap}
-        keyboardVerticalOffset={16}
-        contentContainerStyle={styles.scroll}
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
-        <View
-          style={[
-            styles.hero,
-            {
-              borderRadius: theme.roundness + 8,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.primary,
-            },
-          ]}
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          bounces={false}
         >
-          <Text style={[styles.eyebrow, { color: theme.colors.onPrimary, opacity: 0.78 }]}>Smart local exchange</Text>
-          <Text style={[styles.headline, { color: theme.colors.onPrimary }]}>A cleaner way to trade nearby.</Text>
-          <Text style={[styles.subline, { color: theme.colors.onPrimary, opacity: 0.9 }]}>
-            Fast listing discovery, transparent negotiation, and secure exchange workflows.
-          </Text>
-        </View>
+          <View
+            style={[
+              styles.formShell,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                borderRadius: theme.roundness + 10,
+              },
+            ]}
+          >
+            <OtpLoginForm />
+          </View>
 
-        <AppCard
-          title="Welcome back"
-          subtitle="Continue with OTP to access your listings, requests, and active negotiations."
-        >
-          <OtpLoginForm />
-        </AppCard>
-      </KeyboardAwareScrollView>
+          <Text style={[styles.footerCopy, { color: theme.colors.textMuted }]}>Secure sign-in for listings, requests, and exchange verification.</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -48,18 +44,22 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: "flex-start", padding: 20, paddingTop: 28, paddingBottom: 28, gap: 16 },
-  hero: {
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 16,
+    gap: 18,
+  },
+  formShell: {
     borderWidth: 1,
-    padding: 20,
-    gap: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 34,
   },
-  eyebrow: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    fontWeight: "700",
+  footerCopy: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
   },
-  headline: { fontSize: 30, fontWeight: "800", lineHeight: 36 },
-  subline: { fontSize: 14, lineHeight: 21 },
 });

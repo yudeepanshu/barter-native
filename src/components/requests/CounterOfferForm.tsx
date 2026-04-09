@@ -376,11 +376,6 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
 
     try {
       await onSubmit(payload);
-      setCounterAmount(initialAmount != null && Number.isFinite(Number(initialAmount)) ? String(Number(initialAmount)) : "");
-      setCounterMessage("");
-      setCounterOfferedProductIds([]);
-      setCounterVisibleProductIds(initialVisibleProductIds);
-      setCounterRequestedProductIds(initialRequestedProductIds);
       setFeedback(null);
     } catch (e: any) {
       setFeedback(e?.message || "Failed to submit counter offer.");

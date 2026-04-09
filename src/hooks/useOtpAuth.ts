@@ -6,13 +6,14 @@ import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 
-export type OtpStep = "identifier" | "code";
+export type OtpStep = "identifier" | "sent" | "code";
 
 interface UseOtpAuthReturn {
   step: OtpStep;
   busy: boolean;
   error: string | null;
   requestOtp: (identifier: string) => Promise<void>;
+  proceedToCode: () => void;
   verifyOtp: (identifier: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   goToIdentifierStep: () => void;
@@ -40,9 +41,14 @@ export function useOtpAuth(): UseOtpAuthReturn {
     } finally {
       // TEMPORARY: Allow users to proceed to OTP entry even when request-otp fails.
       // We currently fetch OTP from logs for testing until sender reliability is fixed.
-      setStep("code");
+      setStep("sent");
       setBusy(false);
     }
+  }, []);
+
+  const proceedToCode = useCallback(() => {
+    setStep("code");
+    setError(null);
   }, []);
 
   const verifyOtp = useCallback(
@@ -79,7 +85,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
     setError(null);
   }, []);
 
-  return { step, busy, error, requestOtp, verifyOtp, signOut, goToIdentifierStep, resetError };
+  return { step, busy, error, requestOtp, proceedToCode, verifyOtp, signOut, goToIdentifierStep, resetError };
 }
 
 function toMessage(err: unknown): string {

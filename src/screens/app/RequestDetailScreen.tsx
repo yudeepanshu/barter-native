@@ -1,8 +1,8 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestSummary } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
@@ -30,11 +30,16 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { SwipeableBottomSheet } from "@/components/ui/SwipeableBottomSheet";
 import { ProductCard } from "@/components/products/ProductCard";
+import { OtpCodeField } from "@/components/auth/OtpCodeField";
 import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
+import {
+  useUpdateProfileMutation,
+  toErrorMessage as toProfileErrorMessage,
+} from "@/hooks/mutations/useUpdateProfileMutation";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -63,6 +68,81 @@ function getOfferStatusBadgeStyle(status: string): { bg: string; text: string } 
   }
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/\s+/g, "").trim();
+}
+
+function formatRemainingDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return "00:00";
+  }
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function toInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+}
+
+function OtpExpiryInfo({
+  expiresAt,
+  textColor,
+  onExpire,
+}: {
+  expiresAt: string | null;
+  textColor: string;
+  onExpire: () => void;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const expireNotifiedRef = useRef(false);
+  const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+  const remainingMs = Number.isFinite(expiresAtMs) ? Math.max(0, expiresAtMs - nowMs) : 0;
+  const isExpired = !Number.isFinite(expiresAtMs) || remainingMs <= 0;
+
+  useEffect(() => {
+    expireNotifiedRef.current = false;
+    setNowMs(Date.now());
+  }, [expiresAt]);
+
+  useEffect(() => {
+    if (isExpired) {
+      if (!expireNotifiedRef.current) {
+        expireNotifiedRef.current = true;
+        onExpire();
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isExpired, onExpire]);
+
+  return (
+    <>
+      <Text style={[styles.feedbackText, { color: textColor, marginTop: 0 }]}>
+        {isExpired
+          ? "OTP expired. You can regenerate it now."
+          : `OTP generated. Time remaining ${formatRemainingDuration(remainingMs)}.`}
+      </Text>
+      <Text style={[styles.feedbackText, { color: textColor, marginTop: 0 }]}>
+        It can be regenerated after current OTP expires.
+      </Text>
+    </>
+  );
+}
+
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { theme, statusBarStyle } = useAppTheme();
@@ -87,6 +167,7 @@ export default function RequestDetailScreen() {
   const cancelMutation = useCancelRequestMutation();
   const requestContactRevealMutation = useRequestContactRevealMutation();
   const respondContactRevealMutation = useRespondContactRevealMutation();
+  const updateProfileMutation = useUpdateProfileMutation();
   const counterOfferMutation = useCreateCounterOfferMutation();
   const ownProducts = useProductsListController(
     {
@@ -101,11 +182,26 @@ export default function RequestDetailScreen() {
 
   const [otpInput, setOtpInput] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
+  const [generatedOtpExpiresAt, setGeneratedOtpExpiresAt] = useState<string | null>(null);
+  const [isGeneratedOtpExpired, setIsGeneratedOtpExpired] = useState(false);
   const [txFeedback, setTxFeedback] = useState<string | null>(null);
   const [showCounterOfferForm, setShowCounterOfferForm] = useState(false);
   const [considerationTab, setConsiderationTab] = useState<"yours" | "theirs">("yours");
   const [expandRequesterProducts, setExpandRequesterProducts] = useState(false);
   const [expandYourProducts, setExpandYourProducts] = useState(false);
+  const [contactEmailInput, setContactEmailInput] = useState("");
+  const [contactPhoneInput, setContactPhoneInput] = useState("");
+  const [contactFieldErrors, setContactFieldErrors] = useState<{
+    email?: string;
+    mobileNumber?: string;
+  }>({});
+  const [contactUpdateMessage, setContactUpdateMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setContactEmailInput(session?.user.email ?? "");
+    setContactPhoneInput(session?.user.mobileNumber ?? "");
+    setContactFieldErrors({});
+  }, [session?.user.email, session?.user.mobileNumber]);
 
   if (!session) {
     return null;
@@ -156,7 +252,6 @@ export default function RequestDetailScreen() {
   const actorTurn = isBuyer ? "BUYER" : "SELLER";
   const isExchangeFinalized = request.product.status === "EXCHANGED";
   const showContactRevealSection = request.status === "ACCEPTED" && request.product.status === "RESERVED";
-  const showEmail = request.contactPreference === "EMAIL" || request.contactPreference === "BOTH";
 
   const ownOfferableProducts = ownProducts.items;
   const canActByTurn = OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
@@ -197,18 +292,105 @@ export default function RequestDetailScreen() {
   } : undefined;
 
   const tx = transactionQuery.data;
+  const generatedOtpExpiresAtMs = generatedOtpExpiresAt ? new Date(generatedOtpExpiresAt).getTime() : null;
+  const hasGeneratedOtpExpiredByClock =
+    generatedOtp != null && (generatedOtpExpiresAtMs == null || generatedOtpExpiresAtMs <= Date.now());
+  const buyerOtpExpired = generatedOtp != null && (isGeneratedOtpExpired || hasGeneratedOtpExpiredByClock);
+  const canGenerateBuyerOtp = !generatedOtp || buyerOtpExpired;
   const isRequestCompleted =
     request.status === "COMPLETED" ||
     (request.status === "ACCEPTED" && (isExchangeFinalized || (!transactionQuery.isPending && !tx)));
   const canCancel = OPEN_STATUSES.includes(request.status) || (request.status === "ACCEPTED" && !isRequestCompleted);
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : request.status;
+  const showPendingTurnDetails = OPEN_STATUSES.includes(request.status) && Boolean(request.currentTurn);
+  const acceptedTurnLabel =
+    request.status !== "ACCEPTED" || isRequestCompleted || !tx
+      ? null
+      : tx.status === "INITIATED"
+        ? isBuyer
+          ? "Your turn"
+          : "Their turn"
+        : tx.status === "IN_PROGRESS"
+          ? isBuyer
+            ? (canGenerateBuyerOtp ? "Your turn" : "Their turn")
+            : "Your turn"
+          : null;
+  const showAcceptedTurnDetails = Boolean(acceptedTurnLabel);
+  const showRequestDetailsSection =
+    showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
   const showTransactionSection =
     request.status === "ACCEPTED" && !isRequestCompleted && (transactionQuery.isPending || Boolean(tx));
+  const canViewCounterpartyContact = Boolean(revealState?.contactVisible);
   const showPhone =
+    canViewCounterpartyContact &&
     (request.contactPreference === "PHONE" || request.contactPreference === "BOTH") &&
     Boolean(counterparty.mobileNumber);
+  const viewerEmail = session.user.email ?? "";
+  const viewerPhone = session.user.mobileNumber ?? "";
+  const showEmail =
+    canViewCounterpartyContact &&
+    (request.contactPreference === "EMAIL" || request.contactPreference === "BOTH");
+  const viewerNeedsEmail =
+    request.contactPreference === "EMAIL" || request.contactPreference === "BOTH";
+  const viewerNeedsPhone =
+    request.contactPreference === "PHONE" || request.contactPreference === "BOTH";
+  const missingViewerEmail = viewerNeedsEmail && viewerEmail.trim().length === 0;
+  const missingViewerPhone = viewerNeedsPhone && viewerPhone.trim().length === 0;
+  const viewerMissingContactInfo = missingViewerEmail || missingViewerPhone;
+  const contactRequirementsLabel = request.contactPreference === "BOTH"
+    ? "email and phone"
+    : request.contactPreference === "PHONE"
+      ? "phone"
+      : "email";
+
+  const onSaveMissingContactInfo = async () => {
+    const trimmedEmail = contactEmailInput.trim();
+    const trimmedPhone = normalizePhone(contactPhoneInput);
+    const nextErrors: { email?: string; mobileNumber?: string } = {};
+
+    if (viewerNeedsEmail) {
+      if (trimmedEmail.length === 0) {
+        nextErrors.email = "Email is required for this request.";
+      } else if (!isValidEmail(trimmedEmail)) {
+        nextErrors.email = "Enter a valid email address.";
+      }
+    }
+
+    if (viewerNeedsPhone) {
+      if (trimmedPhone.length === 0) {
+        nextErrors.mobileNumber = "Phone number is required for this request.";
+      } else if (trimmedPhone.length < 10 || trimmedPhone.length > 15) {
+        nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
+      }
+    }
+
+    setContactFieldErrors(nextErrors);
+    setContactUpdateMessage(null);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        ...(viewerNeedsEmail ? { email: trimmedEmail } : {}),
+        ...(viewerNeedsPhone ? { mobileNumber: trimmedPhone } : {}),
+      });
+      setContactUpdateMessage("Contact details updated.");
+    } catch (error) {
+      setContactUpdateMessage(toProfileErrorMessage(error));
+    }
+  };
 
   const onRequestContactReveal = async () => {
+    if (viewerMissingContactInfo) {
+      await dialog.alert(
+        "Add Contact Details",
+        `Add your ${contactRequirementsLabel} before requesting contact reveal so the other party can reach you once it is approved.`,
+      );
+      return;
+    }
+
     try {
       await requestContactRevealMutation.mutateAsync({
         requestId: request.id,
@@ -227,6 +409,14 @@ export default function RequestDetailScreen() {
   const onRespondContactReveal = async (approve: boolean) => {
     const revealRequestId = revealState?.incomingRequestId;
     if (!revealRequestId) {
+      return;
+    }
+
+    if (approve && viewerMissingContactInfo) {
+      await dialog.alert(
+        "Add Contact Details",
+        `Add your ${contactRequirementsLabel} before approving contact reveal so both sides can immediately see usable contact information.`,
+      );
       return;
     }
 
@@ -270,9 +460,9 @@ export default function RequestDetailScreen() {
     try {
       const result = await generateOtpMutation.mutateAsync(tx.id);
       setGeneratedOtp(result.otp);
-      setTxFeedback(
-        `OTP generated. Expires at ${new Date(result.expiresAt).toLocaleTimeString()}.`,
-      );
+      setGeneratedOtpExpiresAt(result.expiresAt);
+      setIsGeneratedOtpExpired(false);
+      setTxFeedback(null);
     } catch (error) {
       setTxFeedback(toTransactionErrorMessage(error));
     }
@@ -286,6 +476,8 @@ export default function RequestDetailScreen() {
       await verifyOtpMutation.mutateAsync({ transactionId: tx.id, otp: otpInput.trim() });
       setOtpInput("");
       setGeneratedOtp(null);
+      setGeneratedOtpExpiresAt(null);
+      setIsGeneratedOtpExpired(false);
       setTxFeedback("OTP verified. Transaction completed.");
     } catch (error) {
       setTxFeedback(toTransactionErrorMessage(error));
@@ -412,181 +604,192 @@ export default function RequestDetailScreen() {
         </View>
 
         {/* Request Details */}
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Request Details</Text>
-            {canCancel ? (
-              <Pressable
-                onPress={() =>
-                  cancelMutation
-                    .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
-                    .catch((error) => {
-                      void dialog.alert("Error", toRequestErrorMessage(error));
-                    })
-                }
-                style={({ pressed }) => [
-                  {
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: theme.colors.danger,
-                    backgroundColor: pressed ? (theme.mode === "dark" ? theme.colors.border : "#fee2e2") : (theme.mode === "dark" ? theme.colors.surface : "#fff"),
-                    opacity: cancelMutation.isPending ? 0.6 : 1,
-                  },
-                ]}
-                disabled={cancelMutation.isPending}
-              >
-                <Text style={{ color: theme.colors.danger, fontWeight: "700", fontSize: 12 }}>
-                  {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
+        {showRequestDetailsSection ? (
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Request Details</Text>
+              {canCancel ? (
+                <Pressable
+                  onPress={() =>
+                    cancelMutation
+                      .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
+                      .catch((error) => {
+                        void dialog.alert("Error", toRequestErrorMessage(error));
+                      })
+                  }
+                  style={({ pressed }) => [
+                    {
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: theme.colors.danger,
+                      backgroundColor: pressed ? (theme.mode === "dark" ? theme.colors.border : "#fee2e2") : (theme.mode === "dark" ? theme.colors.surface : "#fff"),
+                      opacity: cancelMutation.isPending ? 0.6 : 1,
+                    },
+                  ]}
+                  disabled={cancelMutation.isPending}
+                >
+                  <Text style={{ color: theme.colors.danger, fontWeight: "700", fontSize: 12 }}>
+                    {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {showPendingTurnDetails ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                  {request.currentTurn === actorTurn ? "Your turn" : "Their turn"}
                 </Text>
-              </Pressable>
+              </View>
+            ) : showAcceptedTurnDetails ? (
+              <View style={styles.detailRow}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
+                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                  {acceptedTurnLabel}
+                </Text>
+              </View>
+            ) : null}
+
+            {showPendingTurnDetails && latestActiveOffer && latestActiveOffer.type !== "NONE" ? (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Latest Offer</Text>
+                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                    {latestActiveOffer.type === "MIXED" ? "Product + money" : latestActiveOffer.type === "PRODUCT" ? "Product swap" : latestActiveOffer.type === "MONEY" ? "Money offer" : latestActiveOffer.type}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>By</Text>
+                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                    {latestActiveOffer.offeredBy?.userName || "Unknown"}
+                  </Text>
+                </View>
+
+                {latestActiveOffer.offeredAmount && (
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
+                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>₹{latestActiveOffer.offeredAmount}</Text>
+                  </View>
+                )}
+
+                {latestActiveOffer.offeredProducts.length > 0 && (
+                  <View style={styles.offeredProducts}>
+                    <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Offered listings</Text>
+                    {latestActiveOffer.offeredProducts.map((op) => (
+                      <View key={op.id} style={{ marginTop: 8 }}>
+                        <ProductCard
+                          product={op.product}
+                          showMeta={false}
+                          onPress={() => router.push(`/(app)/products/${op.product.id}`)}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {latestActiveOffer.requestedProducts?.length > 0 && (
+                  <View style={styles.offeredProducts}>
+                    <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Requested in return</Text>
+                    {latestActiveOffer.requestedProducts.map((rp) => (
+                      <View key={rp.id} style={{ marginTop: 8 }}>
+                        <ProductCard
+                          product={rp.product}
+                          showMeta={false}
+                          onPress={() => router.push(`/(app)/products/${rp.product.id}`)}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Action Buttons: Accept/Reject/Counter */}
+                {canActByTurn && (
+                  <View style={styles.offerActionButtonsRow}>
+                    <View style={styles.offerActionButtonCell}>
+                      <Button
+                        label="Accept"
+                        style={{
+                          minHeight: 32,
+                          borderRadius: 10,
+                          paddingHorizontal: 18,
+                          paddingVertical: 0,
+                        }}
+                        onPress={() =>
+                          acceptMutation.mutateAsync(request.id).catch((error) => {
+                            void dialog.alert("Error", toRequestErrorMessage(error));
+                          })
+                        }
+                        loading={acceptMutation.isPending}
+                      />
+                    </View>
+                    <View style={styles.offerActionButtonCell}>
+                      <Button
+                        label="Reject"
+                        variant="ghost"
+                        style={{
+                          minHeight: 32,
+                          borderRadius: 10,
+                          paddingHorizontal: 18,
+                          paddingVertical: 0,
+                          backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff",
+                          borderColor: theme.colors.danger,
+                          borderWidth: 1,
+                        }}
+                        textColor={theme.colors.danger}
+                        labelStyle={{ fontWeight: "700" }}
+                        onPress={() =>
+                          rejectMutation.mutateAsync(request.id).catch((error) => {
+                            void dialog.alert("Error", toRequestErrorMessage(error));
+                          })
+                        }
+                        loading={rejectMutation.isPending}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {canCounter && (
+                  <Button
+                    label="Counter Offer"
+                    variant="ghost"
+                    style={{
+                      minHeight: 36,
+                      borderRadius: 10,
+                      marginTop: 2,
+                      backgroundColor: theme.mode === "dark" ? theme.colors.surfaceMuted : "#fff",
+                      borderWidth: 1,
+                      borderColor: theme.mode === "dark" ? theme.colors.primary : theme.colors.border,
+                    }}
+                    textColor={theme.mode === "dark" ? theme.colors.textPrimary : theme.colors.textSecondary}
+                    labelStyle={{ fontWeight: "700" }}
+                    onPress={() => setShowCounterOfferForm(true)}
+                  />
+                )}
+              </>
+            ) : null}
+
+            {showPendingTurnDetails && request.message ? (
+              <View style={styles.messageSection}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Message</Text>
+                <View
+                  style={[
+                    styles.messageCard,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.messageText, { color: theme.colors.textPrimary }]}>{request.message}</Text>
+                </View>
+              </View>
             ) : null}
           </View>
-
-          <View style={styles.detailRow}>
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
-            <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-              {request.currentTurn === actorTurn ? "Your turn" : "Their turn"}
-            </Text>
-          </View>
-
-          {latestActiveOffer && latestActiveOffer.type !== "NONE" && (
-            <>
-              <View style={styles.detailRow}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Latest Offer</Text>
-                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                  {latestActiveOffer.type === "MIXED" ? "Product + money" : latestActiveOffer.type === "PRODUCT" ? "Product swap" : latestActiveOffer.type === "MONEY" ? "Money offer" : latestActiveOffer.type}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>By</Text>
-                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                  {latestActiveOffer.offeredBy?.userName || "Unknown"}
-                </Text>
-              </View>
-
-              {latestActiveOffer.offeredAmount && (
-                <View style={styles.detailRow}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>₹{latestActiveOffer.offeredAmount}</Text>
-                </View>
-              )}
-
-              {latestActiveOffer.offeredProducts.length > 0 && (
-                <View style={styles.offeredProducts}>
-                  <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Offered listings</Text>
-                  {latestActiveOffer.offeredProducts.map((op) => (
-                    <View key={op.id} style={{ marginTop: 8 }}>
-                      <ProductCard
-                        product={op.product}
-                        showMeta={false}
-                        onPress={() => router.push(`/(app)/products/${op.product.id}`)}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {latestActiveOffer.requestedProducts?.length > 0 && (
-                <View style={styles.offeredProducts}>
-                  <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Requested in return</Text>
-                  {latestActiveOffer.requestedProducts.map((rp) => (
-                    <View key={rp.id} style={{ marginTop: 8 }}>
-                      <ProductCard
-                        product={rp.product}
-                        showMeta={false}
-                        onPress={() => router.push(`/(app)/products/${rp.product.id}`)}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Action Buttons: Accept/Reject/Counter */}
-              {canActByTurn && (
-                <View style={styles.offerActionButtonsRow}>
-                  <View style={styles.offerActionButtonCell}>
-                    <Button
-                      label="Accept"
-                      style={{
-                        minHeight: 32,
-                        borderRadius: 10,
-                        paddingHorizontal: 18,
-                        paddingVertical: 0,
-                      }}
-                      onPress={() =>
-                        acceptMutation.mutateAsync(request.id).catch((error) => {
-                          void dialog.alert("Error", toRequestErrorMessage(error));
-                        })
-                      }
-                      loading={acceptMutation.isPending}
-                    />
-                  </View>
-                  <View style={styles.offerActionButtonCell}>
-                    <Button
-                      label="Reject"
-                      variant="ghost"
-                      style={{
-                        minHeight: 32,
-                        borderRadius: 10,
-                        paddingHorizontal: 18,
-                        paddingVertical: 0,
-                        backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff",
-                        borderColor: theme.colors.danger,
-                        borderWidth: 1,
-                      }}
-                      textColor={theme.colors.danger}
-                      labelStyle={{ fontWeight: "700" }}
-                      onPress={() =>
-                        rejectMutation.mutateAsync(request.id).catch((error) => {
-                          void dialog.alert("Error", toRequestErrorMessage(error));
-                        })
-                      }
-                      loading={rejectMutation.isPending}
-                    />
-                  </View>
-                </View>
-              )}
-
-              {canCounter && (
-                <Button
-                  label="Counter Offer"
-                  variant="ghost"
-                  style={{
-                    minHeight: 36,
-                    borderRadius: 10,
-                    marginTop: 2,
-                    backgroundColor: theme.mode === "dark" ? theme.colors.surfaceMuted : "#fff",
-                    borderWidth: 1,
-                    borderColor: theme.mode === "dark" ? theme.colors.primary : theme.colors.border,
-                  }}
-                  textColor={theme.mode === "dark" ? theme.colors.textPrimary : theme.colors.textSecondary}
-                  labelStyle={{ fontWeight: "700" }}
-                  onPress={() => setShowCounterOfferForm(true)}
-                />
-              )}
-            </>
-          )}
-
-          {request.message && (
-            <View style={styles.messageSection}>
-              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Message</Text>
-              <View
-                style={[
-                  styles.messageCard,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceMuted,
-                  },
-                ]}
-              >
-                <Text style={[styles.messageText, { color: theme.colors.textPrimary }]}>{request.message}</Text>
-              </View>
-            </View>
-          )}
-        </View>
+        ) : null}
 
         {hasConsiderationProducts ? (() => {
           const showTabs = yourConsiderationProducts.length > 0 && theirConsiderationProducts.length > 0;
@@ -797,6 +1000,76 @@ export default function RequestDetailScreen() {
               </View>
             ) : null}
 
+            {viewerMissingContactInfo ? (
+              <View
+                style={[
+                  styles.contactMissingCard,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceMuted,
+                  },
+                ]}
+              >
+                <Text style={[styles.contactMissingTitle, { color: theme.colors.textPrimary }]}>Add your contact details</Text>
+                <Text style={[styles.contactMissingText, { color: theme.colors.textMuted }]}>Your {contactRequirementsLabel} is missing. Add it here before continuing with the contact reveal flow.</Text>
+
+                {viewerNeedsEmail ? (
+                  <Input
+                    label="Email"
+                    value={contactEmailInput}
+                    onChangeText={(value) => {
+                      setContactEmailInput(value);
+                      setContactFieldErrors((current) => ({ ...current, email: undefined }));
+                      setContactUpdateMessage(null);
+                    }}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    error={contactFieldErrors.email ?? null}
+                  />
+                ) : null}
+
+                {viewerNeedsPhone ? (
+                  <Input
+                    label="Phone"
+                    value={contactPhoneInput}
+                    onChangeText={(value) => {
+                      setContactPhoneInput(value);
+                      setContactFieldErrors((current) => ({ ...current, mobileNumber: undefined }));
+                      setContactUpdateMessage(null);
+                    }}
+                    placeholder="Enter phone number"
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    error={contactFieldErrors.mobileNumber ?? null}
+                  />
+                ) : null}
+
+                <Button
+                  label="Save Contact Details"
+                  onPress={() => void onSaveMissingContactInfo()}
+                  loading={updateProfileMutation.isPending}
+                />
+
+                {contactUpdateMessage ? (
+                  <Text
+                    style={[
+                      styles.contactMissingText,
+                      {
+                        color: contactUpdateMessage === "Contact details updated."
+                          ? theme.colors.textSecondary
+                          : theme.colors.danger,
+                      },
+                    ]}
+                  >
+                    {contactUpdateMessage}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
             <View style={styles.contactRow}>
               <Text style={[styles.label, { color: theme.colors.textMuted }]}>Name</Text>
               <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.userName}</Text>
@@ -820,6 +1093,7 @@ export default function RequestDetailScreen() {
               {revealState?.canRequestReveal ? (
                 <Button
                   label="Request Contact Details Reveal"
+                  disabled={viewerMissingContactInfo}
                   onPress={() => {
                     void (async () => {
                       const shouldRequest = await dialog.confirm(
@@ -847,6 +1121,7 @@ export default function RequestDetailScreen() {
                   </Text>
                   <Button
                     label="Approve Reveal"
+                    disabled={viewerMissingContactInfo}
                     onPress={() => void onRespondContactReveal(true)}
                     loading={respondContactRevealMutation.isPending}
                   />
@@ -877,19 +1152,38 @@ export default function RequestDetailScreen() {
         {showTransactionSection && tx && (
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
+            <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>Generate OTP only after both parties have agreed to the final terms and are ready to complete the exchange.</Text>
 
             {isBuyer ? (
               <>
-                <Button
-                  label={tx.status === "IN_PROGRESS" ? "Regenerate OTP" : "Generate OTP"}
-                  onPress={onGenerateOtp}
-                  loading={generateOtpMutation.isPending}
-                />
+                {generatedOtp ? (
+                  <View
+                    style={[
+                      styles.otpBox,
+                      {
+                        backgroundColor: theme.mode === "dark" ? "#13243f" : "#dbe8fb",
+                        borderColor: theme.mode === "dark" ? "#2f4f7a" : "#b7cff4",
+                      },
+                    ]}
+                  >
+                    <OtpCodeField value={generatedOtp} editable={false} active={!buyerOtpExpired} />
+                  </View>
+                ) : null}
 
                 {generatedOtp ? (
-                  <View style={styles.otpBox}>
-                    <Text style={styles.otpLabel}>OTP: {generatedOtp}</Text>
-                  </View>
+                  <OtpExpiryInfo
+                    expiresAt={generatedOtpExpiresAt}
+                    textColor={theme.colors.textMuted}
+                    onExpire={() => setIsGeneratedOtpExpired(true)}
+                  />
+                ) : null}
+
+                {canGenerateBuyerOtp ? (
+                  <Button
+                    label={generatedOtp ? "Regenerate OTP" : "Generate OTP"}
+                    onPress={onGenerateOtp}
+                    loading={generateOtpMutation.isPending}
+                  />
                 ) : null}
               </>
             ) : isSeller && tx.status === "IN_PROGRESS" ? (
@@ -932,6 +1226,10 @@ export default function RequestDetailScreen() {
                     offer.offeredById === session.user.id
                       ? "You"
                       : (offer.offeredBy?.userName || "Unknown");
+                  const offeredByAvatar =
+                    offer.offeredById === session.user.id
+                      ? session.user.profilePicture ?? null
+                      : offer.offeredBy?.profilePicture ?? null;
                   const statusStyle = getOfferStatusBadgeStyle(offer.status);
                   const statusBadge = (
                     <View
@@ -959,6 +1257,25 @@ export default function RequestDetailScreen() {
                       key={offer.id}
                       title={`Offer #${historyOffers.length - index}`}
                       subtitle={`By ${offeredByLabel}`}
+                      leftElement={
+                        offeredByAvatar ? (
+                          <Image source={{ uri: offeredByAvatar }} style={styles.offerAvatarImage} />
+                        ) : (
+                          <View
+                            style={[
+                              styles.offerAvatarFallback,
+                              {
+                                borderColor: theme.colors.border,
+                                backgroundColor: theme.colors.surfaceMuted,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.offerAvatarInitials, { color: theme.colors.textSecondary }]}>
+                              {toInitials(offeredByLabel)}
+                            </Text>
+                          </View>
+                        )
+                      }
                       rightElement={statusBadge}
                       themeColors={{
                         textPrimary: theme.colors.textPrimary,
@@ -1022,33 +1339,35 @@ export default function RequestDetailScreen() {
         {/* Back Button removed from bottom */}
       </ScrollView>
 
-      <SwipeableBottomSheet
-        visible={showCounterOfferForm}
-        onClose={() => setShowCounterOfferForm(false)}
-        title="Counter Offer"
-        contentContainerStyle={styles.bottomSheetContent}
-      >
-        <CounterOfferForm
-          product={request.product}
-          ownOfferableProducts={ownOfferableProducts}
-          counterpartyProducts={counterpartyProductsForCounter}
-          requesterProfile={{ userName: counterparty.userName, profilePicture: counterparty.profilePicture ?? null }}
-          onSubmit={onSubmitCounterOffer}
-          loading={counterOfferMutation.isPending}
-          onCancel={() => setShowCounterOfferForm(false)}
-          isBuyer={isBuyer}
-          effectiveMinAmount={effectiveMinAmount}
-          canCounter={canCounter}
-          userId={session.user.id}
-          allOffers={orderedOffers}
-          previousOffer={previousOffer}
-          initialVisibleProductIds={request.visibleProducts
-            .map((vp) => vp.productId)
-            .filter((id) => ownOfferableProducts.some((p) => p.id === id))}
-          initialRequestedProductIds={latestRequesterProductIds}
-          initialAmount={latestOfferAmount}
-        />
-      </SwipeableBottomSheet>
+      {showCounterOfferForm ? (
+        <SwipeableBottomSheet
+          visible
+          onClose={() => setShowCounterOfferForm(false)}
+          title="Counter Offer"
+          contentContainerStyle={styles.bottomSheetContent}
+        >
+          <CounterOfferForm
+            product={request.product}
+            ownOfferableProducts={ownOfferableProducts}
+            counterpartyProducts={counterpartyProductsForCounter}
+            requesterProfile={{ userName: counterparty.userName, profilePicture: counterparty.profilePicture ?? null }}
+            onSubmit={onSubmitCounterOffer}
+            loading={counterOfferMutation.isPending}
+            onCancel={() => setShowCounterOfferForm(false)}
+            isBuyer={isBuyer}
+            effectiveMinAmount={effectiveMinAmount}
+            canCounter={canCounter}
+            userId={session.user.id}
+            allOffers={orderedOffers}
+            previousOffer={previousOffer}
+            initialVisibleProductIds={request.visibleProducts
+              .map((vp) => vp.productId)
+              .filter((id) => ownOfferableProducts.some((p) => p.id === id))}
+            initialRequestedProductIds={latestRequesterProductIds}
+            initialAmount={latestOfferAmount}
+          />
+        </SwipeableBottomSheet>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -1150,6 +1469,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 6,
   },
+  contactMissingCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    marginBottom: 6,
+  },
+  contactMissingTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  contactMissingText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
   contactApproveRow: {
     gap: 8,
   },
@@ -1220,15 +1554,33 @@ const styles = StyleSheet.create({
   offerStatusText: { fontSize: 10, fontWeight: "600" },
   offerType: { fontSize: 13, fontWeight: "500" },
   offerAmount: { fontSize: 13, fontWeight: "600" },
+  offerAvatarImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  offerAvatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offerAvatarInitials: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
   offeredProducts: { marginTop: 10, gap: 12 },
   emptyText: { fontSize: 14, textAlign: "center", marginVertical: 16 },
   otpBox: {
-    backgroundColor: "#dbeafe",
     borderRadius: 8,
-    padding: 12,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: 12,
     marginBottom: 10,
   },
-  otpLabel: { fontSize: 14, fontWeight: "600", color: "#1e40af" },
   feedbackText: { fontSize: 13, lineHeight: 19, marginTop: 8 },
   bottomSheetContent: {
     paddingHorizontal: 16,

@@ -1,9 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { mobileApiClient } from "@/lib/api/client";
-
-function invalidateNotifications(queryClient: ReturnType<typeof useQueryClient>) {
-  return queryClient.invalidateQueries({ queryKey: ["notifications"] });
-}
+import { invalidateNotifications } from "@/lib/query/mutationSync";
 
 export function useMarkNotificationReadMutation() {
   const queryClient = useQueryClient();

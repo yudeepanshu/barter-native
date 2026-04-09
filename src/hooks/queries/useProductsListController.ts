@@ -1,7 +1,8 @@
 import type { ProductsQueryInput } from "@barter/types";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useProductsQuery } from "@/hooks/queries/useProductsQuery";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { useSyncEntityList } from "@/lib/store/useStoreSync";
 
 interface ProductsListControllerOptions {
   enabled?: boolean;
@@ -38,11 +39,7 @@ export function useProductsListController(
 
   const items = queryItems.length > 0 ? queryItems : fallbackItems;
 
-  useEffect(() => {
-    if (queryItems.length > 0) {
-      upsertProducts(queryItems);
-    }
-  }, [queryItems, upsertProducts]);
+  useSyncEntityList(queryItems, upsertProducts);
 
   const refresh = () => void query.refetch();
 

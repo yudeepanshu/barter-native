@@ -8,8 +8,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
 import type { NotificationSummary, RequestStatus } from "@barter/types";
@@ -119,7 +119,6 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const markNotificationReadMutation = useMarkNotificationReadMutation();
   const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
   const clearAllNotificationsMutation = useClearAllNotificationsMutation();
-  const refetchNotifications = notificationsQuery.refetch;
 
   const categories = categoriesQuery.data ?? [];
   const notifications = useMemo(
@@ -180,14 +179,14 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
           return aDistance - bDistance;
         }
 
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
       return next;
     }
 
     next.sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
+      const aTime = new Date(a.updatedAt).getTime();
+      const bTime = new Date(b.updatedAt).getTime();
       return sortBy === "newest" ? bTime - aTime : aTime - bTime;
     });
     return next;
@@ -315,12 +314,6 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     return () => clearTimeout(timer);
   }, [showInitialLoading]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refetchNotifications();
-    }, [refetchNotifications]),
-  );
-
   const onRefreshNotifications = async () => {
     await notificationsQuery.refetch();
   };
@@ -346,9 +339,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     }
   };
 
-  const onOpenNotificationsPanel = async () => {
+  const onOpenNotificationsPanel = () => {
     setShowNotifications(true);
-    await notificationsQuery.refetch();
   };
 
   const onOpenFilters = () => {

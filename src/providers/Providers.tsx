@@ -4,17 +4,19 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { NotificationsListResult, ProductsListResult } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { PRODUCT_LIMIT_CACHE_QUERY_LIMIT } from "@/lib/listings/productCreationLimit";
 import { queryClient } from "@/lib/query/queryClient";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
+import { useRealtimeConnection } from "@/lib/realtime/useRealtimeConnection";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 import { AppDialogProvider } from "@/providers/AppDialogProvider";
 import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
 const NOTIFICATIONS_BOOTSTRAP_FILTERS = { limit: 20, unreadOnly: false } as const;
-const USER_LISTINGS_BOOTSTRAP_LIMIT = 40;
 
 function isAuthBootstrapFailure(error: unknown) {
   const apiError = ApiClient.toApiError(error);
@@ -115,6 +117,7 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
           }
 
           if (!cancelled) {
+            queryClient.setQueryData(queryKeys.auth.me, user);
             state.setSession({ user, tokens: state.session.tokens });
             logAuthBootstrap("info", "session validated");
           }
@@ -249,6 +252,27 @@ function PushNotificationsBootstrap() {
   return null;
 }
 
+function RealtimeBootstrap() {
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
+  const setProfile = useAppDataStore((state) => state.setProfile);
+
+  useRealtimeConnection();
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      setProfile(session.user);
+      return;
+    }
+
+    if (status === "unauthenticated") {
+      setProfile(null);
+    }
+  }, [status, session?.user, setProfile]);
+
+  return null;
+}
+
 function NotificationsBootstrap() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
@@ -306,6 +330,45 @@ function NotificationsBootstrap() {
   return null;
 }
 
+function CategoriesBootstrap() {
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (loadedRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const bootstrapCategories = async () => {
+      try {
+        await queryClient.prefetchQuery({
+          queryKey: queryKeys.categories.all,
+          queryFn: async () => {
+            const envelope = await mobileApiClient.getCategories();
+            return envelope.data ?? [];
+          },
+          staleTime: 30 * 60 * 1000,
+        });
+
+        if (!cancelled) {
+          loadedRef.current = true;
+        }
+      } catch {
+        // Best effort preload; screens can still fetch on demand.
+      }
+    };
+
+    void bootstrapCategories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return null;
+}
+
 function UserListingsBootstrap() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
@@ -326,11 +389,11 @@ function UserListingsBootstrap() {
     const bootstrapListings = async () => {
       try {
         await queryClient.prefetchInfiniteQuery({
-          queryKey: queryKeys.products.infinite({ ownerId: userId, limit: USER_LISTINGS_BOOTSTRAP_LIMIT }),
+          queryKey: queryKeys.products.infinite({ ownerId: userId, limit: PRODUCT_LIMIT_CACHE_QUERY_LIMIT }),
           queryFn: async ({ pageParam }) => {
             const envelope = await mobileApiClient.getProducts({
               ownerId: userId,
-              limit: USER_LISTINGS_BOOTSTRAP_LIMIT,
+              limit: PRODUCT_LIMIT_CACHE_QUERY_LIMIT,
               cursor: pageParam ?? undefined,
             });
             return envelope.data ?? ({ items: [], nextCursor: null, hasMore: false } as ProductsListResult);
@@ -370,7 +433,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <AuthBootstrap>
         <AppDialogProvider>
           <AppUpdateProvider />
+          <RealtimeBootstrap />
           <PushNotificationsBootstrap />
+          <CategoriesBootstrap />
           <NotificationsBootstrap />
           <UserListingsBootstrap />
           {children}

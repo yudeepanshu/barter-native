@@ -19,6 +19,7 @@ import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { useProductRoom } from "@/lib/realtime/rooms";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
@@ -51,6 +52,7 @@ export default function ProductDetailScreen() {
     distanceKm?: string;
   }>();
   const productId = typeof params.id === "string" ? params.id : "";
+  useProductRoom(productId || null);
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
   const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;

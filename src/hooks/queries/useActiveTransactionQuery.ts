@@ -3,12 +3,13 @@ import type { TransactionSummary } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { useSyncEntity } from "@/lib/store/useStoreSync";
 
 export function useActiveTransactionQuery(requestId: string, enabled = true) {
   const upsertTransaction = useAppDataStore((state) => state.upsertTransaction);
   const queryKey = queryKeys.transactions.activeByRequest(requestId);
 
-  return useQuery<
+  const query = useQuery<
     TransactionSummary | null,
     Error,
     TransactionSummary | null,
@@ -21,10 +22,9 @@ export function useActiveTransactionQuery(requestId: string, enabled = true) {
     },
     enabled: enabled && Boolean(requestId),
     retry: false,
-    onSuccess: (transaction) => {
-      if (transaction) {
-        upsertTransaction(transaction);
-      }
-    },
   });
+
+  useSyncEntity(query.data, upsertTransaction);
+
+  return query;
 }

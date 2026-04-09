@@ -1,8 +1,16 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
+import {
+  checkProductCreationLimit,
+  getProductCreationLimitMessage,
+  MAX_PRODUCTS_PER_USER,
+} from "@/lib/listings/productCreationLimit";
+import { queryClient } from "@/lib/query/queryClient";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
@@ -14,9 +22,11 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const session = useSession();
   const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
   const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
   const dialog = useAppDialog();
+  const createCheckInFlightRef = useRef(false);
   const tabBarBottomPadding = Math.max(insets.bottom, 10);
   const tabBarHeight = 58 + tabBarBottomPadding;
 
@@ -30,7 +40,47 @@ export default function AppTabsLayout() {
           const openingCreateTab = currentRouteName !== "create" && route.name === "create";
 
           if (openingCreateTab) {
-            navigation.navigate("create");
+            event.preventDefault();
+
+            if (createCheckInFlightRef.current) {
+              return;
+            }
+
+            createCheckInFlightRef.current = true;
+
+            void (async () => {
+              try {
+                const userId = session?.user.id;
+
+                if (!userId) {
+                  navigation.navigate("create");
+                  return;
+                }
+
+                const atLimit = await checkProductCreationLimit(queryClient, userId);
+
+                if (!atLimit) {
+                  navigation.navigate("create");
+                  return;
+                }
+
+                const action = await dialog.show({
+                  title: "Limit reached",
+                  message: getProductCreationLimitMessage(MAX_PRODUCTS_PER_USER),
+                  actions: [{ key: "see-listings", label: "See current listings" }],
+                  dismissOnBackdrop: true,
+                });
+
+                if (action === "see-listings" && route.name !== "my-listings") {
+                  navigation.navigate("my-listings");
+                }
+              } catch {
+                navigation.navigate("create");
+              } finally {
+                createCheckInFlightRef.current = false;
+              }
+            })();
+
             return;
           }
 

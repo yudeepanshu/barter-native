@@ -3,12 +3,13 @@ import type { RequestSummary } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { useSyncEntity } from "@/lib/store/useStoreSync";
 
 export function useRequestDetailQuery(requestId: string) {
   const upsertRequest = useAppDataStore((state) => state.upsertRequest);
   const queryKey = queryKeys.requests.detail(requestId);
 
-  return useQuery<
+  const query = useQuery<
     RequestSummary | null | undefined,
     Error,
     RequestSummary | null | undefined,
@@ -20,10 +21,9 @@ export function useRequestDetailQuery(requestId: string) {
       return result.data;
     },
     enabled: Boolean(requestId),
-    onSuccess: (request) => {
-      if (request) {
-        upsertRequest(request);
-      }
-    },
   });
+
+  useSyncEntity(query.data, upsertRequest);
+
+  return query;
 }

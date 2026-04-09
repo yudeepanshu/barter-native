@@ -3,10 +3,12 @@ import {
   type InfiniteData,
   type UseInfiniteQueryResult,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { RequestListQueryInput, RequestsListResult } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { useSyncEntityList } from "@/lib/store/useStoreSync";
 
 export type RequestsScope = "sent" | "received";
 
@@ -26,7 +28,7 @@ export function useRequestsQuery(
       ? queryKeys.requests.sentInfinite(filters)
       : queryKeys.requests.receivedInfinite(filters);
 
-  return useInfiniteQuery<
+  const query = useInfiniteQuery<
     RequestsListResult,
     Error,
     InfiniteData<RequestsListResult>,
@@ -45,9 +47,14 @@ export function useRequestsQuery(
     },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
-    onSuccess: (data) => {
-      const requests = data.pages.flatMap((page) => page.items);
-      upsertRequests(requests);
-    },
   });
+
+  const requests = useMemo(
+    () => query.data?.pages.flatMap((page) => page.items) ?? [],
+    [query.data],
+  );
+
+  useSyncEntityList(requests, upsertRequests);
+
+  return query;
 }

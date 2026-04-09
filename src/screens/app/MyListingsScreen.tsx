@@ -153,8 +153,8 @@ export default function MyListingsScreen() {
         : filteredWithoutType.filter((item) => item.status === selectedFilter);
 
     return [...byType].sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
+      const aTime = new Date(a.updatedAt).getTime();
+      const bTime = new Date(b.updatedAt).getTime();
       return sortBy === "newest" ? bTime - aTime : aTime - bTime;
     });
   }, [filteredWithoutType, selectedFilter, sortBy]);

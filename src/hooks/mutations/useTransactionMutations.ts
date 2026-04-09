@@ -2,14 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape, VerifyTransactionOtpInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
-
-function invalidateTransactionRelated(queryClient: ReturnType<typeof useQueryClient>) {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["transactions"] }),
-    queryClient.invalidateQueries({ queryKey: ["requests"] }),
-    queryClient.invalidateQueries({ queryKey: ["products"] }),
-  ]);
-}
+import { invalidateTransactionRelated } from "@/lib/query/mutationSync";
 
 export function useGenerateTransactionOtpMutation() {
   const queryClient = useQueryClient();

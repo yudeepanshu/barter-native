@@ -151,30 +151,100 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     }
   }, [canUseProductMode, product.requestByMoney]);
 
+  const currentDraftAmount = wantsMoney
+    ? (counterAmount.trim() !== "" ? `₹${counterAmount}` : "Not set")
+    : "No money";
+  const currentDraftListingCount = wantsProduct
+    ? (canOfferOwnProducts ? counterOfferedProductIds.length : counterRequestedProductIds.length)
+    : 0;
+  const previousAmountValue = previousOffer?.amount != null ? Number(previousOffer.amount) : null;
+  const previousListingCount = previousOffer?.productCount ?? 0;
+  const amountChanged = previousOffer
+    ? (previousAmountValue ?? null) !== (wantsMoney && counterAmount.trim() !== "" ? Number(counterAmount) : null)
+    : false;
+  const listingsChanged = previousOffer ? previousListingCount !== currentDraftListingCount : false;
+  const changeHint = amountChanged || listingsChanged
+    ? "You are editing your last offer."
+    : "No changes from your previous offer yet.";
+
   // Comparison snapshot for offer negotiation
   const comparisonSnapshot = previousOffer ? (
-    <View style={{ backgroundColor: "#f9fafb", borderRadius: 8, padding: 10, gap: 8, marginBottom: 12 }}>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.textMuted }}>Your previous offer</Text>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginBottom: 2 }}>Amount</Text>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textPrimary }}>
-            {previousOffer.amount != null ? `₹${Number(previousOffer.amount)}` : "None"}
+    <View
+      style={{
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+        padding: 10,
+        gap: 10,
+        marginBottom: 12,
+      }}
+    >
+      <View style={{ gap: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.textPrimary }}>
+          Previous Offer Snapshot
+        </Text>
+        <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+          Compare your last submitted offer with this draft before you send.
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <View
+          style={{
+            flex: 1,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surfaceMuted,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            gap: 2,
+          }}
+        >
+          <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Previous Amount</Text>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.textPrimary }}>
+            {previousAmountValue != null ? `₹${previousAmountValue}` : "No money"}
           </Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginBottom: 2 }}>Listings</Text>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textPrimary }}>
-            {previousOffer.productCount ?? 0}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginBottom: 2 }}>Current</Text>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textPrimary }}>
-            {wantsMoney ? `₹${counterAmount || "0"}` : "—"} / {wantsProduct ? (canOfferOwnProducts ? counterOfferedProductIds.length : counterRequestedProductIds.length) : 0}
+
+        <View
+          style={{
+            flex: 1,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surfaceMuted,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            gap: 2,
+          }}
+        >
+          <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Previous Listings</Text>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.textPrimary }}>
+            {previousListingCount}
           </Text>
         </View>
       </View>
+
+      <View
+        style={{
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.surfaceMuted,
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          gap: 2,
+        }}
+      >
+        <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>This Draft</Text>
+        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.textPrimary }}>
+          {currentDraftAmount} · {currentDraftListingCount} listing(s)
+        </Text>
+      </View>
+
+      <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>{changeHint}</Text>
     </View>
   ) : null;
 

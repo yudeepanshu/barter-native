@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -68,6 +69,7 @@ export default function RequestDetailScreen() {
   const dialog = useAppDialog();
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = typeof params.id === "string" ? params.id : "";
+  useRequestRoom(requestId || null);
 
   const session = useSession();
   const requestQuery = useRequestDetailQuery(requestId);
@@ -78,6 +80,7 @@ export default function RequestDetailScreen() {
     requestId,
     shouldCheckActiveTransaction,
   );
+  useTransactionRoom(transactionQuery.data?.id ?? null);
 
   const acceptMutation = useAcceptRequestMutation();
   const rejectMutation = useRejectRequestMutation();
@@ -925,6 +928,10 @@ export default function RequestDetailScreen() {
             ) : (
               <View style={{ gap: 8 }}>
                 {historyOffers.map((offer, index) => {
+                  const offeredByLabel =
+                    offer.offeredById === session.user.id
+                      ? "You"
+                      : (offer.offeredBy?.userName || "Unknown");
                   const statusStyle = getOfferStatusBadgeStyle(offer.status);
                   const statusBadge = (
                     <View
@@ -951,7 +958,7 @@ export default function RequestDetailScreen() {
                     <CollapsibleSection
                       key={offer.id}
                       title={`Offer #${historyOffers.length - index}`}
-                      subtitle={`By ${offer.offeredBy?.userName || "Unknown"}`}
+                      subtitle={`By ${offeredByLabel}`}
                       rightElement={statusBadge}
                       themeColors={{
                         textPrimary: theme.colors.textPrimary,

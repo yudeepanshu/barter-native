@@ -2,23 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
-import { queryKeys } from "@/lib/query/queryKeys";
-import { useAppDataStore } from "@/lib/store/appDataStore";
-
-type ProductsPage = {
-  items: Array<{ id: string }>;
-  nextCursor: string | null;
-  hasMore: boolean;
-};
-
-type ProductsInfiniteData = {
-  pages: ProductsPage[];
-  pageParams: unknown[];
-};
+import {
+  invalidateProductCollections,
+  invalidateRequestCollections,
+  removeProductEntity,
+} from "@/lib/query/mutationSync";
 
 export function useDeleteProductMutation() {
   const queryClient = useQueryClient();
-  const removeProduct = useAppDataStore((state) => state.removeProduct);
 
   return useMutation({
     mutationFn: async (productId: string) => {
@@ -26,29 +17,11 @@ export function useDeleteProductMutation() {
       return productId;
     },
     onSuccess: async (deletedProductId) => {
-      queryClient.setQueriesData(
-        { queryKey: ["products", "infinite"] },
-        (existing: ProductsInfiniteData | undefined) => {
-          if (!existing) {
-            return existing;
-          }
-
-          return {
-            ...existing,
-            pages: existing.pages.map((page) => ({
-              ...page,
-              items: page.items.filter((item) => item.id !== deletedProductId),
-            })),
-          };
-        },
-      );
-
-      queryClient.removeQueries({ queryKey: queryKeys.products.detail(deletedProductId) });
-      removeProduct(deletedProductId);
+      removeProductEntity(queryClient, deletedProductId);
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["products", "infinite"] }),
-        queryClient.invalidateQueries({ queryKey: ["requests"] }),
+        invalidateProductCollections(queryClient),
+        invalidateRequestCollections(queryClient),
       ]);
     },
   });

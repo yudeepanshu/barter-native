@@ -9,5 +9,6 @@ export function useCategoriesQuery() {
       const envelope = await mobileApiClient.getCategories();
       return envelope.data ?? [];
     },
+    staleTime: 30 * 60 * 1000,
   });
 }

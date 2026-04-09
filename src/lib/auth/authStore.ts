@@ -28,7 +28,12 @@ export const useAuthStore = create<AuthState>()(
       // Starts loading until SecureStore async rehydration completes
       status: "loading" as AuthStatus,
       setSession: (session) => {
-        useAppDataStore.getState().reset();
+        const previousUserId = useAuthStore.getState().session?.user.id;
+        if (previousUserId && previousUserId !== session.user.id) {
+          useAppDataStore.getState().reset();
+        }
+
+        useAppDataStore.getState().setProfile(session.user);
         set({ session, status: "authenticated" });
       },
       clearSession: () => {

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { invalidateProductCollections } from "@/lib/query/mutationSync";
 import { queryKeys } from "@/lib/query/queryKeys";
 
 export function useDeleteProductImageMutation(productId: string) {
@@ -15,7 +16,7 @@ export function useDeleteProductImageMutation(productId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) }),
-        queryClient.invalidateQueries({ queryKey: ["products", "infinite"] }),
+        invalidateProductCollections(queryClient),
       ]);
     },
   });

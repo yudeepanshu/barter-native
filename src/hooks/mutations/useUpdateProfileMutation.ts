@@ -4,9 +4,11 @@ import type { ApiErrorShape, UpdateUserProfileInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { queryKeys } from "@/lib/query/queryKeys";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 
 export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
+  const setProfile = useAppDataStore((state) => state.setProfile);
 
   return useMutation({
     mutationFn: async (payload: UpdateUserProfileInput) => {
@@ -18,6 +20,7 @@ export function useUpdateProfileMutation() {
     },
     onSuccess: async (user) => {
       queryClient.setQueryData(queryKeys.auth.me, user);
+      setProfile(user);
 
       const session = useAuthStore.getState().session;
       if (session) {

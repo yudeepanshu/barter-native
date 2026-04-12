@@ -2,7 +2,7 @@
   "expo": {
     "name": "Xact",
     "slug": "barter-mobile",
-    "version": "2.0.0-alpha.1",
+    "version": "2.1.0-alpha.0",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
@@ -44,7 +44,8 @@
         {
           "locationWhenInUsePermission": "Xact uses your location to auto-fill listing details and improve nearby feed results."
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,7 +1,11 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const fs = require('fs');
 
-const config = getDefaultConfig(__dirname);
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
+
+const config = getDefaultConfig(projectRoot);
 
 /**
  * Workaround for OkHttp bug in React Native's BundleDownloader:
@@ -29,20 +33,10 @@ config.server = {
   },
 };
 
-// Redirect expo-router's renderRootComponent to a patched copy that adds
-// .catch(() => {}) to the _internal_preventAutoHideAsync setTimeout call,
-// preventing unhandled "ExpoKeepAwake.activate" rejections on Android hot-reload.
-config.resolver = {
-  ...config.resolver,
-  resolveRequest: (context, moduleName, platform) => {
-    if (moduleName === 'expo-router/build/renderRootComponent') {
-      return {
-        filePath: path.resolve(__dirname, 'src/patches/renderRootComponent.js'),
-        type: 'sourceFile',
-      };
-    }
-    return context.resolveRequest(context, moduleName, platform);
-  },
-};
+// Limit watched folders to the shared packages directory to reduce watcher load.
+const packagesRoot = path.resolve(workspaceRoot, 'packages');
+if (fs.existsSync(packagesRoot)) {
+  config.watchFolders = [...new Set([...(config.watchFolders || []), packagesRoot])];
+}
 
 module.exports = config;

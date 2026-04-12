@@ -92,15 +92,12 @@ export function SelectableProductGrid({
         animationType="fade"
         onRequestClose={() => setPreviewProduct(null)}
       >
-        <Pressable
-          style={[styles.previewBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setPreviewProduct(null)}
-        >
-          <ScrollView
-            contentContainerStyle={styles.previewScrollContent}
-            showsVerticalScrollIndicator={false}
-            onStartShouldSetResponder={() => true}
-          >
+        <View style={[styles.previewBackdrop, { backgroundColor: theme.colors.overlay }]}>
+          {/* Backdrop: absolute fill behind card — only fires when tapping outside the card */}
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setPreviewProduct(null)} />
+
+          {/* Card: sibling to backdrop Pressable, rendered on top — no Pressable wrapping it */}
+          <View style={styles.previewCardWrapper} pointerEvents="box-none">
             <View
               style={[
                 styles.previewCard,
@@ -126,7 +123,7 @@ export function SelectableProductGrid({
                         <Image source={{ uri: owner.profilePicture }} style={[styles.previewOwnerAvatar, { backgroundColor: theme.colors.surfaceMuted }]} />
                       ) : (
                         <View style={[styles.previewOwnerAvatar, styles.previewOwnerAvatarFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
-                          <Text style={[styles.previewOwnerInitial, { color: theme.colors.primary }]}> 
+                          <Text style={[styles.previewOwnerInitial, { color: theme.colors.primary }]}>
                             {(owner.userName ?? "?").slice(0, 1).toUpperCase()}
                           </Text>
                         </View>
@@ -144,14 +141,17 @@ export function SelectableProductGrid({
                     <>
                       <ScrollView
                         horizontal
-                        pagingEnabled
+                        snapToInterval={previewImageSize}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        scrollEventThrottle={16}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.previewImageScrollContent}
-                        onMomentumScrollEnd={(event) => {
+                        onScroll={(event) => {
                           const nextIndex = Math.round(event.nativeEvent.contentOffset.x / previewImageSize);
                           setPreviewImageIndex(Math.max(0, Math.min(nextIndex, previewProduct.productImages.length - 1)));
                         }}
-                        style={[styles.previewImageCarousel, { width: previewImageSize, backgroundColor: theme.colors.surfaceMuted }]}
+                        style={[styles.previewImageCarousel, { width: previewImageSize, height: previewImageSize, backgroundColor: theme.colors.surfaceMuted }]}
                       >
                         {previewProduct.productImages.map((image) => (
                           <View
@@ -185,8 +185,8 @@ export function SelectableProductGrid({
 
               <Button label="Close" onPress={() => setPreviewProduct(null)} />
             </View>
-          </ScrollView>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -244,8 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 18,
   },
-  previewScrollContent: {
-    flexGrow: 1,
+  previewCardWrapper: {
     justifyContent: "center",
   },
   previewCard: {
@@ -300,7 +299,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   previewImageScrollContent: {
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   previewImage: {
     width: "100%",

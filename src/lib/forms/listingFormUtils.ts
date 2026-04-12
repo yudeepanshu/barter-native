@@ -15,10 +15,10 @@ export async function askImageSource(
   const action = await dialog.show({
     title: "Choose image source",
     message: "Select how you want to add images.",
+    showCloseButton: true,
     actions: [
       { key: "camera", label: "Camera" },
       { key: "library", label: "Gallery" },
-      { key: "cancel", label: "Cancel", role: "cancel" },
     ],
   });
 

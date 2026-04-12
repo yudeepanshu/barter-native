@@ -9,22 +9,44 @@ import type {
   RespondContactRevealInput,
 } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import {
   invalidateRequestCollections,
   invalidateTransactionForRequest,
   syncRequestMutationResult,
 } from "@/lib/query/mutationSync";
 
+function isDuplicateIdempotencyError(error: unknown) {
+  const shaped = ApiClient.toApiError(error) as ApiErrorShape;
+  if (shaped.statusCode !== 409) {
+    return false;
+  }
+
+  const normalized = (shaped.message ?? "").toLowerCase();
+  return normalized.includes("duplicate") || normalized.includes("idempotency");
+}
+
 export function useCreateRequestMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: CreateRequestInput) => {
-      const envelope = await mobileApiClient.createRequest(payload);
-      if (!envelope.data) {
-        throw new Error("No request returned from server");
+      try {
+        const sanitizedPayload: CreateRequestInput = {
+          ...payload,
+          message: sanitizeOptionalText(payload.message, 1000),
+        };
+        const envelope = await mobileApiClient.createRequest(sanitizedPayload);
+        if (!envelope.data) {
+          throw new Error("No request returned from server");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
     onSuccess: async (result) => {
       syncRequestMutationResult(queryClient, result);
@@ -38,8 +60,15 @@ export function useAcceptRequestMutation() {
 
   return useMutation({
     mutationFn: async (requestId: string) => {
-      const envelope = await mobileApiClient.acceptRequest(requestId);
-      return envelope.data ?? null;
+      try {
+        const envelope = await mobileApiClient.acceptRequest(requestId);
+        return envelope.data ?? null;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
+      }
     },
     onSuccess: async (result, requestId) => {
       syncRequestMutationResult(queryClient, result);
@@ -56,8 +85,15 @@ export function useRejectRequestMutation() {
 
   return useMutation({
     mutationFn: async (requestId: string) => {
-      const envelope = await mobileApiClient.rejectRequest(requestId);
-      return envelope.data ?? null;
+      try {
+        const envelope = await mobileApiClient.rejectRequest(requestId);
+        return envelope.data ?? null;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
+      }
     },
     onSuccess: async (result, requestId) => {
       syncRequestMutationResult(queryClient, result);
@@ -74,9 +110,16 @@ export function useCancelRequestMutation() {
 
   return useMutation({
     mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
-      const payload: CancelRequestInput = { reason };
-      const envelope = await mobileApiClient.cancelRequest(requestId, payload);
-      return envelope.data ?? null;
+      try {
+        const payload: CancelRequestInput = { reason: sanitizeOptionalText(reason, 500) ?? "" };
+        const envelope = await mobileApiClient.cancelRequest(requestId, payload);
+        return envelope.data ?? null;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
+      }
     },
     onSuccess: async (result, variables) => {
       syncRequestMutationResult(queryClient, result);
@@ -99,15 +142,26 @@ export function useCreateCounterOfferMutation() {
       requestId: string;
       payload: CreateCounterOfferInput;
     }) => {
-      const envelope = await mobileApiClient.createCounterOffer(requestId, payload);
-      if (!envelope.data) {
-        throw new Error("No request returned from counter offer");
+      try {
+        const sanitizedPayload: CreateCounterOfferInput = {
+          ...payload,
+          message: sanitizeOptionalText(payload.message, 1000),
+        };
+        const envelope = await mobileApiClient.createCounterOffer(requestId, sanitizedPayload);
+        if (!envelope.data) {
+          throw new Error("No request returned from counter offer");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
-    onSuccess: async (result, variables) => {
+    onSuccess: (result, variables) => {
       syncRequestMutationResult(queryClient, result);
-      await Promise.all([
+      void Promise.all([
         invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, variables.requestId),
       ]);
@@ -120,11 +174,22 @@ export function useRequestContactRevealMutation() {
 
   return useMutation({
     mutationFn: async ({ requestId, payload }: { requestId: string; payload: RequestContactRevealInput }) => {
-      const envelope = await mobileApiClient.requestContactReveal(requestId, payload);
-      if (!envelope.data) {
-        throw new Error("No request returned from contact reveal request");
+      try {
+        const sanitizedPayload: RequestContactRevealInput = {
+          ...payload,
+          note: sanitizeOptionalText(payload.note, 500),
+        };
+        const envelope = await mobileApiClient.requestContactReveal(requestId, sanitizedPayload);
+        if (!envelope.data) {
+          throw new Error("No request returned from contact reveal request");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
     onSuccess: async (result, variables) => {
       syncRequestMutationResult(queryClient, result);
@@ -146,11 +211,18 @@ export function useRespondContactRevealMutation() {
       revealRequestId: string;
       payload: RespondContactRevealInput;
     }) => {
-      const envelope = await mobileApiClient.respondContactReveal(requestId, revealRequestId, payload);
-      if (!envelope.data) {
-        throw new Error("No request returned from contact reveal response");
+      try {
+        const envelope = await mobileApiClient.respondContactReveal(requestId, revealRequestId, payload);
+        if (!envelope.data) {
+          throw new Error("No request returned from contact reveal response");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
     onSuccess: async (result, variables) => {
       syncRequestMutationResult(queryClient, result);

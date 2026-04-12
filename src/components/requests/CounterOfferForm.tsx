@@ -38,6 +38,8 @@ interface CounterOfferFormProps {
   previousOffer?: { amount?: number | string | null; productCount?: number };
   /** Initial request-level consideration products belonging to current user */
   initialVisibleProductIds?: string[];
+  /** Initial own products to preselect in the counter form */
+  initialOfferedProductIds?: string[];
   /** Initial requester products to preselect in the counter form */
   initialRequestedProductIds?: string[];
   /** Initial amount to prefill from the latest active offer */
@@ -61,6 +63,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   onCreateListing,
   previousOffer,
   initialVisibleProductIds = [],
+  initialOfferedProductIds = [],
   initialRequestedProductIds = [],
   initialAmount,
 }) => {
@@ -75,9 +78,13 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   const [counterAmount, setCounterAmount] = useState(
     initialAmount != null && Number.isFinite(Number(initialAmount)) ? String(Number(initialAmount)) : ""
   );
-  const [counterOfferedProductIds, setCounterOfferedProductIds] = useState<string[]>([]);
+  const [counterOfferedProductIds, setCounterOfferedProductIds] = useState<string[]>(initialOfferedProductIds);
   const [counterVisibleProductIds, setCounterVisibleProductIds] = useState<string[]>(initialVisibleProductIds);
   const [counterRequestedProductIds, setCounterRequestedProductIds] = useState<string[]>(initialRequestedProductIds);
+  const [offeredTouched, setOfferedTouched] = useState(false);
+  const [amountTouched, setAmountTouched] = useState(false);
+  const [visibleTouched, setVisibleTouched] = useState(false);
+  const [requestedTouched, setRequestedTouched] = useState(false);
   const [counterMessage, setCounterMessage] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -120,19 +127,59 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     (p) => !counterVisibleProductIds.includes(p.id)
   );
 
-  useEffect(() => {
-    setCounterVisibleProductIds(initialVisibleProductIds);
-  }, [initialVisibleProductIds]);
+  const sameIdList = (left: string[], right: string[]) => {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    const leftSorted = [...left].sort();
+    const rightSorted = [...right].sort();
+    return leftSorted.every((id, idx) => id === rightSorted[idx]);
+  };
 
   useEffect(() => {
-    setCounterRequestedProductIds(initialRequestedProductIds);
-  }, [initialRequestedProductIds]);
+    if (loading || offeredTouched) {
+      return;
+    }
+
+    if (!sameIdList(counterOfferedProductIds, initialOfferedProductIds)) {
+      setCounterOfferedProductIds(initialOfferedProductIds);
+    }
+  }, [counterOfferedProductIds, initialOfferedProductIds, loading, offeredTouched]);
 
   useEffect(() => {
-    setCounterAmount(
-      initialAmount != null && Number.isFinite(Number(initialAmount)) ? String(Number(initialAmount)) : ""
-    );
-  }, [initialAmount]);
+    // Keep server-driven defaults in sync only before user starts editing,
+    // and freeze them while submit is in progress to avoid visual rollback.
+    if (loading || visibleTouched) {
+      return;
+    }
+
+    if (!sameIdList(counterVisibleProductIds, initialVisibleProductIds)) {
+      setCounterVisibleProductIds(initialVisibleProductIds);
+    }
+  }, [counterVisibleProductIds, initialVisibleProductIds, loading, visibleTouched]);
+
+  useEffect(() => {
+    if (loading || requestedTouched) {
+      return;
+    }
+
+    if (!sameIdList(counterRequestedProductIds, initialRequestedProductIds)) {
+      setCounterRequestedProductIds(initialRequestedProductIds);
+    }
+  }, [counterRequestedProductIds, initialRequestedProductIds, loading, requestedTouched]);
+
+  useEffect(() => {
+    if (loading || amountTouched) {
+      return;
+    }
+
+    const nextAmount =
+      initialAmount != null && Number.isFinite(Number(initialAmount)) ? String(Number(initialAmount)) : "";
+    if (counterAmount !== nextAmount) {
+      setCounterAmount(nextAmount);
+    }
+  }, [amountTouched, counterAmount, initialAmount, loading]);
 
   useEffect(() => {
     if (!product.isFree && canUseProductMode && !includeMoney && !includeProduct) {
@@ -273,7 +320,11 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   
   const currentOfferInfo = {
     amount: wantsMoney && counterAmount.trim() ? Number(counterAmount) : null,
-    productIds: wantsProduct ? (canOfferOwnProducts ? counterOfferedProductIds.sort() : counterRequestedProductIds.sort()) : [],
+    productIds: wantsProduct
+      ? (canOfferOwnProducts
+        ? [...counterOfferedProductIds].sort()
+        : [...counterRequestedProductIds].sort())
+      : [],
   };
 
   const lastOfferInfo = lastUserOffer
@@ -289,6 +340,9 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     currentOfferInfo.productIds.every((id, idx) => id === lastOfferInfo.productIds[idx]);
 
   const toggleCounterProduct = (productId: string) => {
+    setOfferedTouched(true);
+    setVisibleTouched(true);
+    setRequestedTouched(true);
     setCounterOfferedProductIds((prev) => {
       const next = prev.includes(productId)
         ? prev.filter((existingId) => existingId !== productId)
@@ -304,6 +358,9 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   };
 
   const toggleCounterVisibleProduct = (productId: string) => {
+    setOfferedTouched(true);
+    setVisibleTouched(true);
+    setRequestedTouched(true);
     setCounterVisibleProductIds((prev) => {
       if (prev.includes(productId)) {
         return prev.filter((existingId) => existingId !== productId);
@@ -316,6 +373,9 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   };
 
   const toggleCounterRequestedProduct = (productId: string) => {
+    setOfferedTouched(true);
+    setVisibleTouched(true);
+    setRequestedTouched(true);
     setCounterRequestedProductIds((prev) => {
       if (prev.includes(productId)) {
         return prev.filter((existingId) => existingId !== productId);
@@ -449,7 +509,10 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
       showAmountField={showsAmountField}
       amountLabel="Offer amount (₹)"
       amount={counterAmount}
-      onChangeAmount={setCounterAmount}
+      onChangeAmount={(value) => {
+        setAmountTouched(true);
+        setCounterAmount(value);
+      }}
       amountPlaceholder="Enter amount"
       amountHelperText={amountHelperText}
       amountWarningText={amountWarningText}

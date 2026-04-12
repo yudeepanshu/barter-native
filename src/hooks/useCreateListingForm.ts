@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as ImagePicker from "expo-image-picker";
+import { useQueryClient } from "@tanstack/react-query";
 import type { CreateProductInput } from "@barter/types";
 import {
   CREATE_LISTING_RULES,
@@ -29,6 +30,16 @@ import {
   uploadImages as uploadProductImages,
   LISTING_FORM_ERRORS,
 } from "@/lib/forms/listingFormUtils";
+import {
+  sanitizeDescriptionInput,
+  sanitizeLocationNameInput,
+  sanitizeMoneyInput,
+  sanitizeTitleInput,
+} from "@/lib/utils/inputSanitizer";
+import { useListingImagePreparationStore } from "@/lib/forms/listingImagePreparationStore";
+import { syncProductEntity } from "@/lib/query/mutationSync";
+import { mobileApiClient } from "@/lib/api/client";
+import { queryKeys } from "@/lib/query/queryKeys";
 
 interface UseCreateListingFormOptions {
   returnToProductId?: string;
@@ -37,9 +48,14 @@ interface UseCreateListingFormOptions {
 export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const router = useRouter();
   const session = useSession();
+  const queryClient = useQueryClient();
   const createMutation = useCreateProductMutation();
   const { requestLocation } = useDeviceLocation();
   const dialog = useAppDialog();
+  const markPreparing = useListingImagePreparationStore((state) => state.markPreparing);
+  const markActivating = useListingImagePreparationStore((state) => state.markActivating);
+  const markFailed = useListingImagePreparationStore((state) => state.markFailed);
+  const clearPreparing = useListingImagePreparationStore((state) => state.clearPreparing);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -151,7 +167,11 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     }
 
     try {
-      const payload: CreateProductInput = { ...validation.normalized };
+      const payload: CreateProductInput = {
+        ...validation.normalized,
+        status: "INACTIVE",
+        isListed: false,
+      };
 
       // Location is mandatory for create listing at this stage.
       if (manualLatitude != null && manualLongitude != null) {
@@ -164,9 +184,66 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
 
       const created = await createMutation.mutateAsync(payload);
 
+      const myListingsKey = queryKeys.products.infinite({
+        ownerId: session?.user.id,
+        limit: 40,
+      });
+
+      queryClient.setQueryData(myListingsKey, (existing: any) => {
+        if (!existing || !Array.isArray(existing.pages) || existing.pages.length === 0) {
+          return {
+            pages: [{ items: [created], nextCursor: null, hasMore: false }],
+            pageParams: [null],
+          };
+        }
+
+        const firstPage = existing.pages[0] ?? { items: [], nextCursor: null, hasMore: false };
+        const alreadyExists = firstPage.items?.some((item: { id: string }) => item.id === created.id);
+        if (alreadyExists) {
+          return existing;
+        }
+
+        return {
+          ...existing,
+          pages: [
+            {
+              ...firstPage,
+              items: [created, ...(firstPage.items ?? [])],
+            },
+            ...existing.pages.slice(1),
+          ],
+        };
+      });
+
       if (images.length > 0) {
-        setIsUploadingImages(true);
-        await uploadProductImages(created.id, images, (index) => index === 0);
+        const imagesToUpload = [...images];
+        markPreparing(created.id, imagesToUpload[0]?.uri ?? null, imagesToUpload);
+
+        void (async () => {
+          try {
+            await uploadProductImages(created.id, imagesToUpload, (index) => index === 0);
+            markActivating(created.id);
+
+            // Do not block the listing while publish-to-active is in flight.
+            const relistedEnvelope = await mobileApiClient.relistProduct(created.id);
+            if (relistedEnvelope.data) {
+              syncProductEntity(queryClient, relistedEnvelope.data);
+            } else {
+              const refreshed = await mobileApiClient.getProductById(created.id);
+              if (refreshed.data) {
+                syncProductEntity(queryClient, refreshed.data);
+              }
+            }
+
+            clearPreparing(created.id);
+          } catch {
+            markFailed(created.id);
+            void dialog.alert(
+              "Image upload failed",
+              "Listing is saved as inactive. Add an image from Edit and relist to make it active.",
+            );
+          }
+        })();
       }
 
       // Reset all fields after successful creation
@@ -182,8 +259,6 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       }
     } catch (error) {
       setFormError(toUploadErrorMessage(error, toErrorMessage));
-    } finally {
-      setIsUploadingImages(false);
     }
   };
 
@@ -236,6 +311,11 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
   };
 
+  const setSanitizedTitle = (value: string) => setTitle(sanitizeTitleInput(value));
+  const setSanitizedDescription = (value: string) => setDescription(sanitizeDescriptionInput(value));
+  const setSanitizedLocationName = (value: string) => setLocationName(sanitizeLocationNameInput(value));
+  const setSanitizedMinMoneyAmount = (value: string) => setMinMoneyAmount(sanitizeMoneyInput(value));
+
   return {
     rules: CREATE_LISTING_RULES,
     state: {
@@ -257,8 +337,8 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       isSubmitting: createMutation.isPending || isUploadingImages,
     },
     actions: {
-      setTitle,
-      setDescription,
+      setTitle: setSanitizedTitle,
+      setDescription: setSanitizedDescription,
       attachCurrentLocation,
       setManualCoordinates,
       clearManualCoordinates: () => {
@@ -271,7 +351,8 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       setCategoryId,
       setIsFree,
       setRequestByMoney,
-      setMinMoneyAmount,
+      setLocationName: setSanitizedLocationName,
+      setMinMoneyAmount: setSanitizedMinMoneyAmount,
       submit,
       pickImages,
       removeImageAt,

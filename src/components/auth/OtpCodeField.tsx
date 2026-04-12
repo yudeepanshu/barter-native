@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface OtpCodeFieldProps {
@@ -21,6 +21,7 @@ export function OtpCodeField({
 }: OtpCodeFieldProps) {
   const { theme } = useAppTheme();
   const inputRef = useRef<TextInput>(null);
+  const cellPositionsRef = useRef<{ x: number; width: number }[]>([]);
   const normalizedValue = value.replace(/\D+/g, "").slice(0, length);
   const chars = Array.from({ length }, (_, index) => normalizedValue[index] ?? "");
 
@@ -38,6 +39,21 @@ export function OtpCodeField({
 
   const canFocus = editable && Boolean(onChangeText);
 
+  const handleCellPress = (cellIndex: number) => {
+    if (canFocus) {
+      inputRef.current?.focus();
+      // Set cursor position to the clicked cell
+      // Position cursor at: min(cellIndex + 1, normalizedValue.length + 1)
+      const cursorPos = Math.min(cellIndex + 1, normalizedValue.length + 1);
+      inputRef.current?.setSelection(cursorPos, cursorPos);
+    }
+  };
+
+  const handleCellLayout = (index: number, event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    cellPositionsRef.current[index] = { x, width };
+  };
+
   return (
     <>
       <Pressable
@@ -53,7 +69,13 @@ export function OtpCodeField({
           const filled = char.length > 0;
           const highlighted = active && (filled || index === normalizedValue.length);
           return (
-            <View key={index} style={styles.otpCell}>
+            <Pressable
+              key={index}
+              onPress={() => handleCellPress(index)}
+              disabled={!canFocus}
+              onLayout={(event) => handleCellLayout(index, event)}
+              style={styles.otpCell}
+            >
               <Text style={[styles.otpDigit, { color: theme.colors.textPrimary }]}>{char || " "}</Text>
               <View
                 style={[
@@ -63,7 +85,7 @@ export function OtpCodeField({
                   },
                 ]}
               />
-            </View>
+            </Pressable>
           );
         })}
       </Pressable>
@@ -77,6 +99,9 @@ export function OtpCodeField({
               return;
             }
             onChangeText(next.replace(/\D+/g, "").slice(0, length));
+          }}
+          onBlur={() => {
+            // Keep the input pressable for focus restoration
           }}
           keyboardType="number-pad"
           textContentType="oneTimeCode"

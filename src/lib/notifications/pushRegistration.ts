@@ -70,6 +70,22 @@ function getProjectId() {
   return null;
 }
 
+type NotificationPermissionSnapshot = ExpoNotifications.NotificationPermissionsStatus & {
+  granted?: boolean;
+  status?: string;
+};
+
+function hasNotificationPermission(notifications: typeof ExpoNotifications, permission: ExpoNotifications.NotificationPermissionsStatus) {
+  const snapshot = permission as NotificationPermissionSnapshot;
+
+  return (
+    snapshot.granted === true ||
+    snapshot.status === "granted" ||
+    permission.ios?.status === notifications.IosAuthorizationStatus.AUTHORIZED ||
+    permission.ios?.status === notifications.IosAuthorizationStatus.PROVISIONAL
+  );
+}
+
 export async function getExpoPushTokenForDevice() {
   try {
     const notifications = await loadNotificationsModule();
@@ -90,16 +106,20 @@ export async function getExpoPushTokenForDevice() {
       return null;
     }
 
-    const { status: existingStatus } = await notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    const existingPermission = await notifications.getPermissionsAsync();
+    let hasPermission = hasNotificationPermission(notifications, existingPermission);
 
-    if (existingStatus !== "granted") {
+    if (!hasPermission) {
       const permissionResponse = await notifications.requestPermissionsAsync();
-      finalStatus = permissionResponse.status;
+      hasPermission = hasNotificationPermission(notifications, permissionResponse);
     }
 
-    if (finalStatus !== "granted") {
-      logPushRegistration("notification permission not granted", { finalStatus });
+    if (!hasPermission) {
+      logPushRegistration("notification permission not granted", {
+        granted: (existingPermission as NotificationPermissionSnapshot).granted,
+        status: (existingPermission as NotificationPermissionSnapshot).status,
+        iosStatus: existingPermission.ios?.status,
+      });
       return null;
     }
 

@@ -22,6 +22,7 @@ import {
 } from "@/hooks/mutations/useNotificationMutations";
 import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useProductFeedFilters } from "@/hooks/useProductFeedFilters";
 import { Input } from "@/components/ui/Input";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -81,6 +82,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const { permission, lastKnown, requestLocation } = useDeviceLocation();
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const dialog = useAppDialog();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
@@ -113,8 +115,13 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   );
 
   const categoriesQuery = useCategoriesQuery();
+  const requestsById = useAppDataStore((state) => state.requestsById);
+  const cachedSentRequests = useMemo(
+    () => Object.values(requestsById).filter((req) => req.buyerId === userId),
+    [requestsById, userId],
+  );
   const products = useProductsListController(filterState.filters, { enabled: isDiscoveryReady });
-  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 });
+  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
   const notificationsQuery = useNotificationsQuery({ limit: 20 });
   const markNotificationReadMutation = useMarkNotificationReadMutation();
   const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
@@ -127,7 +134,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   );
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
   const requestedProductIds = useMemo(() => {
-    const items = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const items = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? cachedSentRequests;
     return new Set(
       items
         .filter((item) => REQUESTED_STATUSES.includes(item.status))
@@ -318,6 +325,16 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     await notificationsQuery.refetch();
   };
 
+  const onManualRefreshFeed = () => {
+    setIsManualRefreshing(true);
+
+    void products.query
+      .refetch()
+      .finally(() => {
+        setIsManualRefreshing(false);
+      });
+  };
+
   const onOpenNotification = async (item: NotificationSummary) => {
     if (!item.isRead) {
       await markNotificationReadMutation.mutateAsync(item.id);
@@ -436,7 +453,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.listHeaderWrap}>
           <AppCard>
-            <View style={[styles.headerContent, showHeaderFilters ? styles.headerContentExpanded : null]}>
+            <View style={styles.headerContent}>
               <View style={styles.greetingRow}>
                 <View style={styles.greetingContent}>
                   <View style={styles.greetingTitleRow}>
@@ -535,7 +552,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
           maxToRenderPerBatch={8}
           windowSize={7}
           refreshControl={
-            <RefreshControl refreshing={products.query.isRefetching} onRefresh={products.refresh} />
+            <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefreshFeed} />
           }
           onEndReachedThreshold={0.35}
           onEndReached={products.loadMore}
@@ -901,9 +918,6 @@ const styles = StyleSheet.create({
   headerContent: {
     gap: 0,
   },
-  headerContentExpanded: {
-    gap: 10,
-  },
   headerSection: {
     gap: 14,
     marginBottom: 12,
@@ -956,6 +970,7 @@ const styles = StyleSheet.create({
   greeting: { flexShrink: 1, fontSize: 24, lineHeight: 29, fontWeight: "800" },
   subtitle: { fontSize: 14, marginTop: 3 },
   collapseContent: {
+    paddingTop: 10,
     gap: 10,
     paddingBottom: 2,
   },

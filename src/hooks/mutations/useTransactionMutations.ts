@@ -4,16 +4,33 @@ import type { ApiErrorShape, VerifyTransactionOtpInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { invalidateTransactionRelated } from "@/lib/query/mutationSync";
 
+function isDuplicateIdempotencyError(error: unknown) {
+  const shaped = ApiClient.toApiError(error) as ApiErrorShape;
+  if (shaped.statusCode !== 409) {
+    return false;
+  }
+
+  const normalized = (shaped.message ?? "").toLowerCase();
+  return normalized.includes("duplicate") || normalized.includes("idempotency");
+}
+
 export function useGenerateTransactionOtpMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (transactionId: string) => {
-      const envelope = await mobileApiClient.generateTransactionOtp(transactionId);
-      if (!envelope.data) {
-        throw new Error("No OTP payload returned from server");
+      try {
+        const envelope = await mobileApiClient.generateTransactionOtp(transactionId);
+        if (!envelope.data) {
+          throw new Error("No OTP payload returned from server");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
     onSuccess: async () => {
       await invalidateTransactionRelated(queryClient);
@@ -26,12 +43,19 @@ export function useVerifyTransactionOtpMutation() {
 
   return useMutation({
     mutationFn: async ({ transactionId, otp }: { transactionId: string; otp: string }) => {
-      const payload: VerifyTransactionOtpInput = { otp };
-      const envelope = await mobileApiClient.verifyTransactionOtp(transactionId, payload);
-      if (!envelope.data) {
-        throw new Error("No transaction returned after OTP verification");
+      try {
+        const payload: VerifyTransactionOtpInput = { otp };
+        const envelope = await mobileApiClient.verifyTransactionOtp(transactionId, payload);
+        if (!envelope.data) {
+          throw new Error("No transaction returned after OTP verification");
+        }
+        return envelope.data;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
       }
-      return envelope.data;
     },
     onSuccess: async () => {
       await invalidateTransactionRelated(queryClient);

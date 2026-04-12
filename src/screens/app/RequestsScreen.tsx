@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
@@ -20,13 +20,6 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
-import {
-  useAcceptRequestMutation,
-  useCancelRequestMutation,
-  useRejectRequestMutation,
-  toErrorMessage as toRequestErrorMessage,
-} from "@/hooks/mutations/useRequestMutations";
-import { useActiveTransactionQuery } from "@/hooks/queries/useActiveTransactionQuery";
 import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -91,9 +84,6 @@ export default function RequestsScreen() {
   const session = useSession();
   const sentQuery = useRequestsQuery("sent", { limit: 20 });
   const receivedQuery = useRequestsQuery("received", { limit: 20 });
-  const acceptMutation = useAcceptRequestMutation();
-  const rejectMutation = useRejectRequestMutation();
-  const cancelMutation = useCancelRequestMutation();
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
@@ -112,6 +102,7 @@ export default function RequestsScreen() {
   const [showProductFilterModal, setShowProductFilterModal] = useState(false);
   const [draftProductFilter, setDraftProductFilter] = useState(ALL_PRODUCTS_FILTER);
   const [isViewTransitioning, setIsViewTransitioning] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const lastNonEmptyTabOptionsRef = useRef<Array<{ value: "received" | "sent"; label: string }>>([]);
   const lastAppliedParamKeyRef = useRef<string | null>(null);
   const hasReceivedItems = receivedItems.length > 0;
@@ -246,10 +237,18 @@ export default function RequestsScreen() {
   };
 
   const onRefreshAll = () => {
-    void Promise.all([
+    if (isManualRefreshing) {
+      return;
+    }
+
+    setIsManualRefreshing(true);
+
+    void Promise.allSettled([
       sentQuery.refetch(),
       receivedQuery.refetch(),
-    ]);
+    ]).finally(() => {
+      setIsManualRefreshing(false);
+    });
   };
 
   return (
@@ -289,7 +288,7 @@ export default function RequestsScreen() {
               contentContainerStyle={styles.scrollAreaContent}
               refreshControl={
                 <RefreshControl
-                  refreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
+                  refreshing={isManualRefreshing}
                   onRefresh={onRefreshAll}
                 />
               }
@@ -318,11 +317,8 @@ export default function RequestsScreen() {
               selectedProductLabel={selectedProductLabel}
               activeFilterCount={requestFilterActiveCount}
               onOpenFilter={onOpenProductFilter}
-              acceptMutation={acceptMutation}
-              rejectMutation={rejectMutation}
-              cancelMutation={cancelMutation}
               sessionUserId={session?.user.id ?? ""}
-              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
+              isRefreshing={isManualRefreshing}
               onRefresh={onRefreshAll}
             />
           ) : null}
@@ -342,11 +338,8 @@ export default function RequestsScreen() {
               selectedProductLabel={selectedProductLabel}
               activeFilterCount={requestFilterActiveCount}
               onOpenFilter={onOpenProductFilter}
-              acceptMutation={acceptMutation}
-              rejectMutation={rejectMutation}
-              cancelMutation={cancelMutation}
               sessionUserId={session?.user.id ?? ""}
-              isRefreshing={sentQuery.isRefetching || receivedQuery.isRefetching}
+              isRefreshing={isManualRefreshing}
               onRefresh={onRefreshAll}
             />
           ) : null}
@@ -453,9 +446,6 @@ function RequestSection({
   onOpenFilter,
   isRefreshing,
   onRefresh,
-  acceptMutation,
-  rejectMutation,
-  cancelMutation,
   sessionUserId,
 }: {
   title: string;
@@ -473,9 +463,6 @@ function RequestSection({
   onOpenFilter: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
-  acceptMutation: ReturnType<typeof useAcceptRequestMutation>;
-  rejectMutation: ReturnType<typeof useRejectRequestMutation>;
-  cancelMutation: ReturnType<typeof useCancelRequestMutation>;
   sessionUserId: string;
 }) {
   const { theme } = useAppTheme();
@@ -570,9 +557,6 @@ function RequestSection({
                   item={row.item}
                   router={router}
                   actorTurn={actorTurn}
-                  acceptMutation={acceptMutation}
-                  rejectMutation={rejectMutation}
-                  cancelMutation={cancelMutation}
                   sessionUserId={sessionUserId}
                 />
               )
@@ -589,69 +573,36 @@ function RequestSection({
   );
 }
 
-function RequestItem({
+/**
+ * OPTIMIZATION: RequestItem is memoized to prevent unnecessary re-renders
+ * when parent (RequestSection) updates but this item's props are unchanged.
+ *
+ * IMPORTANT: All callback props (acceptMutation, rejectMutation, etc.)
+ * are passed from parent and remain stable across renders, so shallow
+ * equality works perfectly here.
+ */
+const RequestItem = memo(function RequestItem({
   item,
   router,
   actorTurn,
-  acceptMutation,
-  rejectMutation,
-  cancelMutation,
   sessionUserId,
 }: {
   item: RequestSummary;
   router: ReturnType<typeof useRouter>;
   actorTurn: RequestTurn;
-  acceptMutation: ReturnType<typeof useAcceptRequestMutation>;
-  rejectMutation: ReturnType<typeof useRejectRequestMutation>;
-  cancelMutation: ReturnType<typeof useCancelRequestMutation>;
   sessionUserId: string;
 }) {
   const { theme } = useAppTheme();
-  const activeTransactionQuery = useActiveTransactionQuery(
-    item.id,
-    item.status === "ACCEPTED" && item.product.status !== "EXCHANGED",
-  );
-  const [txFeedback, setTxFeedback] = useState<string | null>(null);
 
   const activeOffer = item.offers[item.offers.length - 1];
   const isExchangeFinalized = item.product.status === "EXCHANGED";
-  const tx = activeTransactionQuery.data;
   const isRequestCompleted =
     item.status === "COMPLETED" ||
-    (item.status === "ACCEPTED" && (isExchangeFinalized || (!activeTransactionQuery.isPending && !tx)));
+    (item.status === "ACCEPTED" && isExchangeFinalized);
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : item.status;
   const showTurn = OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
-  const showTransactionSection =
-    item.status === "ACCEPTED" && !isRequestCompleted && (activeTransactionQuery.isPending || Boolean(tx));
-  const canActByTurn = !showTransactionSection && OPEN_STATUSES.includes(item.status) && item.currentTurn === actorTurn;
-  const canCancel = !showTransactionSection && OPEN_STATUSES.includes(item.status);
-  const canCounter =
-    !item.product.isFree &&
-    (item.status === "PENDING" || item.status === "NEGOTIATING") &&
-    canActByTurn;
   const isBuyer = sessionUserId === item.buyerId;
-  const isSeller = sessionUserId === item.sellerId;
   const requestedByLabel = isBuyer ? "You" : (item.buyer.userName?.trim() || "Unknown");
-
-  const onAccept = () => {
-    void acceptMutation.mutateAsync(item.id).catch(() => {
-      setTxFeedback("Could not accept request");
-    });
-  };
-
-  const onReject = () => {
-    void rejectMutation.mutateAsync(item.id).catch(() => {
-      setTxFeedback("Could not reject request");
-    });
-  };
-
-  const onCancel = () => {
-    void cancelMutation
-      .mutateAsync({ requestId: item.id, reason: "Cancelled from app" })
-      .catch((error) => {
-        setTxFeedback(toRequestErrorMessage(error));
-      });
-  };
 
   return (
     <Pressable
@@ -708,7 +659,6 @@ function RequestItem({
             </View>
           ) : null}
         </View>
-        {item.message ? <Text style={[styles.messageText, { color: theme.colors.textSecondary }]}>{item.message}</Text> : null}
 
         {/*
         <View style={styles.actions}>
@@ -814,7 +764,7 @@ function RequestItem({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },

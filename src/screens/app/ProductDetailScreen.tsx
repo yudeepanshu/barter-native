@@ -8,8 +8,9 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -20,6 +21,7 @@ import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useR
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { useProductRoom } from "@/lib/realtime/rooms";
+import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
@@ -53,6 +55,7 @@ export default function ProductDetailScreen() {
   }>();
   const productId = typeof params.id === "string" ? params.id : "";
   useProductRoom(productId || null);
+  useRealtimeToastScope(productId ? { type: "product", productId } : { type: "none" });
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
   const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;
@@ -60,7 +63,9 @@ export default function ProductDetailScreen() {
     ? formatDistanceLabel(routeDistanceKm)
     : null;
   const query = useProductQuery(productId);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [composerReady, setComposerReady] = useState(false);
   const productData = query.data ?? null;
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
@@ -79,6 +84,14 @@ export default function ProductDetailScreen() {
   );
   const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
   const { permission, lastKnown } = useDeviceLocation();
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setComposerReady(true);
+    });
+    return () => task.cancel();
+  }, []);
+
   const viewerLocation =
     permission === "granted" && lastKnown
       ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
@@ -93,6 +106,15 @@ export default function ProductDetailScreen() {
       (req) => req.productId === productData.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status),
     );
   }, [sentRequestsQuery.data, cachedSentRequests, productData, isOwner]);
+
+  const onManualRefresh = () => {
+    setIsManualRefreshing(true);
+    query
+      .refetch()
+      .finally(() => {
+        setIsManualRefreshing(false);
+      });
+  };
 
   if (query.isPending) {
     return (
@@ -148,7 +170,7 @@ export default function ProductDetailScreen() {
         keyboardVerticalOffset={12}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
+          <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} />
         }
       >
         <View style={styles.backRow}>
@@ -249,7 +271,11 @@ export default function ProductDetailScreen() {
             <View style={styles.imageSection}>
               <ScrollView
                 horizontal
-                pagingEnabled
+                snapToInterval={imageFrameSize}
+                snapToAlignment="center"
+                decelerationRate="fast"
+                scrollEnabled={true}
+                scrollEventThrottle={16}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.imageScrollContent}
                 onMomentumScrollEnd={(event) => {
@@ -261,7 +287,7 @@ export default function ProductDetailScreen() {
                 {product.productImages.map((image) => (
                   <View
                     key={image.id}
-                    style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted }]}
+                    style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted, flexShrink: 0 }]}
                   >
                     <Image
                       source={{ uri: image.url }}
@@ -353,11 +379,13 @@ export default function ProductDetailScreen() {
         ) : null}
 
           {session && !activeRequest ? (
-            <RequestComposer
-              product={product}
-              sessionUserId={session.user.id}
-              initialOfferedProductId={offeredProductId}
-            />
+            composerReady ? (
+              <RequestComposer
+                product={product}
+                sessionUserId={session.user.id}
+                initialOfferedProductId={offeredProductId}
+              />
+            ) : null
           ) : null}
       </KeyboardAwareScrollView>
     </SafeAreaView>

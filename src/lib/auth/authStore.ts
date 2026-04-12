@@ -7,9 +7,20 @@ import { useAppDataStore } from "@/lib/store/appDataStore";
 /**
  * Custom storage adapter that delegates to expo-secure-store.
  * Tokens and user profile are encrypted at rest on the device.
+ *
+ * getItem returns null instead of throwing so that a transient Keystore
+ * error (e.g. Android hardware key not yet ready on first boot) causes
+ * Zustand to treat the store as empty rather than propagating a rejection
+ * out of rehydrate().
  */
 const secureStorage = {
-  getItem: (name: string) => SecureStore.getItemAsync(name),
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      return await SecureStore.getItemAsync(name);
+    } catch {
+      return null;
+    }
+  },
   setItem: (name: string, value: string) => SecureStore.setItemAsync(name, value),
   removeItem: (name: string) => SecureStore.deleteItemAsync(name),
 };

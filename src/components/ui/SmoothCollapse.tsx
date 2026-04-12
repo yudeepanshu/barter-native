@@ -1,5 +1,12 @@
-import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, type ViewStyle } from "react-native";
+import { useEffect } from "react";
+import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from "react-native";
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 interface SmoothCollapseProps {
   expanded: boolean;
@@ -16,43 +23,37 @@ export function SmoothCollapse({
   durationMs = 420,
   style,
 }: SmoothCollapseProps) {
-  const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const progress = useSharedValue(expanded ? 1 : 0);
+  const measuredHeight = useSharedValue(0);
 
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: expanded ? 1 : 0,
+    progress.value = withTiming(expanded ? 1 : 0, {
       duration: durationMs,
       easing: Easing.bezier(0.2, 0.0, 0.0, 1.0),
-      useNativeDriver: false,
-    }).start();
-  }, [durationMs, expanded, progress]);
+    });
+  }, [expanded, durationMs, progress]);
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (nextHeight > 0 && nextHeight !== measuredHeight.value) {
+      measuredHeight.value = nextHeight;
+    }
+  };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const resolvedHeight = measuredHeight.value > 0 ? measuredHeight.value : maxHeight;
+
+    return {
+      height: interpolate(progress.value, [0, 1], [0, resolvedHeight]),
+      opacity: interpolate(progress.value, [0, 1], [0, 1]),
+    };
+  });
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        style,
-        {
-          maxHeight: progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, maxHeight],
-          }),
-          opacity: progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          }),
-          transform: [
-            {
-              translateY: progress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-8, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      {children}
+    <Animated.View style={[styles.container, style, animatedStyle]}>
+      <View style={styles.inner} onLayout={handleLayout}>
+        {children}
+      </View>
     </Animated.View>
   );
 }
@@ -60,5 +61,13 @@ export function SmoothCollapse({
 const styles = StyleSheet.create({
   container: {
     overflow: "hidden",
+    width: "100%",
+  },
+  inner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    width: "100%",
   },
 });

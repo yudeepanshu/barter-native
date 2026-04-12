@@ -120,7 +120,10 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
         <Pressable
           style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}
           onPress={() => {
-            if (!pendingDialog || pendingDialog.disableDismiss || !pendingDialog.dismissOnBackdrop) {
+            if (!pendingDialog || pendingDialog.disableDismiss) {
+              return;
+            }
+            if (!pendingDialog.dismissOnBackdrop && !pendingDialog.showCloseButton) {
               return;
             }
             onClose(null);

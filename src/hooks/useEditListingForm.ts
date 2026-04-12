@@ -26,6 +26,13 @@ import {
   uploadImages as uploadProductImages,
   LISTING_FORM_ERRORS,
 } from "@/lib/forms/listingFormUtils";
+import { validateImageAssets } from "@/lib/utils/imageValidation";
+import {
+  sanitizeDescriptionInput,
+  sanitizeLocationNameInput,
+  sanitizeMoneyInput,
+  sanitizeTitleInput,
+} from "@/lib/utils/inputSanitizer";
 
 export function useEditListingForm(
   product: ProductSummary,
@@ -82,6 +89,17 @@ export function useEditListingForm(
 
       const result = await launchCamera();
       if (!result.canceled && result.assets.length > 0) {
+        // NEW: Validate before adding to state
+        const validationResults = await validateImageAssets(result.assets);
+        
+        // Collect first error, if any
+        const firstError = validationResults.find((r) => !r.isValid);
+        if (firstError?.error) {
+          setFormError(firstError.error);
+          return; // Don't add invalid image
+        }
+
+        // All passed; add valid images only
         setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
         setFieldErrors((prev) => ({ ...prev, images: undefined }));
       }
@@ -96,6 +114,17 @@ export function useEditListingForm(
 
     const result = await launchImageLibrary(remainingSlots);
     if (!result.canceled) {
+      // NEW: Validate before adding to state
+      const validationResults = await validateImageAssets(result.assets);
+      
+      // Check for errors
+      const firstError = validationResults.find((r) => !r.isValid);
+      if (firstError?.error) {
+        setFormError(firstError.error);
+        return; // Don't add invalid images
+      }
+
+      // All passed; add valid images only
       setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
       setFieldErrors((prev) => ({ ...prev, images: undefined }));
     }
@@ -244,6 +273,11 @@ export function useEditListingForm(
     setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
   };
 
+  const setSanitizedTitle = (value: string) => setTitle(sanitizeTitleInput(value));
+  const setSanitizedDescription = (value: string) => setDescription(sanitizeDescriptionInput(value));
+  const setSanitizedLocationName = (value: string) => setLocationName(sanitizeLocationNameInput(value));
+  const setSanitizedMinMoneyAmount = (value: string) => setMinMoneyAmount(sanitizeMoneyInput(value));
+
   return {
     rules: CREATE_LISTING_RULES,
     state: {
@@ -266,14 +300,15 @@ export function useEditListingForm(
       hasInitialized: true,
     },
     actions: {
-      setTitle,
-      setDescription,
+      setTitle: setSanitizedTitle,
+      setDescription: setSanitizedDescription,
       attachCurrentLocation,
       clearManualCoordinates,
+      setLocationName: setSanitizedLocationName,
       setCategoryId,
       setIsFree,
       setRequestByMoney,
-      setMinMoneyAmount,
+      setMinMoneyAmount: setSanitizedMinMoneyAmount,
       setFormError,
       pickImages,
       removeExistingImage,

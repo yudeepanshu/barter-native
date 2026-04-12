@@ -9,8 +9,9 @@ import {
   View,
 } from "react-native";
 import { useEffect, useMemo, useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
 import type { ImagePickerAsset } from "expo-image-picker";
 import { useAuthStatus, useSession } from "@/hooks/useSession";
@@ -49,9 +50,19 @@ function normalizePhone(value: string) {
   return value.replace(/\s+/g, "").trim();
 }
 
+function getCurrentVersionLabel() {
+  const fromConfig = Constants.expoConfig?.version?.trim();
+  if (fromConfig) {
+    return `Version ${fromConfig}`;
+  }
+
+  return "Version unavailable";
+}
+
 type ProfilePicturePickMode = "deferred" | "direct";
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const status = useAuthStatus();
   const session = useSession();
   const profileQuery = useProfileQuery(status === "authenticated");
@@ -60,6 +71,7 @@ export default function ProfileScreen() {
   const { theme, statusBarStyle, preference, resolvedMode, setPreference } = useAppTheme();
   const dialog = useAppDialog();
   const user = profileQuery.data ?? session?.user ?? null;
+  const appVersionLabel = useMemo(() => getCurrentVersionLabel(), []);
 
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
@@ -70,6 +82,7 @@ export default function ProfileScreen() {
   const [showPhotoPreview, setShowPhotoPreview] = useState(false);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     userName?: string;
     email?: string;
@@ -116,6 +129,15 @@ export default function ProfileScreen() {
     setPendingProfileFileName(null);
     setFieldErrors({});
     setFormMessage(null);
+  };
+
+  const onManualRefresh = () => {
+    setIsManualRefreshing(true);
+    profileQuery
+      .refetch()
+      .finally(() => {
+        setIsManualRefreshing(false);
+      });
   };
 
   const onSave = async () => {
@@ -286,11 +308,11 @@ export default function ProfileScreen() {
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={12}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 78 }]}
         refreshControl={
           <RefreshControl
-            refreshing={profileQuery.isRefetching}
-            onRefresh={() => void profileQuery.refetch()}
+            refreshing={isManualRefreshing}
+            onRefresh={onManualRefresh}
             tintColor={theme.colors.primary}
           />
         }
@@ -489,6 +511,11 @@ export default function ProfileScreen() {
             />
           </View>
         )}
+
+        <View style={styles.versionFooter}>
+          <Text style={[styles.versionText, { color: theme.colors.textMuted }]}>{appVersionLabel}</Text>
+        </View>
+
       </KeyboardAwareScrollView>
 
       <Modal
@@ -565,7 +592,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
-  content: { padding: 16, paddingBottom: 110, gap: 12 },
+  content: { flexGrow: 1, padding: 16, gap: 12 },
   center: { paddingTop: 40, alignItems: "center" },
   errorCard: { gap: 10 },
   serverWarningCard: {
@@ -583,6 +610,17 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "800" },
   formMessage: { fontSize: 13 },
   pendingPhotoText: { fontSize: 12 },
+  versionFooter: {
+    marginTop: "auto",
+    paddingTop: 12,
+    alignItems: "center",
+  },
+  versionText: {
+    fontSize: 12,
+    textAlign: "center",
+    letterSpacing: 0.2,
+    opacity: 0.85,
+  },
   formActions: { gap: 10 },
   formActionsRow: { flexDirection: "row", gap: 10 },
   formActionCell: { flex: 1 },

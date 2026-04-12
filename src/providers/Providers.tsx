@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { Platform } from "react-native";
+import * as Font from "expo-font";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { NotificationsListResult, ProductsListResult } from "@barter/types";
@@ -11,12 +13,14 @@ import { useAuthStore } from "@/lib/auth/authStore";
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
 import { useRealtimeConnection } from "@/lib/realtime/useRealtimeConnection";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { TopToastHost } from "@/components/ui/TopToastHost";
 import { AppDialogProvider } from "@/providers/AppDialogProvider";
 import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
 const NOTIFICATIONS_BOOTSTRAP_FILTERS = { limit: 20, unreadOnly: false } as const;
+const DISCOVERY_BOOTSTRAP_FILTERS = { limit: 20 } as const;
 
 function isAuthBootstrapFailure(error: unknown) {
   const apiError = ApiClient.toApiError(error);
@@ -84,13 +88,30 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
     };
 
     const resolveAuthState = async () => {
+      // Rehydrate is isolated so a storage failure doesn't silently skip
+      // session validation or mix error messages.
       try {
         await useAuthStore.persist.rehydrate();
-
-        if (cancelled) {
-          return;
+      } catch (error) {
+        // Treat a failed rehydration as an empty store rather than a hard
+        // error — the user will be shown the login screen and can sign in
+        // again.  Log as warn (not error) so Metro HMR doesn't show a red
+        // box for an expected recovery path.
+        logAuthBootstrap("warn", "rehydration failed, treating as unauthenticated", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+        if (!cancelled) {
+          useAuthStore.getState().clearSession();
         }
+        completeBootstrap();
+        return;
+      }
 
+      if (cancelled) {
+        return;
+      }
+
+      try {
         const state = useAuthStore.getState();
 
         if (!state.session) {
@@ -125,7 +146,7 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
           const authFailure = isAuthBootstrapFailure(error);
 
           logAuthBootstrap(
-            authFailure ? "warn" : "error",
+            authFailure ? "warn" : "warn",
             authFailure
               ? "session validation failed after refresh attempt, clearing session"
               : "session validation deferred; preserving persisted session",
@@ -141,13 +162,6 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
               state.setSession(state.session);
             }
           }
-        }
-      } catch (error) {
-        logAuthBootstrap("error", "rehydration failed, clearing session", {
-          reason: error instanceof Error ? error.message : "unknown",
-        });
-        if (!cancelled) {
-          useAuthStore.getState().clearSession();
         }
       } finally {
         completeBootstrap();
@@ -369,6 +383,19 @@ function CategoriesBootstrap() {
   return null;
 }
 
+function IconFontsWarmup() {
+  useEffect(() => {
+    void Font.loadAsync({
+      ...Ionicons.font,
+      ...Feather.font,
+    }).catch(() => {
+      // Best effort warmup; icon components can still lazy-load fonts on demand.
+    });
+  }, []);
+
+  return null;
+}
+
 function UserListingsBootstrap() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
@@ -427,17 +454,80 @@ function UserListingsBootstrap() {
   return null;
 }
 
+function ProductDiscoveryBootstrap() {
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
+  const lastLoadedUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+
+    if (lastLoadedUserIdRef.current === session.user.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const bootstrapDiscovery = async () => {
+      try {
+        await queryClient.prefetchInfiniteQuery({
+          queryKey: queryKeys.products.infinite({
+            ...DISCOVERY_BOOTSTRAP_FILTERS,
+            excludeOwnerId: session.user.id,
+          }),
+          queryFn: async ({ pageParam }) => {
+            const envelope = await mobileApiClient.getProducts({
+              ...DISCOVERY_BOOTSTRAP_FILTERS,
+              excludeOwnerId: session.user.id,
+              cursor: pageParam ?? undefined,
+            });
+            return envelope.data ?? ({ items: [], nextCursor: null, hasMore: false } as ProductsListResult);
+          },
+          initialPageParam: null as string | null,
+          getNextPageParam: (lastPage: ProductsListResult) =>
+            lastPage.hasMore ? lastPage.nextCursor : undefined,
+        });
+
+        if (!cancelled) {
+          lastLoadedUserIdRef.current = session.user.id;
+        }
+      } catch {
+        // Best-effort; feed can still fetch on demand.
+      }
+    };
+
+    void bootstrapDiscovery();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      lastLoadedUserIdRef.current = null;
+    }
+  }, [status]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthBootstrap>
         <AppDialogProvider>
           <AppUpdateProvider />
+          <IconFontsWarmup />
           <RealtimeBootstrap />
           <PushNotificationsBootstrap />
           <CategoriesBootstrap />
           <NotificationsBootstrap />
           <UserListingsBootstrap />
+          <ProductDiscoveryBootstrap />
+          <TopToastHost />
           {children}
         </AppDialogProvider>
       </AuthBootstrap>

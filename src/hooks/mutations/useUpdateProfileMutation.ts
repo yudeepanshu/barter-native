@@ -5,6 +5,12 @@ import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import {
+  sanitizeEmailInput,
+  sanitizePhoneInput,
+  sanitizeProfileUserName,
+  sanitizeSingleLineInput,
+} from "@/lib/utils/inputSanitizer";
 
 export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
@@ -12,7 +18,24 @@ export function useUpdateProfileMutation() {
 
   return useMutation({
     mutationFn: async (payload: UpdateUserProfileInput) => {
-      const envelope = await mobileApiClient.updateCurrentUser(payload);
+      const sanitizedPayload: UpdateUserProfileInput = {
+        ...payload,
+        userName:
+          typeof payload.userName === "string"
+            ? sanitizeProfileUserName(payload.userName)
+            : payload.userName,
+        email: typeof payload.email === "string" ? sanitizeEmailInput(payload.email) : payload.email,
+        mobileNumber:
+          typeof payload.mobileNumber === "string"
+            ? sanitizePhoneInput(payload.mobileNumber)
+            : payload.mobileNumber,
+        profilePicture:
+          typeof payload.profilePicture === "string"
+            ? sanitizeSingleLineInput(payload.profilePicture, 2048)
+            : payload.profilePicture,
+      };
+
+      const envelope = await mobileApiClient.updateCurrentUser(sanitizedPayload);
       if (!envelope.data) {
         throw new Error("No user returned from server");
       }

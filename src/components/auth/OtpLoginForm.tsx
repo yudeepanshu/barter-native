@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useOtpAuth } from "@/hooks/useOtpAuth";
 import { Button } from "@/components/ui/Button";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { OtpCodeField } from "@/components/auth/OtpCodeField";
+import { Input } from "@/components/ui/Input";
+import { sanitizeIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
 
 function maskIdentifier(value: string): string {
   const trimmed = value.trim();
@@ -60,25 +62,25 @@ export function OtpLoginForm() {
         <>
           <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>We will send you one-time password to your email or mobile number</Text>
           <View style={styles.entryBlock}>
-            <TextInput
+            <Input
               value={identifier}
               onChangeText={(val) => {
-                setIdentifier(val);
+                setIdentifier(sanitizeIdentifierInput(val));
                 resetError();
               }}
+              label=""
               placeholder="Email or mobile number"
-              placeholderTextColor={theme.colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
               returnKeyType="done"
-              style={[styles.identifierInput, { color: theme.colors.textPrimary, borderBottomColor: theme.colors.primary }]}
+              error={error}
+              style={styles.identifierInput}
             />
           </View>
-          {error ? <Text style={[styles.inlineError, { color: theme.colors.danger }]}>{error}</Text> : null}
           <Button
             label="Get OTP"
-            onPress={() => requestOtp(identifier.trim())}
+            onPress={() => requestOtp(sanitizeIdentifierInput(identifier))}
             loading={busy}
             disabled={identifier.trim().length === 0}
             style={[styles.primaryButton, { backgroundColor: theme.colors.primary, borderRadius: 999 }]}
@@ -99,13 +101,13 @@ export function OtpLoginForm() {
             disabled={busy}
             style={({ pressed }) => [styles.notYouWrap, { opacity: pressed || busy ? 0.7 : 1 }]}
           >
-            <Text style={[styles.notYouText, { color: theme.colors.primary }]}>Not you?</Text>
+            <Text style={[styles.notYouText, { color: "#00BFFF" }]}>Not you?</Text>
           </Pressable>
 
           <OtpCodeField
             value={code}
             onChangeText={(val) => {
-              setCode(val);
+              setCode(sanitizeOtpInput(val));
               resetError();
             }}
             editable={!busy}
@@ -118,17 +120,17 @@ export function OtpLoginForm() {
           <View style={styles.resendRow}>
             <Text style={[styles.resendPrompt, { color: theme.colors.textMuted }]}>Didn't you receive the OTP? </Text>
             <Pressable
-              onPress={() => requestOtp(identifier.trim())}
+              onPress={() => requestOtp(sanitizeIdentifierInput(identifier))}
               disabled={busy}
               style={({ pressed }) => [{ opacity: pressed || busy ? 0.7 : 1 }]}
             >
-              <Text style={[styles.resendLink, { color: theme.colors.primary }]}>Resend OTP</Text>
+              <Text style={[styles.resendLink, { color: "#00BFFF" }]}>Resend OTP</Text>
             </Pressable>
           </View>
 
           <Button
             label="Verify"
-            onPress={() => verifyOtp(identifier.trim(), code.trim())}
+            onPress={() => verifyOtp(sanitizeIdentifierInput(identifier), sanitizeOtpInput(code))}
             loading={busy}
             disabled={code.trim().length !== 6}
             style={[styles.primaryButton, { backgroundColor: theme.colors.primary, borderRadius: 999 }]}
@@ -222,14 +224,11 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   identifierInput: {
-    minHeight: 50,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "500",
     textAlign: "left",
-    borderBottomWidth: 2,
-    paddingHorizontal: 2,
-    paddingBottom: 8,
+    paddingHorizontal: 14,
   },
   identifierHighlight: {
     fontWeight: "800",

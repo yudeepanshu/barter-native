@@ -1,19 +1,13 @@
 import type { ComponentProps } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
-  Animated,
-  Easing,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useKeyboardAwareInput } from "@/components/layout/KeyboardAwareContext";
-import { useKeyboardMetrics } from "@/hooks/useKeyboardMetrics";
 
 interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
   label?: string;
@@ -25,60 +19,17 @@ interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
 export function Input({ label, error, style, showCharacterCount = false, ...rest }: InputProps) {
   const { theme } = useAppTheme();
   const keyboardAware = useKeyboardAwareInput();
-  const keyboard = useKeyboardMetrics();
-  const insets = useSafeAreaInsets();
-  const windowDimensions = useWindowDimensions();
   const [focused, setFocused] = useState(false);
-  const containerRef = useRef<View>(null);
   const inputRef = useRef<TextInput>(null);
-  const translateY = useRef(new Animated.Value(0)).current;
   const currentValue = typeof rest.value === "string" ? rest.value : rest.value != null ? String(rest.value) : "";
   const maxLength = typeof rest.maxLength === "number" ? rest.maxLength : null;
 
-  const updateStickyOffset = useCallback(() => {
-    if (!focused || !keyboard.isVisible) {
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: keyboard.animationDuration,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-      return;
-    }
-
-    const container = containerRef.current;
-    if (!container) {
-      return;
-    }
-
-    requestAnimationFrame(() => {
-      container.measureInWindow((_x, y, _width, height) => {
-        const safeInset = Platform.OS === "ios" ? insets.bottom : 0;
-        const keyboardInset = Math.max(0, keyboard.height - safeInset);
-        const visibleBottom = windowDimensions.height - keyboardInset - 10;
-        const overlap = Math.max(0, y + height - visibleBottom);
-
-        Animated.timing(translateY, {
-          toValue: overlap > 0 ? -overlap : 0,
-          duration: keyboard.animationDuration,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-      });
-    });
-  }, [focused, insets.bottom, keyboard.animationDuration, keyboard.height, keyboard.isVisible, translateY, windowDimensions.height]);
-
-  useEffect(() => {
-    updateStickyOffset();
-  }, [updateStickyOffset]);
-
   return (
-    <View ref={containerRef} style={styles.container} onLayout={updateStickyOffset}>
-      <Animated.View
+    <View style={styles.container}>
+      <View
         style={[
           styles.stickyContent,
           focused ? styles.focusedLayer : null,
-          { transform: [{ translateY }] },
         ]}
       >
         {label ? <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text> : null}
@@ -113,7 +64,7 @@ export function Input({ label, error, style, showCharacterCount = false, ...rest
           </Text>
         ) : null}
         {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
-      </Animated.View>
+      </View>
     </View>
   );
 }

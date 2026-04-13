@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useOtpAuth } from "@/hooks/useOtpAuth";
-import { Button } from "@/components/ui/Button";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { OtpCodeField } from "@/components/auth/OtpCodeField";
 import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
+import { Button } from "@/components/ui/Button";
 import { sanitizeIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
 
 function maskIdentifier(value: string): string {
@@ -43,6 +44,10 @@ function OtpIllustration() {
 export function OtpLoginForm() {
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
+  const [otpRejected, setOtpRejected] = useState(false);
+  const [autoVerifying, setAutoVerifying] = useState(false);
+  const lastSubmittedCodeRef = useRef<string | null>(null);
+  const verifyRequestIdRef = useRef(0);
   const { step, busy, error, requestOtp, proceedToCode, verifyOtp, goToIdentifierStep, resetError } = useOtpAuth();
   const { theme } = useAppTheme();
   const isOtpStep = step === "sent" || step === "code";
@@ -52,6 +57,41 @@ export function OtpLoginForm() {
       proceedToCode();
     }
   }, [code, proceedToCode, step]);
+
+  useEffect(() => {
+    const sanitizedIdentifier = sanitizeIdentifierInput(identifier);
+    const sanitizedCode = sanitizeOtpInput(code);
+
+    if (!isOtpStep || sanitizedCode.length !== 6 || sanitizedIdentifier.length === 0) {
+      return;
+    }
+
+    if (busy || autoVerifying) {
+      return;
+    }
+
+    if (lastSubmittedCodeRef.current === sanitizedCode) {
+      return;
+    }
+
+    lastSubmittedCodeRef.current = sanitizedCode;
+    const requestId = ++verifyRequestIdRef.current;
+    setAutoVerifying(true);
+
+    void (async () => {
+      const ok = await verifyOtp(sanitizedIdentifier, sanitizedCode);
+
+      if (verifyRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      if (!ok) {
+        setOtpRejected(true);
+      }
+
+      setAutoVerifying(false);
+    })();
+  }, [autoVerifying, busy, code, identifier, isOtpStep, verifyOtp]);
 
   return (
     <View style={styles.container}>
@@ -95,6 +135,10 @@ export function OtpLoginForm() {
           <Pressable
             onPress={() => {
               setCode("");
+              setOtpRejected(false);
+              setAutoVerifying(false);
+              lastSubmittedCodeRef.current = null;
+              verifyRequestIdRef.current += 1;
               resetError();
               goToIdentifierStep();
             }}
@@ -107,12 +151,22 @@ export function OtpLoginForm() {
           <OtpCodeField
             value={code}
             onChangeText={(val) => {
-              setCode(sanitizeOtpInput(val));
+              const next = sanitizeOtpInput(val);
+              setCode(next);
+              if (otpRejected) {
+                setOtpRejected(false);
+              }
+              if (next.length < 6) {
+                lastSubmittedCodeRef.current = null;
+                verifyRequestIdRef.current += 1;
+                setAutoVerifying(false);
+              }
               resetError();
             }}
-            editable={!busy}
-            active={!busy}
+            editable={!busy && !autoVerifying}
+            active={!busy && !autoVerifying}
             autoFocus={isOtpStep}
+            invalid={otpRejected}
           />
 
           {error ? <Text style={[styles.inlineError, { color: theme.colors.danger }]}>{error}</Text> : null}
@@ -128,14 +182,14 @@ export function OtpLoginForm() {
             </Pressable>
           </View>
 
-          <Button
-            label="Verify"
-            onPress={() => verifyOtp(sanitizeIdentifierInput(identifier), sanitizeOtpInput(code))}
-            loading={busy}
-            disabled={code.trim().length !== 6}
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary, borderRadius: 999 }]}
-            labelStyle={styles.primaryButtonLabel}
-          />
+          {autoVerifying && !otpRejected && !error ? (
+            <View style={styles.autoVerifyRow}>
+              <Spinner size={16} />
+              <Text style={[styles.autoVerifyText, { color: theme.colors.textMuted }]}>Verifying OTP...</Text>
+            </View>
+          ) : (
+            <Text style={[styles.autoVerifyHint, { color: theme.colors.textMuted }]}>OTP is verified automatically once all 6 digits are entered.</Text>
+          )}
         </>
       )}
     </View>
@@ -255,6 +309,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "700",
+  },
+  autoVerifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  autoVerifyText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  autoVerifyHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 4,
   },
   inlineError: {
     fontSize: 13,

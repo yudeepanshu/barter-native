@@ -1,7 +1,8 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { OtpLoginForm } from "@/components/auth/OtpLoginForm";
+import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 export default function LoginScreen() {
@@ -10,33 +11,31 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      <KeyboardAwareScrollView
+        containerStyle={styles.keyboardWrap}
+        keyboardVerticalOffset={12}
+        androidKeyboardHandling="pan"
+        extraBottomPadding={28}
+        extraScrollPadding={30}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={styles.scroll}
       >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          bounces={false}
+        <View
+          style={[
+            styles.formShell,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderRadius: theme.roundness + 10,
+            },
+          ]}
         >
-          <View
-            style={[
-              styles.formShell,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                borderRadius: theme.roundness + 10,
-              },
-            ]}
-          >
-            <OtpLoginForm />
-          </View>
+          <OtpLoginForm />
+        </View>
 
-          <Text style={[styles.footerCopy, { color: theme.colors.textMuted }]}>Secure sign-in for listings, requests, and exchange verification.</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <Text style={[styles.footerCopy, { color: theme.colors.textMuted }]}>Secure sign-in for listings, requests, and exchange verification.</Text>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

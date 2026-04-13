@@ -1,11 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { memo } from "react";
 import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, formatLocationBadgeLabel, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
+import { AppImage } from "@/components/ui/AppImage";
 
 interface ProductCardProps {
   product: ProductSummary;
@@ -65,13 +65,9 @@ export const ProductCard = memo(function ProductCard({
     >
       {primaryImage ? (
         <View style={[styles.thumbnailContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
-          <Image
-            source={{ uri: primaryImage.url }}
+          <AppImage
+            uri={primaryImage.url}
             style={styles.thumbnail}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={primaryImage.url}
-            transition={100}
           />
           {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
         </View>

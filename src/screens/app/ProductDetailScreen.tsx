@@ -1,5 +1,4 @@
 import {
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -8,10 +7,9 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ProductSummary } from "@barter/types";
+import type { ProductSummary, RequestStatus } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
@@ -36,11 +34,13 @@ import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
+import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
+const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -65,7 +65,6 @@ export default function ProductDetailScreen() {
   const query = useProductQuery(productId);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [composerReady, setComposerReady] = useState(false);
   const productData = query.data ?? null;
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
@@ -85,13 +84,6 @@ export default function ProductDetailScreen() {
   const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
   const { permission, lastKnown } = useDeviceLocation();
 
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setComposerReady(true);
-    });
-    return () => task.cancel();
-  }, []);
-
   const viewerLocation =
     permission === "granted" && lastKnown
       ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
@@ -101,10 +93,22 @@ export default function ProductDetailScreen() {
       return null;
     }
 
-    const requests = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? cachedSentRequests;
-    return requests.find(
-      (req) => req.productId === productData.id && ["PENDING", "NEGOTIATING", "ACCEPTED"].includes(req.status),
-    );
+    const matchesActiveRequest = (request: (typeof cachedSentRequests)[number]) =>
+      request.productId === productData.id && ACTIVE_REQUEST_STATUSES.includes(request.status);
+
+    const storeMatch = cachedSentRequests.find(matchesActiveRequest);
+    if (storeMatch) {
+      return storeMatch;
+    }
+
+    for (const page of sentRequestsQuery.data?.pages ?? []) {
+      const queryMatch = page.items.find(matchesActiveRequest);
+      if (queryMatch) {
+        return queryMatch;
+      }
+    }
+
+    return null;
   }, [sentRequestsQuery.data, cachedSentRequests, productData, isOwner]);
 
   const onManualRefresh = () => {
@@ -191,7 +195,10 @@ export default function ProductDetailScreen() {
           {product.owner ? (
             <View style={styles.ownerRow}>
               {product.owner.profilePicture ? (
-                <Image source={{ uri: product.owner.profilePicture }} style={[styles.ownerAvatar, { backgroundColor: theme.colors.surfaceMuted }]} />
+                <AppImage
+                  uri={product.owner.profilePicture}
+                  style={[styles.ownerAvatar, { backgroundColor: theme.colors.surfaceMuted }]}
+                />
               ) : (
                 <View style={[styles.ownerAvatarFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
                   <Text style={[styles.ownerAvatarInitial, { color: theme.colors.primary }]}>
@@ -289,10 +296,9 @@ export default function ProductDetailScreen() {
                     key={image.id}
                     style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted, flexShrink: 0 }]}
                   >
-                    <Image
-                      source={{ uri: image.url }}
+                    <AppImage
+                      uri={image.url}
                       style={styles.productImage}
-                      resizeMode="cover"
                     />
                     {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
                     {isOwner && image.isPrimary ? <Text style={styles.imagePrimaryBadge}>Primary</Text> : null}
@@ -379,13 +385,11 @@ export default function ProductDetailScreen() {
         ) : null}
 
           {session && !activeRequest ? (
-            composerReady ? (
-              <RequestComposer
-                product={product}
-                sessionUserId={session.user.id}
-                initialOfferedProductId={offeredProductId}
-              />
-            ) : null
+            <RequestComposer
+              product={product}
+              sessionUserId={session.user.id}
+              initialOfferedProductId={offeredProductId}
+            />
           ) : null}
       </KeyboardAwareScrollView>
     </SafeAreaView>
@@ -530,7 +534,7 @@ function RequestComposer({
             ? "PRODUCT"
             : "NONE";
 
-      await createRequestMutation.mutateAsync({
+      const result = await createRequestMutation.mutateAsync({
         productId: product.id,
         offerType,
         offeredProducts: wantsProduct ? offeredProductIds : undefined,
@@ -539,7 +543,14 @@ function RequestComposer({
         contactPreference: "PHONE",
         message: message.trim() || undefined,
       });
-      router.back();
+
+      const requestId = result?.request?.id;
+      if (requestId) {
+        router.replace(`/(app)/requests/${requestId}`);
+        return;
+      }
+
+      router.replace("/(app)/(tabs)/requests");
     } catch (error) {
       setFeedback(toErrorMessage(error));
     }
@@ -610,9 +621,7 @@ function RequestComposer({
           amountHelperText={
             product.requestByMoney && effectiveMinMoneyAmount != null
               ? `Minimum accepted: ${formatCurrency(effectiveMinMoneyAmount)}`
-              : product.requestByMoney && normalizedMinMoneyAmount != null
-                ? `Minimum accepted: ${formatCurrency(normalizedMinMoneyAmount)}`
-                : undefined
+              : undefined
           }
           amountWarningText={
             amount
@@ -701,7 +710,7 @@ function RequestComposer({
           onChangeMessage={setMessage}
           messagePlaceholder="Add details for the seller"
           feedback={feedback}
-          feedbackColor={theme.colors.textSecondary}
+          feedbackColor={theme.colors.danger}
           submitLabel="Send request"
           submitLoading={createRequestMutation.isPending}
           onSubmit={() => {

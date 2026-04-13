@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Dimensions, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -17,6 +17,9 @@ export default function CompleteProfileScreen() {
   const router = useRouter();
   const session = useAuthStore((state) => state.session);
   const setSession = useAuthStore((state) => state.setSession);
+  // Snapshot window height before any keyboard event so minHeight never changes
+  // when Android shrinks the viewport in adjustResize mode.
+  const minHeight = useRef(Dimensions.get("window").height).current;
 
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +72,7 @@ export default function CompleteProfileScreen() {
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={16}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { minHeight }]}
       >
         <AppCard
           title="Complete signup"
@@ -88,10 +91,10 @@ export default function CompleteProfileScreen() {
               }}
               autoCapitalize="words"
               autoCorrect={false}
+              maxLength={40}
+              showCharacterCount
               error={error}
             />
-
-            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Use 3 to 40 letters and spaces only.</Text>
 
             <Button
               label="Continue"
@@ -116,5 +119,4 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   form: { gap: 12 },
-  helperText: { fontSize: 12 },
 });

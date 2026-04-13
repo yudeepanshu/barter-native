@@ -15,7 +15,7 @@ interface UseOtpAuthReturn {
   error: string | null;
   requestOtp: (identifier: string) => Promise<void>;
   proceedToCode: () => void;
-  verifyOtp: (identifier: string, code: string) => Promise<void>;
+  verifyOtp: (identifier: string, code: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   goToIdentifierStep: () => void;
   resetError: () => void;
@@ -70,8 +70,11 @@ export function useOtpAuth(): UseOtpAuthReturn {
         if (needsProfileCompletion(payload.user.userName)) {
           router.replace("/(app)/complete-profile");
         }
+
+        return true;
       } catch (err) {
         setError(toMessage(err));
+        return false;
       } finally {
         setBusy(false);
       }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface OtpCodeFieldProps {
@@ -9,6 +9,7 @@ interface OtpCodeFieldProps {
   editable?: boolean;
   active?: boolean;
   autoFocus?: boolean;
+  invalid?: boolean;
 }
 
 export function OtpCodeField({
@@ -18,6 +19,7 @@ export function OtpCodeField({
   editable = true,
   active = true,
   autoFocus = false,
+  invalid = false,
 }: OtpCodeFieldProps) {
   const { theme } = useAppTheme();
   const inputRef = useRef<TextInput>(null);
@@ -25,13 +27,22 @@ export function OtpCodeField({
   const normalizedValue = value.replace(/\D+/g, "").slice(0, length);
   const chars = Array.from({ length }, (_, index) => normalizedValue[index] ?? "");
 
+  const focusInput = () => {
+    inputRef.current?.focus();
+    if (Platform.OS === "android") {
+      // Android occasionally ignores focus when an invisible field regains focus
+      // right after keyboard dismissal; re-focus in next tick to reopen keyboard.
+      setTimeout(() => inputRef.current?.focus(), 40);
+    }
+  };
+
   useEffect(() => {
     if (!editable || !autoFocus) {
       return;
     }
 
     const timer = setTimeout(() => {
-      inputRef.current?.focus();
+      focusInput();
     }, 120);
 
     return () => clearTimeout(timer);
@@ -41,7 +52,7 @@ export function OtpCodeField({
 
   const handleCellPress = (cellIndex: number) => {
     if (canFocus) {
-      inputRef.current?.focus();
+      focusInput();
       // Set cursor position to the clicked cell
       // Position cursor at: min(cellIndex + 1, normalizedValue.length + 1)
       const cursorPos = Math.min(cellIndex + 1, normalizedValue.length + 1);
@@ -55,11 +66,11 @@ export function OtpCodeField({
   };
 
   return (
-    <>
+    <View style={styles.fieldWrap}>
       <Pressable
         onPress={() => {
           if (canFocus) {
-            inputRef.current?.focus();
+            focusInput();
           }
         }}
         disabled={!canFocus}
@@ -76,12 +87,25 @@ export function OtpCodeField({
               onLayout={(event) => handleCellLayout(index, event)}
               style={styles.otpCell}
             >
-              <Text style={[styles.otpDigit, { color: theme.colors.textPrimary }]}>{char || " "}</Text>
+              <Text
+                style={[
+                  styles.otpDigit,
+                  {
+                    color: invalid ? theme.colors.danger : theme.colors.textPrimary,
+                  },
+                ]}
+              >
+                {char || " "}
+              </Text>
               <View
                 style={[
                   styles.otpUnderline,
                   {
-                    backgroundColor: highlighted ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: invalid
+                      ? theme.colors.danger
+                      : highlighted
+                        ? theme.colors.primary
+                        : theme.colors.border,
                   },
                 ]}
               />
@@ -106,15 +130,24 @@ export function OtpCodeField({
           keyboardType="number-pad"
           textContentType="oneTimeCode"
           autoComplete="sms-otp"
+          showSoftInputOnFocus
+          contextMenuHidden
+          caretHidden
+          blurOnSubmit={false}
           maxLength={length}
           style={styles.hiddenOtpInput}
         />
       ) : null}
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fieldWrap: {
+    width: "100%",
+    alignItems: "center",
+    position: "relative",
+  },
   otpRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -140,8 +173,8 @@ const styles = StyleSheet.create({
   },
   hiddenOtpInput: {
     position: "absolute",
-    width: 1,
-    height: 1,
+    width: "100%",
+    height: 56,
     opacity: 0,
   },
 });

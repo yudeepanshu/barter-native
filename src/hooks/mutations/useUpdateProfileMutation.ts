@@ -18,17 +18,35 @@ export function useUpdateProfileMutation() {
 
   return useMutation({
     mutationFn: async (payload: UpdateUserProfileInput) => {
+      const currentUser = useAuthStore.getState().session?.user;
+      const nextUserName =
+        typeof payload.userName === "string"
+          ? sanitizeProfileUserName(payload.userName).trim()
+          : payload.userName;
+      const nextEmail =
+        typeof payload.email === "string" ? sanitizeEmailInput(payload.email).trim() : payload.email;
+      const nextMobileNumber =
+        typeof payload.mobileNumber === "string"
+          ? sanitizePhoneInput(payload.mobileNumber)
+          : payload.mobileNumber;
+
+      if (currentUser?.userName?.trim() && nextUserName === "") {
+        throw new Error("Name cannot be empty once set.");
+      }
+
+      if (currentUser?.email?.trim() && (nextEmail === null || nextEmail === "")) {
+        throw new Error("Email cannot be empty once set.");
+      }
+
+      if (currentUser?.mobileNumber?.trim() && (nextMobileNumber === null || nextMobileNumber === "")) {
+        throw new Error("Phone number cannot be empty once set.");
+      }
+
       const sanitizedPayload: UpdateUserProfileInput = {
         ...payload,
-        userName:
-          typeof payload.userName === "string"
-            ? sanitizeProfileUserName(payload.userName)
-            : payload.userName,
-        email: typeof payload.email === "string" ? sanitizeEmailInput(payload.email) : payload.email,
-        mobileNumber:
-          typeof payload.mobileNumber === "string"
-            ? sanitizePhoneInput(payload.mobileNumber)
-            : payload.mobileNumber,
+        userName: nextUserName,
+        email: nextEmail === "" ? null : nextEmail,
+        mobileNumber: nextMobileNumber === "" ? null : nextMobileNumber,
         profilePicture:
           typeof payload.profilePicture === "string"
             ? sanitizeSingleLineInput(payload.profilePicture, 2048)

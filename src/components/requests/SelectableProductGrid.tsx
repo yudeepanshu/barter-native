@@ -1,9 +1,10 @@
 import React from "react";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Button } from "@/components/ui/Button";
+import { AppImage } from "@/components/ui/AppImage";
 import { ProductMetadata } from "@/components/products/ProductMetadata";
 import { getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
 
@@ -54,7 +55,7 @@ export function SelectableProductGrid({
             >
               <View style={styles.thumbWrap}>
                 {previewUri ? (
-                  <Image source={{ uri: previewUri }} style={styles.thumb} />
+                  <AppImage uri={previewUri} style={styles.thumb} />
                 ) : (
                   <View style={[styles.thumbFallback, { backgroundColor: theme.colors.surface }]}>
                     <Feather name="image" size={14} color={theme.colors.textMuted} />
@@ -120,7 +121,10 @@ export function SelectableProductGrid({
                   {owner ? (
                     <View style={styles.previewOwnerRow}>
                       {owner.profilePicture ? (
-                        <Image source={{ uri: owner.profilePicture }} style={[styles.previewOwnerAvatar, { backgroundColor: theme.colors.surfaceMuted }]} />
+                        <AppImage
+                          uri={owner.profilePicture}
+                          style={[styles.previewOwnerAvatar, { backgroundColor: theme.colors.surfaceMuted }]}
+                        />
                       ) : (
                         <View style={[styles.previewOwnerAvatar, styles.previewOwnerAvatarFallback, { backgroundColor: theme.colors.surfaceMuted }]}>
                           <Text style={[styles.previewOwnerInitial, { color: theme.colors.primary }]}>
@@ -158,7 +162,7 @@ export function SelectableProductGrid({
                             key={image.id}
                             style={{ width: previewImageSize, height: previewImageSize, backgroundColor: theme.colors.surfaceMuted }}
                           >
-                            <Image source={{ uri: image.url }} style={styles.previewImage} />
+                            <AppImage uri={image.url} style={styles.previewImage} />
                           </View>
                         ))}
                       </ScrollView>

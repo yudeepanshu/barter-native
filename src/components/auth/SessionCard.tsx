@@ -1,6 +1,7 @@
 import type { AuthUser } from "@barter/types";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
+import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface SessionCardProps {
@@ -54,8 +55,8 @@ export function SessionCard({
       <View style={styles.avatarRow}>
         <Pressable onPress={onAvatarPress} disabled={!onAvatarPress}>
           {user.profilePicture && !imageFailed ? (
-            <Image
-              source={{ uri: user.profilePicture }}
+            <AppImage
+              uri={user.profilePicture}
               style={[styles.avatarImage, { borderColor: theme.colors.border }]}
               onError={() => setImageFailed(true)}
             />

@@ -1,4 +1,4 @@
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -34,6 +34,7 @@ import { OtpCodeField } from "@/components/auth/OtpCodeField";
 import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
+import { AppImage } from "@/components/ui/AppImage";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
 import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
@@ -170,7 +171,7 @@ const OfferCard = memo(
         subtitle={`By ${offeredByLabel}`}
         leftElement={
           offeredByAvatar ? (
-            <Image source={{ uri: offeredByAvatar }} style={passedStyles.offerAvatarImage} />
+            <AppImage uri={offeredByAvatar} style={passedStyles.offerAvatarImage} />
           ) : (
             <View
               style={[

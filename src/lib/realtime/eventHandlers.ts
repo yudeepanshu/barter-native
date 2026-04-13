@@ -24,6 +24,7 @@ type RequestRealtimePatch = {
   requestId: string;
   status: RequestStatus;
   currentTurn?: RequestTurn;
+  message?: string | null;
   updatedAt: string;
 };
 
@@ -65,6 +66,7 @@ function patchRequestSummary(
     status: patch.status,
     updatedAt: patch.updatedAt,
     ...(patch.currentTurn ? { currentTurn: patch.currentTurn } : {}),
+    ...(Object.prototype.hasOwnProperty.call(patch, 'message') ? { message: patch.message } : {}),
   };
 }
 
@@ -279,18 +281,20 @@ function patchTransactionActiveByRequestCache(
 }
 
 function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient: QueryClient) {
-  const { action, requestId, status, currentTurn } = event.payload;
+  const { action, requestId, status, currentTurn, message } = event.payload;
 
   const patch: RequestRealtimePatch = {
     requestId,
     status: status as RequestStatus,
     updatedAt: event.occurredAt,
     ...(currentTurn ? { currentTurn: currentTurn as RequestTurn } : {}),
+    ...(Object.prototype.hasOwnProperty.call(event.payload, 'message') ? { message } : {}),
   };
 
   useAppStore.getState().patchRequest(requestId, {
     status: patch.status,
     ...(patch.currentTurn ? { currentTurn: patch.currentTurn } : {}),
+    ...(Object.prototype.hasOwnProperty.call(patch, 'message') ? { message: patch.message } : {}),
   });
 
   const detailMatched = patchRequestDetailCache(queryClient, patch);

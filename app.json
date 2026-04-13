@@ -2,7 +2,7 @@
   "expo": {
     "name": "Xact",
     "slug": "barter-mobile",
-    "version": "2.1.0-alpha.0",
+    "version": "2.1.3-alpha.1",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",

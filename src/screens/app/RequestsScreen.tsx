@@ -296,8 +296,8 @@ export default function RequestsScreen() {
             >
               <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
                 <Feather name="inbox" size={20} color={theme.colors.textMuted} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No requests right now</Text>
-                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Once someone sends or receives an offer, it will appear here.</Text>
+                <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Nothing here yet</Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Your sent and received requests will show up here once activity begins.</Text>
               </View>
             </ScrollView>
           ) : null}

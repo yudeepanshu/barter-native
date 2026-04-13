@@ -47,8 +47,8 @@ export function KeyboardAwareScrollView({
   keyboardDismissMode,
   keyboardShouldPersistTaps = "handled",
   refreshControl,
-  extraBottomPadding = 20,
-  extraScrollPadding = 20,
+  extraBottomPadding = 12,
+  extraScrollPadding = 10,
   androidKeyboardHandling = "auto",
   autoScrollToFocusedInput = true,
 }: KeyboardAwareScrollViewProps) {

@@ -1,4 +1,4 @@
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState, memo } from "react";
@@ -37,6 +37,7 @@ import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { AnchoredContextMenu, type AnchoredContextMenuItem } from "@/components/ui/AnchoredContextMenu";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
+import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useListingImagePreparationStore } from "@/lib/forms/listingImagePreparationStore";
@@ -868,7 +869,10 @@ function ListingPreview({
       <View style={styles.imageWrap}>
         {displayImageUri ? (
           <>
-            <Image source={{ uri: displayImageUri }} style={styles.image} resizeMode="cover" />
+            <AppImage
+              uri={displayImageUri}
+              style={styles.image}
+            />
             {isPreparing ? (
               <View style={[styles.imageStatusOverlay, { backgroundColor: "rgba(15, 23, 42, 0.45)" }]}> 
                 <ActivityIndicator size="small" color="#ffffff" />

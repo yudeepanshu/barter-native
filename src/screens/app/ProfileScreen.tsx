@@ -1,5 +1,4 @@
 import {
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -34,6 +33,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ThemePreference } from "@/theme/appTheme";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AppCard } from "@/components/ui/AppCard";
+import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
@@ -48,6 +48,10 @@ function isValidEmail(value: string) {
 
 function normalizePhone(value: string) {
   return value.replace(/\s+/g, "").trim();
+}
+
+function hasExistingValue(value: string | null | undefined) {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function getCurrentVersionLabel() {
@@ -146,15 +150,21 @@ export default function ProfileScreen() {
     const trimmedEmail = email.trim();
     const trimmedPhone = normalizePhone(mobileNumber);
 
-    if (trimmedUserName.length < 3) {
+    if (hasExistingValue(user?.userName) && trimmedUserName.length === 0) {
+      nextErrors.userName = "Name cannot be empty once set.";
+    } else if (trimmedUserName.length < 3) {
       nextErrors.userName = "Name must be at least 3 characters.";
     }
 
-    if (trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)) {
+    if (hasExistingValue(user?.email) && trimmedEmail.length === 0) {
+      nextErrors.email = "Email cannot be empty once set.";
+    } else if (trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)) {
       nextErrors.email = "Enter a valid email address.";
     }
 
-    if (trimmedPhone.length > 0 && (trimmedPhone.length < 10 || trimmedPhone.length > 15)) {
+    if (hasExistingValue(user?.mobileNumber) && trimmedPhone.length === 0) {
+      nextErrors.mobileNumber = "Phone number cannot be empty once set.";
+    } else if (trimmedPhone.length > 0 && (trimmedPhone.length < 10 || trimmedPhone.length > 15)) {
       nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
     }
 
@@ -548,8 +558,8 @@ export default function ProfileScreen() {
                 hitSlop={8}
                 style={styles.previewImageButton}
               >
-                <Image
-                  source={{ uri: user.profilePicture }}
+                <AppImage
+                  uri={user.profilePicture}
                   style={[
                     styles.previewImage,
                     { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },

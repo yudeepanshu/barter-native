@@ -25,8 +25,9 @@ interface ProductMetadataProps {
   showProductType?: boolean;
   showLocation?: boolean;
   viewerLocation?: { latitude: number; longitude: number } | null;
+  canShowRelativeDistance?: boolean;
   fallbackDistanceLabel?: string | null;
-  distanceOverrideLabel?: string | null;
+  distanceOverrideKm?: number | null;
   locationLines?: number;
 }
 
@@ -57,11 +58,22 @@ export function formatDistanceLabel(distanceKm: number) {
   if (distanceKm < 1) {
     return "Nearby";
   }
-  if (distanceKm > 100) {
-    return ">100 km away";
-  }
   const kmText = distanceKm < 10 ? distanceKm.toFixed(1) : Math.round(distanceKm).toString();
   return `${kmText} km away`;
+}
+
+const RELATIVE_DISTANCE_MAX_KM = 60;
+
+export function getDistanceBadgeLabel(
+  canShowRelativeDistance: boolean,
+  distanceKm?: number | null,
+  fallbackDistanceLabel?: string | null,
+) {
+  if (canShowRelativeDistance && distanceKm != null && distanceKm <= RELATIVE_DISTANCE_MAX_KM) {
+    return formatDistanceLabel(distanceKm);
+  }
+
+  return fallbackDistanceLabel ?? null;
 }
 
 export function getProductTypeLabel(product: ProductSummary) {
@@ -137,8 +149,9 @@ export function ProductMetadata({
   showProductType = true,
   showLocation,
   viewerLocation,
+  canShowRelativeDistance = true,
   fallbackDistanceLabel = null,
-  distanceOverrideLabel = null,
+  distanceOverrideKm = null,
   locationLines = 2,
 }: ProductMetadataProps) {
   const { theme } = useAppTheme();
@@ -154,13 +167,8 @@ export function ProductMetadata({
           longitude: product.longitude as number,
         })
       : null;
-  const computedDistanceLabel =
-    computedDistanceKm != null ? formatDistanceLabel(computedDistanceKm) : null;
-  const distanceLabel = distanceOverrideLabel ?? (
-    computedDistanceKm != null && computedDistanceKm > 100 && fallbackDistanceLabel
-      ? fallbackDistanceLabel
-      : computedDistanceLabel ?? fallbackDistanceLabel
-  );
+  const effectiveDistanceKm = computedDistanceKm ?? distanceOverrideKm;
+  const distanceLabel = getDistanceBadgeLabel(canShowRelativeDistance, effectiveDistanceKm, fallbackDistanceLabel);
 
   const chips: Array<{
     key: string;

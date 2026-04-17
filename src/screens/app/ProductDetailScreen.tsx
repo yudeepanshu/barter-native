@@ -27,7 +27,6 @@ import {
   ProductMetadata,
   hasExchangeHistory,
   getInactiveExpiryWarning,
-  formatDistanceLabel,
   formatLocationBadgeLabel,
 } from "@/components/products/ProductMetadata";
 import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
@@ -59,9 +58,7 @@ export default function ProductDetailScreen() {
   const offeredProductId = typeof params.offeredProductId === "string" ? params.offeredProductId : undefined;
   const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
   const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;
-  const routeDistanceLabel = Number.isFinite(routeDistanceKm)
-    ? formatDistanceLabel(routeDistanceKm)
-    : null;
+  const routeDistanceOverrideKm = Number.isFinite(routeDistanceKm) ? routeDistanceKm : null;
   const query = useProductQuery(productId);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -340,8 +337,9 @@ export default function ProductDetailScreen() {
               showProductType={false}
               showLocation={false}
               viewerLocation={viewerLocation}
+              canShowRelativeDistance={permission === "granted"}
               fallbackDistanceLabel={previewLocationLabel}
-              distanceOverrideLabel={previewLocationLabel ?? routeDistanceLabel}
+              distanceOverrideKm={routeDistanceOverrideKm}
             />
           </View>
         </View>

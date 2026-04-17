@@ -604,7 +604,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               showMeta
               isRequested={requestedProductIds.has(item.id)}
               viewerLocation={permission === "granted" ? viewerLocation : null}
-              fallbackDistanceLabel={permission === "granted" ? null : ">100 km away"}
+              canShowRelativeDistance={permission === "granted"}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}

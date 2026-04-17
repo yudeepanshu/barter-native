@@ -13,6 +13,7 @@ interface ProductCardProps {
   showMeta?: boolean;
   isRequested?: boolean;
   viewerLocation?: { latitude: number; longitude: number } | null;
+  canShowRelativeDistance?: boolean;
   fallbackDistanceLabel?: string | null;
 }
 
@@ -42,6 +43,7 @@ export const ProductCard = memo(function ProductCard({
   showMeta = true,
   isRequested = false,
   viewerLocation = null,
+  canShowRelativeDistance = true,
   fallbackDistanceLabel = null,
 }: ProductCardProps) {
   const { theme } = useAppTheme();
@@ -87,6 +89,7 @@ export const ProductCard = memo(function ProductCard({
             showProductType={false}
             showLocation={false}
             viewerLocation={viewerLocation}
+            canShowRelativeDistance={canShowRelativeDistance}
             fallbackDistanceLabel={fallbackDistanceLabel ?? formatLocationBadgeLabel(product.locationName)}
           />
         </View>

@@ -1,4 +1,5 @@
 import {
+  Dimensions,
   FlatList,
   Modal,
   Pressable,
@@ -12,17 +13,22 @@ import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { ProductSummary, RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
+import type { RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
-import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { FilterChip } from "@/components/filters/FilterChip";
+import { REQUESTS_SHARED_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
+
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+// Fixed chrome inside the modal: header row + action buttons row + paddings + gaps
+const MODAL_CHROME_HEIGHT = 130;
+const FILTER_SCROLL_MAX_HEIGHT = SCREEN_HEIGHT * 0.5 - MODAL_CHROME_HEIGHT;
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
@@ -79,11 +85,11 @@ function getStatusBadgeStyle(status: string): { bg: string; text: string } {
 
 export default function RequestsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string; productId?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; productId?: string, _t?: string }>();
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
-  const sentQuery = useRequestsQuery("sent", { limit: 20 });
-  const receivedQuery = useRequestsQuery("received", { limit: 20 });
+  const sentQuery = useRequestsQuery("sent", { limit: REQUESTS_SHARED_LIMIT });
+  const receivedQuery = useRequestsQuery("received", { limit: REQUESTS_SHARED_LIMIT });
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
@@ -196,7 +202,7 @@ export default function RequestsScreen() {
     }
 
     const tab = params.tab === "sent" ? "sent" : "received";
-    const paramKey = `${tab}:${requestedProductId}`;
+    const paramKey = `${tab}:${requestedProductId}:${params._t ?? ""}`;
     if (lastAppliedParamKeyRef.current === paramKey) {
       return;
     }
@@ -374,27 +380,32 @@ export default function RequestsScreen() {
                 </Pressable>
               </View>
 
-              {productFilterOptions.map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={[
-                    styles.filterOption,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor:
-                        draftProductFilter === option.value ? theme.colors.surfaceMuted : theme.colors.surface,
-                    },
-                  ]}
-                  onPress={() => setDraftProductFilter(option.value)}
+              {/* 
+                filterScrollWrapper has a maxHeight capped at (50% screen - fixed chrome).
+                When content is short, the ScrollView shrinks to fit naturally.
+                When content overflows, scroll kicks in and the sheet stays within 50%.
+              */}
+              <View style={[styles.filterScrollWrapper, { maxHeight: FILTER_SCROLL_MAX_HEIGHT }]}>
+                <ScrollView
+                  contentContainerStyle={styles.filterScrollContentContainer}
+                  showsVerticalScrollIndicator={true}
                 >
-                  <Text style={[styles.filterOptionText, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {option.label} ({option.count})
-                  </Text>
-                  {draftProductFilter === option.value ? (
-                    <Feather name="check" size={16} color={theme.colors.primary} />
-                  ) : null}
-                </Pressable>
-              ))}
+                  <View style={styles.filterChipsContainer}>
+                    {productFilterOptions && productFilterOptions.length > 0 ? (
+                      productFilterOptions.map((option) => (
+                        <FilterChip
+                          key={option.value}
+                          active={draftProductFilter === option.value}
+                          label={`${option.label} (${option.count})`}
+                          onPress={() => setDraftProductFilter(option.value)}
+                        />
+                      ))
+                    ) : (
+                      <Text style={{ color: theme.colors.textMuted }}>No products available</Text>
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
 
               <View style={styles.filterActionRow}>
                 <Pressable
@@ -659,108 +670,6 @@ const RequestItem = memo(function RequestItem({
             </View>
           ) : null}
         </View>
-
-        {/*
-        <View style={styles.actions}>
-          <View style={styles.actionPillRow}>
-            {canActByTurn ? (
-              <Pressable
-                onPress={onAccept}
-                disabled={acceptMutation.isPending}
-                style={[
-                  styles.actionPill,
-                  {
-                    borderColor: "#86efac",
-                    backgroundColor: "#f0fdf4",
-                  },
-                  acceptMutation.isPending ? styles.actionPillDisabled : null,
-                ]}
-              >
-                {acceptMutation.isPending ? (
-                  <Spinner size={12} />
-                ) : (
-                  <Feather name="check" size={14} color="#166534" />
-                )}
-                <Text style={[styles.actionPillText, { color: "#166534" }]}>Accept</Text>
-              </Pressable>
-            ) : null}
-
-            {canActByTurn ? (
-              <Pressable
-                onPress={onReject}
-                disabled={rejectMutation.isPending}
-                style={[
-                  styles.actionPill,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceMuted,
-                  },
-                  rejectMutation.isPending ? styles.actionPillDisabled : null,
-                ]}
-              >
-                {rejectMutation.isPending ? (
-                  <Spinner size={12} />
-                ) : (
-                  <Feather name="x" size={14} color={theme.colors.textSecondary} />
-                )}
-                <Text style={[styles.actionPillText, { color: theme.colors.textPrimary }]}>Decline</Text>
-              </Pressable>
-            ) : null}
-
-            {canCounter ? (
-              <Pressable
-                onPress={() => setShowCounterForm((prev) => !prev)}
-                style={[
-                  styles.actionPill,
-                  {
-                    borderColor: showCounterForm ? theme.colors.primary : theme.colors.border,
-                    backgroundColor: showCounterForm ? theme.colors.surfaceMuted : theme.colors.surfaceMuted,
-                  },
-                ]}
-              >
-                <Feather
-                  name={showCounterForm ? "chevron-up" : "repeat"}
-                  size={14}
-                  color={showCounterForm ? theme.colors.primary : theme.colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.actionPillText,
-                    { color: showCounterForm ? theme.colors.primary : theme.colors.textPrimary },
-                  ]}
-                >
-                  {showCounterForm ? "Hide" : "Counter"}
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {canCancel ? (
-              <Pressable
-                onPress={onCancel}
-                disabled={cancelMutation.isPending}
-                style={[
-                  styles.actionPill,
-                  {
-                    borderColor: "#fecaca",
-                    backgroundColor: "#fff7f7",
-                  },
-                  cancelMutation.isPending ? styles.actionPillDisabled : null,
-                ]}
-              >
-                {cancelMutation.isPending ? (
-                  <Spinner size={12} />
-                ) : (
-                  <Feather name="slash" size={14} color="#dc2626" />
-                )}
-                <Text style={[styles.actionPillText, { color: "#b91c1c" }]}>Cancel</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-        */}
-
-
-
       </View>
     </Pressable>
   );
@@ -1007,6 +916,18 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 22,
     gap: 10,
+    flexDirection: "column",
+    // No maxHeight here — the sheet sizes itself to content.
+    // The scroll cap is enforced by filterScrollWrapper's maxHeight instead.
+  },
+  filterScrollWrapper: {
+    // maxHeight is applied inline using the FILTER_SCROLL_MAX_HEIGHT constant
+    // so the sheet never exceeds 50% of screen height regardless of filter count.
+    width: "100%",
+  },
+  filterScrollContentContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
   filterModalHeaderRow: {
     flexDirection: "row",
@@ -1048,5 +969,11 @@ const styles = StyleSheet.create({
   filterActionText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  filterChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 16,
   },
 });

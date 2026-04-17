@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
 import { ApiClient } from "@barter/api-client";
-import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 import { sanitizeIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
+
+const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again.";
+const OTP_INVALID_ERROR_MESSAGE = "Invalid OTP. Please try again.";
 
 export type OtpStep = "identifier" | "sent" | "code";
 
@@ -39,8 +41,8 @@ export function useOtpAuth(): UseOtpAuthReturn {
     try {
       const sanitizedIdentifier = sanitizeIdentifierInput(identifier);
       await mobileApiClient.requestOtp({ identifier: sanitizedIdentifier });
-    } catch (err) {
-      setError(toMessage(err));
+    } catch {
+      setError(OTP_GENERIC_ERROR_MESSAGE);
     } finally {
       // TEMPORARY: Allow users to proceed to OTP entry even when request-otp fails.
       // We currently fetch OTP from logs for testing until sender reliability is fixed.
@@ -73,7 +75,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
 
         return true;
       } catch (err) {
-        setError(toMessage(err));
+        setError(getSafeOtpErrorMessage(err));
         return false;
       } finally {
         setBusy(false);
@@ -105,7 +107,14 @@ export function useOtpAuth(): UseOtpAuthReturn {
   return { step, busy, error, requestOtp, proceedToCode, verifyOtp, signOut, goToIdentifierStep, resetError };
 }
 
-function toMessage(err: unknown): string {
-  const shaped = ApiClient.toApiError(err) as ApiErrorShape;
-  return shaped.message;
+function getSafeOtpErrorMessage(err: unknown): string {
+  const apiError = ApiClient.toApiError(err);
+
+  // Keep user-facing messages intentionally generic and avoid backend text leakage.
+  // 400/401 are treated as an invalid OTP attempt in this flow.
+  if (apiError.statusCode === 400 || apiError.statusCode === 401) {
+    return OTP_INVALID_ERROR_MESSAGE;
+  }
+
+  return OTP_GENERIC_ERROR_MESSAGE;
 }

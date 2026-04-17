@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Xact",
+    "name": "Flippe",
     "slug": "barter-mobile",
-    "version": "2.1.3-alpha.1",
+    "version": "3.0.1-alpha.0",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
@@ -11,12 +11,12 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Xact uses your location to auto-fill listing location details and show nearby listings."
+        "NSLocationWhenInUseUsageDescription": "Flippe uses your location to auto-fill listing location details and show nearby listings."
       },
       "bundleIdentifier": "com.barter.app"
     },
@@ -24,10 +24,8 @@
       "package": "com.barter.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -42,7 +40,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Xact uses your location to auto-fill listing details and improve nearby feed results."
+          "locationWhenInUsePermission": "Flippe uses your location to auto-fill listing details and improve nearby feed results."
         }
       ],
       "expo-image"

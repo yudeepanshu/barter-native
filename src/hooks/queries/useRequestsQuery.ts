@@ -16,6 +16,9 @@ interface UseRequestsQueryOptions {
   enabled?: boolean;
 }
 
+export const REQUESTS_SHARED_LIMIT = 20;
+export const REQUESTS_STALE_TIME_MS = 60_000;
+
 export function useRequestsQuery(
   scope: RequestsScope,
   filters: Omit<RequestListQueryInput, "cursor">,
@@ -37,6 +40,7 @@ export function useRequestsQuery(
   >({
     queryKey,
     enabled,
+    staleTime: REQUESTS_STALE_TIME_MS,
     queryFn: async ({ pageParam }) => {
       const query = { ...filters, cursor: pageParam ?? undefined };
       const envelope =

@@ -15,7 +15,6 @@ export function AppCard({ title, subtitle, rightSlot, children }: AppCardProps) 
     <View
       style={[
         styles.card,
-        theme.shadow.card,
         {
           borderColor: theme.colors.border,
           borderRadius: theme.roundness,

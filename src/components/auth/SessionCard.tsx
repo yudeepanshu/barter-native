@@ -44,7 +44,6 @@ export function SessionCard({
     <View
       style={[
         styles.card,
-        theme.shadow.card,
         {
           borderColor: theme.colors.border,
           borderRadius: theme.roundness,

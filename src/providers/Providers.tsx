@@ -139,7 +139,8 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
 
           if (!cancelled) {
             queryClient.setQueryData(queryKeys.auth.me, user);
-            state.setSession({ user, tokens: state.session.tokens });
+            const latestTokens = useAuthStore.getState().session?.tokens ?? state.session.tokens;
+            state.setSession({ user, tokens: latestTokens });
             logAuthBootstrap("info", "session validated");
           }
         } catch (error) {
@@ -159,7 +160,8 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
             if (authFailure) {
               state.clearSession();
             } else {
-              state.setSession(state.session);
+              const latestSession = useAuthStore.getState().session ?? state.session;
+              state.setSession(latestSession);
             }
           }
         }

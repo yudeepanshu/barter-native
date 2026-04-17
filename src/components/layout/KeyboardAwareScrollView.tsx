@@ -52,10 +52,13 @@ export function KeyboardAwareScrollView({
   androidKeyboardHandling = "auto",
   autoScrollToFocusedInput = true,
 }: KeyboardAwareScrollViewProps) {
-  const behavior: KeyboardAvoidingViewProps["behavior"] = Platform.OS === "ios" ? "padding" : "height";
+  const behavior: KeyboardAvoidingViewProps["behavior"] =
+    Platform.OS === "ios" ? "padding" : "height";
+
   const insets = useSafeAreaInsets();
   const windowDimensions = useWindowDimensions();
   const keyboard = useKeyboardMetrics();
+
   const scrollRef = useRef<ScrollView>(null);
   const focusedInputRef = useRef<TextInput | null>(null);
   const scrollOffsetYRef = useRef(0);
@@ -68,26 +71,16 @@ export function KeyboardAwareScrollView({
   }, [keyboard.isVisible, windowDimensions.height]);
 
   const isAndroidResizeActive = useMemo(() => {
-    if (Platform.OS !== "android") {
-      return false;
-    }
-    if (androidKeyboardHandling === "resize") {
-      return true;
-    }
-    if (androidKeyboardHandling === "pan") {
-      return false;
-    }
+    if (Platform.OS !== "android") return false;
+    if (androidKeyboardHandling === "resize") return true;
+    if (androidKeyboardHandling === "pan") return false;
     return baselineWindowHeightRef.current - windowDimensions.height > 60;
   }, [androidKeyboardHandling, windowDimensions.height]);
 
   const effectiveKeyboardInset = useMemo(() => {
-    if (!keyboard.isVisible) {
-      return 0;
-    }
+    if (!keyboard.isVisible) return 0;
 
-    if (Platform.OS === "android" && isAndroidResizeActive) {
-      return 0;
-    }
+    if (Platform.OS === "android" && isAndroidResizeActive) return 0;
 
     const safeInset = Platform.OS === "ios" ? insets.bottom : 0;
     return Math.max(0, keyboard.height - safeInset);
@@ -100,72 +93,81 @@ export function KeyboardAwareScrollView({
     [],
   );
 
-  const ensureFocusedInputVisible = useCallback(
-    (targetInput?: TextInput | null) => {
-      if (!autoScrollToFocusedInput) {
+  const ensureFocusedInputVisible = useCallback(() => {
+    if (!autoScrollToFocusedInput) return;
+
+    const input = focusedInputRef.current;
+    const scroll = scrollRef.current;
+
+    if (!input || !scroll || !keyboard.isVisible) return;
+
+    input.measureInWindow((_x, y, _width, height) => {
+      const visibleTop = insets.top + 12;
+      const visibleBottom =
+        windowDimensions.height - effectiveKeyboardInset - extraScrollPadding;
+
+      const inputBottom = y + height;
+
+      // ✅ Guard (avoid unnecessary scroll)
+      if (inputBottom <= visibleBottom && y >= visibleTop) {
         return;
       }
 
-      const input = targetInput ?? focusedInputRef.current;
-      const scroll = scrollRef.current;
-      if (!input || !scroll) {
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          input.measureInWindow((_x, y, _width, height) => {
-            const visibleTop = insets.top + 12;
-            const visibleBottom = windowDimensions.height - effectiveKeyboardInset - extraScrollPadding;
-            const inputBottom = y + height;
-
-            if (inputBottom > visibleBottom) {
-              const delta = inputBottom - visibleBottom;
-              scroll.scrollTo({ y: Math.max(0, scrollOffsetYRef.current + delta), animated: true });
-              return;
-            }
-
-            if (y < visibleTop) {
-              const delta = visibleTop - y;
-              scroll.scrollTo({ y: Math.max(0, scrollOffsetYRef.current - delta), animated: true });
-            }
-          });
+      if (inputBottom > visibleBottom) {
+        const delta = inputBottom - visibleBottom;
+        scroll.scrollTo({
+          y: Math.max(0, scrollOffsetYRef.current + delta),
+          animated: true,
         });
-      });
-    },
-    [autoScrollToFocusedInput, effectiveKeyboardInset, extraScrollPadding, insets.top, windowDimensions.height],
-  );
+        return;
+      }
 
+      if (y < visibleTop) {
+        const delta = visibleTop - y;
+        scroll.scrollTo({
+          y: Math.max(0, scrollOffsetYRef.current - delta),
+          animated: true,
+        });
+      }
+    });
+  }, [
+    autoScrollToFocusedInput,
+    effectiveKeyboardInset,
+    extraScrollPadding,
+    insets.top,
+    keyboard.isVisible,
+    windowDimensions.height,
+  ]);
+
+  // ✅ KEY FIX: trigger after keyboard/layout update
   useEffect(() => {
-    if (!keyboard.isVisible) {
-      return;
-    }
+    if (!keyboard.isVisible) return;
 
-    const timer = setTimeout(() => {
-      ensureFocusedInputVisible();
-    }, keyboard.animationDuration);
-
-    return () => clearTimeout(timer);
-  }, [ensureFocusedInputVisible, keyboard.animationDuration, keyboard.isVisible, keyboard.height]);
+    ensureFocusedInputVisible();
+  }, [keyboard.isVisible, effectiveKeyboardInset, ensureFocusedInputVisible]);
 
   const contextValue = useMemo<KeyboardAwareContextValue>(
     () => ({
       notifyInputFocused: (input: TextInput | null) => {
         focusedInputRef.current = input;
-        ensureFocusedInputVisible(input);
       },
     }),
-    [ensureFocusedInputVisible],
+    [],
   );
 
   const resolvedContentContainerStyle = useMemo(() => {
     const flattened = StyleSheet.flatten(contentContainerStyle) ?? {};
-    const basePaddingBottom = typeof flattened.paddingBottom === "number" ? flattened.paddingBottom : 0;
+    const basePaddingBottom =
+      typeof flattened.paddingBottom === "number" ? flattened.paddingBottom : 0;
 
     return [
       flattened,
       {
-        paddingBottom: basePaddingBottom + effectiveKeyboardInset + insets.bottom + extraBottomPadding,
+        paddingBottom:
+          basePaddingBottom +
+          effectiveKeyboardInset +
+          insets.bottom +
+          extraBottomPadding,
       },
     ];
   }, [contentContainerStyle, effectiveKeyboardInset, extraBottomPadding, insets.bottom]);
@@ -175,13 +177,18 @@ export function KeyboardAwareScrollView({
       <KeyboardAvoidingView
         style={[styles.keyboardWrap, containerStyle]}
         behavior={behavior}
-        keyboardVerticalOffset={Platform.OS === "ios" ? keyboardVerticalOffset : 0}
+        keyboardVerticalOffset={
+          Platform.OS === "ios" ? keyboardVerticalOffset : 0
+        }
       >
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={resolvedContentContainerStyle}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-          keyboardDismissMode={keyboardDismissMode ?? (Platform.OS === "ios" ? "interactive" : "on-drag")}
+          keyboardDismissMode={
+            keyboardDismissMode ??
+            (Platform.OS === "ios" ? "interactive" : "on-drag")
+          }
           automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
           refreshControl={refreshControl}
           onScroll={onScroll}

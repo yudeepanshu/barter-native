@@ -152,7 +152,7 @@ export function getRealtimeToastMessage(
 
     return {
       title: "Listing updated",
-      message: "This post was updated in realtime.",
+      message: "This post was updated recently.",
       variant: "info",
     };
   }

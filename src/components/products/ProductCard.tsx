@@ -54,7 +54,6 @@ export const ProductCard = memo(function ProductCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        theme.shadow.card,
         {
           borderRadius: theme.roundness,
           borderColor: theme.colors.border,

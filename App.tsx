@@ -82,7 +82,7 @@ export default function App() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          <Text style={styles.heading}>Xact Auth Foundation</Text>
+          <Text style={styles.heading}>Flippe Auth Foundation</Text>
           <Text style={styles.subtitle}>Mobile OTP flow backed by shared API contracts.</Text>
 
           <TextInput

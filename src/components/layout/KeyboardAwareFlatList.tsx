@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardMetrics } from "@/hooks/useKeyboardMetrics";
-import { KeyboardAwareContext, type KeyboardAwareContextValue } from "@/components/layout/KeyboardAwareContext";
+import {
+  KeyboardAwareContext,
+  type KeyboardAwareContextValue,
+} from "@/components/layout/KeyboardAwareContext";
 
 interface KeyboardAwareFlatListProps<ItemT> extends FlatListProps<ItemT> {
   extraBottomPadding?: number;
@@ -35,6 +38,7 @@ export function KeyboardAwareFlatList<ItemT>({
   const insets = useSafeAreaInsets();
   const windowDimensions = useWindowDimensions();
   const keyboard = useKeyboardMetrics();
+
   const listRef = useRef<FlatList<ItemT>>(null);
   const focusedInputRef = useRef<TextInput | null>(null);
   const scrollOffsetYRef = useRef(0);
@@ -47,26 +51,15 @@ export function KeyboardAwareFlatList<ItemT>({
   }, [keyboard.isVisible, windowDimensions.height]);
 
   const isAndroidResizeActive = useMemo(() => {
-    if (Platform.OS !== "android") {
-      return false;
-    }
-    if (androidKeyboardHandling === "resize") {
-      return true;
-    }
-    if (androidKeyboardHandling === "pan") {
-      return false;
-    }
+    if (Platform.OS !== "android") return false;
+    if (androidKeyboardHandling === "resize") return true;
+    if (androidKeyboardHandling === "pan") return false;
     return baselineWindowHeightRef.current - windowDimensions.height > 60;
   }, [androidKeyboardHandling, windowDimensions.height]);
 
   const effectiveKeyboardInset = useMemo(() => {
-    if (!keyboard.isVisible) {
-      return 0;
-    }
-
-    if (Platform.OS === "android" && isAndroidResizeActive) {
-      return 0;
-    }
+    if (!keyboard.isVisible) return 0;
+    if (Platform.OS === "android" && isAndroidResizeActive) return 0;
 
     const safeInset = Platform.OS === "ios" ? insets.bottom : 0;
     return Math.max(0, keyboard.height - safeInset);
@@ -80,72 +73,81 @@ export function KeyboardAwareFlatList<ItemT>({
     [onScroll],
   );
 
-  const ensureFocusedInputVisible = useCallback(
-    (targetInput?: TextInput | null) => {
-      if (!autoScrollToFocusedInput) {
+  const ensureFocusedInputVisible = useCallback(() => {
+    if (!autoScrollToFocusedInput) return;
+
+    const input = focusedInputRef.current;
+    const list = listRef.current;
+
+    if (!input || !list || !keyboard.isVisible) return;
+
+    input.measureInWindow((_x, y, _width, height) => {
+      const visibleTop = insets.top + 12;
+      const visibleBottom =
+        windowDimensions.height - effectiveKeyboardInset - extraScrollPadding;
+
+      const inputBottom = y + height;
+
+      // ✅ guard (prevents unnecessary scroll)
+      if (inputBottom <= visibleBottom && y >= visibleTop) {
         return;
       }
 
-      const input = targetInput ?? focusedInputRef.current;
-      const list = listRef.current;
-      if (!input || !list) {
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          input.measureInWindow((_x, y, _width, height) => {
-            const visibleTop = insets.top + 12;
-            const visibleBottom = windowDimensions.height - effectiveKeyboardInset - extraScrollPadding;
-            const inputBottom = y + height;
-
-            if (inputBottom > visibleBottom) {
-              const delta = inputBottom - visibleBottom;
-              list.scrollToOffset({ offset: Math.max(0, scrollOffsetYRef.current + delta), animated: true });
-              return;
-            }
-
-            if (y < visibleTop) {
-              const delta = visibleTop - y;
-              list.scrollToOffset({ offset: Math.max(0, scrollOffsetYRef.current - delta), animated: true });
-            }
-          });
+      if (inputBottom > visibleBottom) {
+        const delta = inputBottom - visibleBottom;
+        list.scrollToOffset({
+          offset: Math.max(0, scrollOffsetYRef.current + delta),
+          animated: true,
         });
-      });
-    },
-    [autoScrollToFocusedInput, effectiveKeyboardInset, extraScrollPadding, insets.top, windowDimensions.height],
-  );
+        return;
+      }
 
+      if (y < visibleTop) {
+        const delta = visibleTop - y;
+        list.scrollToOffset({
+          offset: Math.max(0, scrollOffsetYRef.current - delta),
+          animated: true,
+        });
+      }
+    });
+  }, [
+    autoScrollToFocusedInput,
+    effectiveKeyboardInset,
+    extraScrollPadding,
+    insets.top,
+    keyboard.isVisible,
+    windowDimensions.height,
+  ]);
+
+  // ✅ KEY FIX: run AFTER keyboard/layout updates
   useEffect(() => {
-    if (!keyboard.isVisible) {
-      return;
-    }
+    if (!keyboard.isVisible) return;
 
-    const timer = setTimeout(() => {
-      ensureFocusedInputVisible();
-    }, keyboard.animationDuration);
-
-    return () => clearTimeout(timer);
-  }, [ensureFocusedInputVisible, keyboard.animationDuration, keyboard.isVisible, keyboard.height]);
+    ensureFocusedInputVisible();
+  }, [keyboard.isVisible, effectiveKeyboardInset, ensureFocusedInputVisible]);
 
   const contextValue = useMemo<KeyboardAwareContextValue>(
     () => ({
       notifyInputFocused: (input) => {
         focusedInputRef.current = input;
-        ensureFocusedInputVisible(input);
       },
     }),
-    [ensureFocusedInputVisible],
+    [],
   );
 
   const resolvedContentContainerStyle = useMemo(() => {
     const flattened = StyleSheet.flatten(contentContainerStyle) ?? {};
-    const basePaddingBottom = typeof flattened.paddingBottom === "number" ? flattened.paddingBottom : 0;
+    const basePaddingBottom =
+      typeof flattened.paddingBottom === "number" ? flattened.paddingBottom : 0;
 
     return [
       flattened,
       {
-        paddingBottom: basePaddingBottom + effectiveKeyboardInset + insets.bottom + extraBottomPadding,
+        paddingBottom:
+          basePaddingBottom +
+          effectiveKeyboardInset +
+          insets.bottom +
+          extraBottomPadding,
       },
     ];
   }, [contentContainerStyle, effectiveKeyboardInset, extraBottomPadding, insets.bottom]);
@@ -156,7 +158,10 @@ export function KeyboardAwareFlatList<ItemT>({
         ref={listRef}
         contentContainerStyle={resolvedContentContainerStyle}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-        keyboardDismissMode={keyboardDismissMode ?? (Platform.OS === "ios" ? "interactive" : "on-drag")}
+        keyboardDismissMode={
+          keyboardDismissMode ??
+          (Platform.OS === "ios" ? "interactive" : "on-drag")
+        }
         automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         onScroll={handleScroll}
         scrollEventThrottle={scrollEventThrottle}

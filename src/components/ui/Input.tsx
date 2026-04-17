@@ -16,23 +16,39 @@ interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
   showCharacterCount?: boolean;
 }
 
-export function Input({ label, error, style, showCharacterCount = false, ...rest }: InputProps) {
+export function Input({
+  label,
+  error,
+  style,
+  showCharacterCount = false,
+  ...rest
+}: InputProps) {
   const { theme } = useAppTheme();
   const keyboardAware = useKeyboardAwareInput();
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const currentValue = typeof rest.value === "string" ? rest.value : rest.value != null ? String(rest.value) : "";
-  const maxLength = typeof rest.maxLength === "number" ? rest.maxLength : null;
+
+  const currentValue =
+    typeof rest.value === "string"
+      ? rest.value
+      : rest.value != null
+      ? String(rest.value)
+      : "";
+
+  const maxLength =
+    typeof rest.maxLength === "number" ? rest.maxLength : null;
 
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.stickyContent,
-          focused ? styles.focusedLayer : null,
-        ]}
-      >
-        {label ? <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text> : null}
+      <View style={[styles.stickyContent]}>
+        {label && (
+          <Text
+            style={[styles.label, { color: theme.colors.textSecondary }]}
+          >
+            {label}
+          </Text>
+        )}
+
         <TextInput
           ref={inputRef}
           placeholderTextColor={theme.colors.textMuted}
@@ -41,15 +57,20 @@ export function Input({ label, error, style, showCharacterCount = false, ...rest
             {
               color: theme.colors.textPrimary,
               backgroundColor: theme.colors.surface,
-              borderColor: focused ? theme.colors.primary : theme.colors.border,
+              borderColor: focused
+                ? theme.colors.primary
+                : theme.colors.border,
               borderRadius: theme.roundness - 4,
             },
-            Boolean(error) && { borderColor: theme.colors.danger },
+            error && { borderColor: theme.colors.danger },
             style,
           ]}
           onFocus={(event) => {
             setFocused(true);
+
+            // ✅ Just notify — no timing logic
             keyboardAware?.notifyInputFocused(inputRef.current);
+
             rest.onFocus?.(event);
           }}
           onBlur={(event) => {
@@ -58,12 +79,25 @@ export function Input({ label, error, style, showCharacterCount = false, ...rest
           }}
           {...rest}
         />
-        {showCharacterCount && maxLength != null ? (
-          <Text style={[styles.characterCount, { color: theme.colors.textMuted }]}> 
+
+        {showCharacterCount && maxLength != null && (
+          <Text
+            style={[
+              styles.characterCount,
+              { color: theme.colors.textMuted },
+            ]}
+          >
             {currentValue.length}/{maxLength}
           </Text>
-        ) : null}
-        {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
+        )}
+
+        {error && (
+          <Text
+            style={[styles.errorText, { color: theme.colors.danger }]}
+          >
+            {error}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -71,9 +105,7 @@ export function Input({ label, error, style, showCharacterCount = false, ...rest
 
 const styles = StyleSheet.create({
   container: { gap: 4 },
-  stickyContent: {
-    gap: 4,
-  },
+  stickyContent: { gap: 4 },
   focusedLayer: {
     zIndex: 40,
     elevation: 40,

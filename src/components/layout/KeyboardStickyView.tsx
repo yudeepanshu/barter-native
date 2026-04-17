@@ -1,5 +1,17 @@
-import { useEffect, useMemo, useRef, type PropsWithChildren } from "react";
-import { Animated, Easing, Platform, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type PropsWithChildren,
+} from "react";
+import {
+  Animated,
+  Easing,
+  Platform,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardMetrics } from "@/hooks/useKeyboardMetrics";
 
@@ -8,21 +20,34 @@ interface KeyboardStickyViewProps extends PropsWithChildren {
   bottomOffset?: number;
 }
 
-export function KeyboardStickyView({ children, style, bottomOffset = 0 }: KeyboardStickyViewProps) {
+export function KeyboardStickyView({
+  children,
+  style,
+  bottomOffset = 0,
+}: KeyboardStickyViewProps) {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardMetrics();
+
   const animatedOffset = useRef(new Animated.Value(0)).current;
+  const previousOffsetRef = useRef(0);
 
   const targetOffset = useMemo(() => {
-    if (!keyboard.isVisible) {
-      return 0;
-    }
+    if (!keyboard.isVisible) return 0;
 
     const safeInset = Platform.OS === "ios" ? insets.bottom : 0;
     return Math.max(0, keyboard.height - safeInset);
   }, [insets.bottom, keyboard.height, keyboard.isVisible]);
 
   useEffect(() => {
+    const prev = previousOffsetRef.current;
+
+    // ✅ Skip tiny or no-op updates (prevents jitter)
+    if (Math.abs(prev - targetOffset) < 2) {
+      return;
+    }
+
+    previousOffsetRef.current = targetOffset;
+
     Animated.timing(animatedOffset, {
       toValue: targetOffset,
       duration: keyboard.animationDuration,
@@ -38,7 +63,11 @@ export function KeyboardStickyView({ children, style, bottomOffset = 0 }: Keyboa
         style,
         {
           paddingBottom: insets.bottom + bottomOffset,
-          transform: [{ translateY: Animated.multiply(animatedOffset, -1) }],
+          transform: [
+            {
+              translateY: Animated.multiply(animatedOffset, -1),
+            },
+          ],
         },
       ]}
     >

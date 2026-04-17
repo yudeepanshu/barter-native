@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ProductSummary, RequestStatus } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
-import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { REQUESTS_SHARED_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import {
   toErrorMessage,
@@ -58,6 +58,7 @@ const LISTING_FILTERS: Array<{ key: ListingFilter; label: string }> = [
 ];
 
 const OPEN_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
+const OPEN_REQUEST_DISPLAY_CAP = 10;
 
 /**
  * OPTIMIZATION: ListingItem is memoized to prevent unnecessary re-renders
@@ -103,6 +104,8 @@ const ListingItem = memo(
     localPreviewUri: string | null;
     onContextMenuOpen: (productId: string, anchor: { left: number; top: number; bottom: number }) => void;
   }) {
+    const displayOpenRequestCount = openRequestCount > OPEN_REQUEST_DISPLAY_CAP ? "10+" : `${openRequestCount}`;
+
     return (
       <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <Pressable
@@ -163,14 +166,14 @@ const ListingItem = memo(
             <View style={styles.openRequestInfoWrap}>
               <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Open requests</Text>
               <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted }]}>
-                {openRequestCount} active request{openRequestCount > 1 ? "s" : ""} for this listing.
+                {displayOpenRequestCount} active request{openRequestCount > 1 ? "s" : ""} for this listing.
               </Text>
             </View>
             <Pressable
               onPress={() =>
                 router.push({
                   pathname: "/(app)/(tabs)/requests",
-                  params: { tab: "received", productId: item.id },
+                  params: { tab: "received", productId: item.id, _t: Date.now().toString() },
                 })
               }
               style={[
@@ -221,7 +224,8 @@ export default function MyListingsScreen() {
   const [contextMenuProductId, setContextMenuProductId] = useState<string | null>(null);
   const [contextMenuAnchor, setContextMenuAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
   const products = useProductsListController({ ownerId: session?.user.id, limit: 40 });
-  const receivedRequestsQuery = useRequestsQuery("received", { limit: 100 });
+  const sentRequestsQuery = useRequestsQuery("sent", { limit: REQUESTS_SHARED_LIMIT });
+  const receivedRequestsQuery = useRequestsQuery("received", { limit: REQUESTS_SHARED_LIMIT });
   const categories = categoriesQuery.data ?? [];
   const pendingByProductId = useListingImagePreparationStore((state) => state.pendingByProductId);
   const markPreparing = useListingImagePreparationStore((state) => state.markPreparing);
@@ -377,11 +381,13 @@ export default function MyListingsScreen() {
 
   const onManualRefresh = () => {
     setIsManualRefreshing(true);
-    products.query
-      .refetch()
-      .finally(() => {
-        setIsManualRefreshing(false);
-      });
+    void Promise.allSettled([
+      products.query.refetch(),
+      sentRequestsQuery.refetch(),
+      receivedRequestsQuery.refetch(),
+    ]).finally(() => {
+      setIsManualRefreshing(false);
+    });
   };
 
   const onDelete = (productId: string) => {

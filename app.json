@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flippe",
     "slug": "barter-mobile",
-    "version": "3.0.1-alpha.0",
+    "version": "3.0.1-alpha.2",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",

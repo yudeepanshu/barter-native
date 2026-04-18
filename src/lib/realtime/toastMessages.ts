@@ -34,6 +34,11 @@ function isDomainEvent(value: unknown): value is RealtimeDomainEvent {
   return Boolean(candidate.type && candidate.payload);
 }
 
+function extractActorId(event: RealtimeDomainEvent): string | null {
+  const payload = event.payload as { actorId?: unknown };
+  return typeof payload.actorId === "string" ? payload.actorId : null;
+}
+
 function getRequestUpdateToast(payload: DomainEventPayloadMap["request.updated"]): RealtimeToastPayload | null {
   const { action, requestId } = payload;
   const requestRef = requestId.slice(-6).toUpperCase();
@@ -120,6 +125,11 @@ export function getRealtimeToastMessage(
     return null;
   }
 
+  const actorId = extractActorId(event);
+  if (currentUserId && actorId && actorId === currentUserId) {
+    return null;
+  }
+
   if (event.type === "request.updated") {
     const requestPayload = event.payload as DomainEventPayloadMap["request.updated"];
 
@@ -131,12 +141,8 @@ export function getRealtimeToastMessage(
       return null;
     }
 
-    const actorId = requestPayload.actorId;
-    if (!actorId) {
-      return null;
-    }
-
-    if (currentUserId && actorId === currentUserId) {
+    const requestActorId = requestPayload.actorId;
+    if (!requestActorId) {
       return null;
     }
 

@@ -44,6 +44,7 @@ export type DomainEventPayloadMap = {
   "product.updated": {
     productId: string;
     ownerId: string;
+    actorId?: string;
     status: string;
     isListed: boolean;
     action: ProductAction;
@@ -58,6 +59,7 @@ export type DomainEventPayloadMap = {
     sellerId: string;
     status: string;
     action: TransactionAction;
+    actorId?: string;
   };
   "notification.updated": {
     userId: string;
@@ -65,6 +67,7 @@ export type DomainEventPayloadMap = {
     notificationId?: string;
     notificationType?: string;
     unreadCount?: number;
+    actorId?: string;
   };
 };
 

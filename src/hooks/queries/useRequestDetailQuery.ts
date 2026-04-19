@@ -5,9 +5,26 @@ import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useSyncEntity } from "@/lib/store/useStoreSync";
 
+function hasHydratedRequestDetail(request: RequestSummary | null | undefined): request is RequestSummary {
+  if (!request?.product?.owner) {
+    return false;
+  }
+
+  return request.offers.every(
+    (offer) =>
+      offer.offeredProducts.every((product) => Boolean(product.product)) &&
+      offer.requestedProducts.every((product) => Boolean(product.product)),
+  );
+}
+
 export function useRequestDetailQuery(requestId: string) {
+  const cachedRequest = useAppDataStore((state) =>
+    requestId ? state.requestsById[requestId] ?? null : null,
+  );
   const upsertRequest = useAppDataStore((state) => state.upsertRequest);
+  const upsertOffers = useAppDataStore((state) => state.upsertOffers);
   const queryKey = queryKeys.requests.detail(requestId);
+  const initialData = hasHydratedRequestDetail(cachedRequest) ? cachedRequest : undefined;
 
   const query = useQuery<
     RequestSummary | null | undefined,
@@ -21,9 +38,13 @@ export function useRequestDetailQuery(requestId: string) {
       return result.data;
     },
     enabled: Boolean(requestId),
+    initialData,
+    initialDataUpdatedAt: initialData ? new Date(initialData.updatedAt).getTime() : undefined,
+    staleTime: 2 * 60 * 1000,
   });
 
   useSyncEntity(query.data, upsertRequest);
+  useSyncEntity(query.data, (request) => upsertOffers(request.id, request.offers ?? []));
 
   return query;
 }

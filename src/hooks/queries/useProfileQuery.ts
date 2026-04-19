@@ -5,6 +5,7 @@ import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useSyncNullableEntity } from "@/lib/store/useStoreSync";
 
 export function useProfileQuery(enabled = true) {
+  const profile = useAppDataStore((state) => state.profile);
   const setProfile = useAppDataStore((state) => state.setProfile);
 
   const query = useQuery({
@@ -14,6 +15,8 @@ export function useProfileQuery(enabled = true) {
       return envelope.data ?? null;
     },
     enabled,
+    initialData: profile ?? undefined,
+    staleTime: 5 * 60 * 1000,
   });
 
   useSyncNullableEntity(query.data, setProfile);

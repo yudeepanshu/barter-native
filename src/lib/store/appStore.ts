@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   AuthUser,
+  Category,
   NotificationSummary,
   ProductSummary,
   RequestOffer,
@@ -24,6 +25,11 @@ interface ProductsSlice {
   upsertProduct: (product: ProductSummary) => void;
   patchProduct: (productId: string, patch: Partial<ProductSummary>) => void;
   removeProduct: (productId: string) => void;
+}
+
+interface CategoriesSlice {
+  categoriesById: Record<string, Category>;
+  upsertCategories: (categories: Category[]) => void;
 }
 
 interface RequestsSlice {
@@ -64,6 +70,7 @@ interface ProfileSlice {
 
 export interface AppStore
   extends ProductsSlice,
+    CategoriesSlice,
     RequestsSlice,
     OffersSlice,
     TransactionsSlice,
@@ -74,6 +81,7 @@ export interface AppStore
 
 const EMPTY_STATE = {
   productsById: {},
+  categoriesById: {},
   requestsById: {},
   offersByRequestId: {},
   transactionsById: {},
@@ -83,6 +91,7 @@ const EMPTY_STATE = {
 } satisfies Pick<
   AppStore,
   | "productsById"
+  | "categoriesById"
   | "requestsById"
   | "offersByRequestId"
   | "transactionsById"
@@ -104,6 +113,13 @@ const createProductsSlice = (set: StoreSetter<AppStore>): ProductsSlice => ({
   },
   removeProduct: (productId) => {
     set((state) => ({ productsById: removeOne(state.productsById, productId) }));
+  },
+});
+
+const createCategoriesSlice = (set: StoreSetter<AppStore>): CategoriesSlice => ({
+  categoriesById: {},
+  upsertCategories: (categories) => {
+    set((state) => ({ categoriesById: upsertMany(state.categoriesById, categories) }));
   },
 });
 
@@ -224,6 +240,7 @@ const createProfileSlice = (set: StoreSetter<AppStore>): ProfileSlice => ({
 export const useAppStore = create<AppStore>((set) => ({
   ...EMPTY_STATE,
   ...createProductsSlice(set),
+  ...createCategoriesSlice(set),
   ...createRequestsSlice(set),
   ...createOffersSlice(set),
   ...createTransactionsSlice(set),

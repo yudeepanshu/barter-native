@@ -39,4 +39,30 @@ if (fs.existsSync(packagesRoot)) {
   config.watchFolders = [...new Set([...(config.watchFolders || []), packagesRoot])];
 }
 
+/**
+ * Redirect expo-router's renderRootComponent to our patched copy so that
+ * ExpoKeepAwake.activate rejections are swallowed instead of crashing as
+ * unhandled promise rejections on Android when the Activity is torn down.
+ */
+const patchedRenderRootComponent = path.resolve(
+  projectRoot,
+  'src/patches/renderRootComponent.js',
+);
+const originalResolveRequest = config.resolver?.resolveRequest;
+config.resolver = {
+  ...config.resolver,
+  resolveRequest: (context, moduleName, platform) => {
+    if (
+      moduleName === 'expo-router/build/renderRootComponent' ||
+      moduleName.endsWith('/expo-router/build/renderRootComponent')
+    ) {
+      return { filePath: patchedRenderRootComponent, type: 'sourceFile' };
+    }
+    if (originalResolveRequest) {
+      return originalResolveRequest(context, moduleName, platform);
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  },
+};
+
 module.exports = config;

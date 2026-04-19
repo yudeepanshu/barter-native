@@ -8,11 +8,11 @@ import {
   Text,
   View,
 } from "react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
-import type { NotificationSummary, RequestStatus } from "@barter/types";
+import type { NotificationSummary, ProductSummary, RequestStatus } from "@barter/types";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import {
@@ -21,7 +21,7 @@ import {
   useClearAllNotificationsMutation,
 } from "@/hooks/mutations/useNotificationMutations";
 import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
-import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { REQUESTS_SENT_MATCH_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useProductFeedFilters } from "@/hooks/useProductFeedFilters";
 import { Input } from "@/components/ui/Input";
@@ -42,6 +42,7 @@ import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSele
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { RangeSlider } from "../filters/RangeSlider";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
+import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -121,7 +122,11 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     [requestsById, userId],
   );
   const products = useProductsListController(filterState.filters, { enabled: isDiscoveryReady });
-  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
+  const sentRequestsQuery = useRequestsQuery(
+    "sent",
+    { limit: REQUESTS_SENT_MATCH_LIMIT },
+    { enabled: cachedSentRequests.length === 0 },
+  );
   const notificationsQuery = useNotificationsQuery({ limit: 20 });
   const markNotificationReadMutation = useMarkNotificationReadMutation();
   const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
@@ -142,7 +147,9 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     );
   }, [sentRequestsQuery.data]);
 
-  const showInitialLoading = !isDiscoveryReady || (products.query.isPending && products.items.length === 0);
+  const showInitialLoading =
+    products.items.length === 0 &&
+    (!isDiscoveryReady || products.query.isPending);
   const showInitialError = Boolean(products.query.error) && products.items.length === 0;
 
   const visibleProducts = useMemo(() => {
@@ -321,6 +328,15 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     return () => clearTimeout(timer);
   }, [showInitialLoading]);
 
+  useEffect(() => {
+    const firstPageItems = products.query.data?.pages[0]?.items ?? [];
+    if (firstPageItems.length === 0) {
+      return;
+    }
+
+    void writeStartupFeedSnapshot(userId, firstPageItems);
+  }, [products.query.data, userId]);
+
   const onRefreshNotifications = async () => {
     await notificationsQuery.refetch();
   };
@@ -447,6 +463,43 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     !showInitialError &&
     !products.query.isFetchingNextPage &&
     !products.query.hasNextPage;
+  const isBackgroundRefreshing =
+    products.query.isFetching &&
+    !showInitialLoading &&
+    !isManualRefreshing &&
+    !products.query.isFetchingNextPage;
+
+  const onOpenProduct = useCallback(
+    (item: ProductSummary) => {
+      const distanceKm =
+        viewerLocation && item.latitude != null && item.longitude != null
+          ? getDistanceKm(viewerLocation, { latitude: item.latitude, longitude: item.longitude })
+          : null;
+
+      router.push({
+        pathname: "/(app)/products/[id]",
+        params: {
+          id: item.id,
+          ...(distanceKm != null ? { distanceKm: distanceKm.toString() } : null),
+        },
+      });
+    },
+    [router, viewerLocation],
+  );
+
+  const renderProductItem = useCallback(
+    ({ item }: { item: ProductSummary }) => (
+      <ProductCard
+        product={item}
+        onPressProduct={onOpenProduct}
+        showMeta
+        isRequested={requestedProductIds.has(item.id)}
+        viewerLocation={permission === "granted" ? viewerLocation : null}
+        canShowRelativeDistance={permission === "granted"}
+      />
+    ),
+    [onOpenProduct, permission, requestedProductIds, viewerLocation],
+  );
 
   return (
     <>
@@ -484,6 +537,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                   <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
                     Discover high-value listings near you
                   </Text>
+                  {isBackgroundRefreshing ? (
+                    <View style={styles.refreshHintRow}>
+                      <ActivityIndicator size={12} color={theme.colors.textMuted} />
+                      <Text style={[styles.refreshHintText, { color: theme.colors.textMuted }]}>Refreshing in background</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <Pressable
@@ -584,29 +643,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               </View>
             ) : null
           }
-          renderItem={({ item }) => (
-            <ProductCard
-              product={item}
-              onPress={() => {
-                const distanceKm =
-                  viewerLocation && item.latitude != null && item.longitude != null
-                    ? getDistanceKm(viewerLocation, { latitude: item.latitude, longitude: item.longitude })
-                    : null;
-
-                router.push({
-                  pathname: "/(app)/products/[id]",
-                  params: {
-                    id: item.id,
-                    ...(distanceKm != null ? { distanceKm: distanceKm.toString() } : null),
-                  },
-                });
-              }}
-              showMeta
-              isRequested={requestedProductIds.has(item.id)}
-              viewerLocation={permission === "granted" ? viewerLocation : null}
-              canShowRelativeDistance={permission === "granted"}
-            />
-          )}
+          renderItem={renderProductItem}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         />
       </View>
@@ -969,6 +1006,16 @@ const styles = StyleSheet.create({
   },
   greeting: { flexShrink: 1, fontSize: 24, lineHeight: 29, fontWeight: "800" },
   subtitle: { fontSize: 14, marginTop: 3 },
+  refreshHintRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  refreshHintText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
   collapseContent: {
     paddingTop: 10,
     gap: 10,

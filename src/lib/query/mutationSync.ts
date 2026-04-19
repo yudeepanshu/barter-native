@@ -125,6 +125,13 @@ export function invalidateRequestCollections(queryClient: QueryClient) {
   ]);
 }
 
+export function invalidateRequestCollectionByScope(
+  queryClient: QueryClient,
+  scope: "sent" | "received",
+) {
+  return queryClient.invalidateQueries({ queryKey: ["requests", scope, "infinite"] });
+}
+
 export function invalidateProductCollections(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: ["products", "infinite"] });
 }
@@ -140,14 +147,6 @@ export function invalidateTransactionForRequest(queryClient: QueryClient, reques
   return queryClient.invalidateQueries({
     queryKey: queryKeys.transactions.activeByRequest(requestId),
   });
-}
-
-export function invalidateTransactionRelated(queryClient: QueryClient) {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["transactions"] }),
-    queryClient.invalidateQueries({ queryKey: ["requests"] }),
-    queryClient.invalidateQueries({ queryKey: ["products"] }),
-  ]);
 }
 
 export function invalidateNotifications(queryClient: QueryClient) {

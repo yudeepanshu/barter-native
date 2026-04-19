@@ -21,7 +21,11 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { FilterChip } from "@/components/filters/FilterChip";
-import { REQUESTS_SHARED_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import {
+  REQUESTS_SENT_MATCH_LIMIT,
+  REQUESTS_SHARED_LIMIT,
+  useRequestsQuery,
+} from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -88,7 +92,7 @@ export default function RequestsScreen() {
   const params = useLocalSearchParams<{ tab?: string; productId?: string, _t?: string }>();
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
-  const sentQuery = useRequestsQuery("sent", { limit: REQUESTS_SHARED_LIMIT });
+  const sentQuery = useRequestsQuery("sent", { limit: REQUESTS_SENT_MATCH_LIMIT });
   const receivedQuery = useRequestsQuery("received", { limit: REQUESTS_SHARED_LIMIT });
 
   const sentItems = sentQuery.data?.pages.flatMap((page) => page.items) ?? [];

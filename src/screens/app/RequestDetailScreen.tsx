@@ -7,7 +7,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestSummary } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
 import { useRequestDetailQuery } from "@/hooks/queries/useRequestDetailQuery";
-import { useRequestOffersQuery } from "@/hooks/queries/useRequestOffersQuery";
 import { useActiveTransactionQuery } from "@/hooks/queries/useActiveTransactionQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import {
@@ -105,7 +104,7 @@ function toInitials(name: string) {
  * jank and performance degradation in offer history with many entries.
  *
  * Shallow equality works here because:
- * - offer object reference is stable from useRequestOffersQuery (React Query)
+ * - offer object reference is stable from the request detail query payload
  * - session/theme come from hooks (stable across renders)
  * - router is stable from useRouter hook
  * - index prop is derived cleanly
@@ -311,7 +310,6 @@ export default function RequestDetailScreen() {
 
   const session = useSession();
   const requestQuery = useRequestDetailQuery(requestId);
-  const offersQuery = useRequestOffersQuery(requestId, { order: "desc" });
   const shouldCheckActiveTransaction =
     requestQuery.data?.status === "ACCEPTED" && requestQuery.data.product.status !== "EXCHANGED";
   const transactionQuery = useActiveTransactionQuery(
@@ -374,7 +372,6 @@ export default function RequestDetailScreen() {
 
     void Promise.allSettled([
       requestQuery.refetch(),
-      offersQuery.refetch(),
       shouldCheckActiveTransaction ? transactionQuery.refetch() : Promise.resolve(),
     ]).finally(() => {
       setIsManualRefreshing(false);
@@ -440,7 +437,9 @@ export default function RequestDetailScreen() {
   const ownOfferableProducts = ownProducts.items;
   const canActByTurn = OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
   const canCounter = !request.product.isFree && OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
-  const orderedOffers = offersQuery.data?.offers ?? [];
+  const orderedOffers = [...request.offers].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
   const activeOffer = orderedOffers[0] ?? request.offers[request.offers.length - 1];
   const latestActiveOffer = activeOffer?.status === "ACTIVE" ? activeOffer : null;
   const historyOffers = orderedOffers;
@@ -1397,7 +1396,7 @@ export default function RequestDetailScreen() {
         )}
 
         {/* Offer History */}
-        {offersQuery.data?.offers && (
+        {
           <View style={{ gap: 10 }}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History</Text>
             {historyOffers.length === 0 ? (
@@ -1422,7 +1421,7 @@ export default function RequestDetailScreen() {
               </View>
             )}
           </View>
-        )}
+        }
 
         {/* Back Button removed from bottom */}
       </ScrollView>

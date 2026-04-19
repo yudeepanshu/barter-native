@@ -11,10 +11,12 @@ import type {
 import { mobileApiClient } from "@/lib/api/client";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import {
+  invalidateRequestCollectionByScope,
   invalidateRequestCollections,
   invalidateTransactionForRequest,
   syncRequestMutationResult,
 } from "@/lib/query/mutationSync";
+import { useAppStore } from "@/lib/store/appStore";
 
 function isDuplicateIdempotencyError(error: unknown) {
   const shaped = ApiClient.toApiError(error) as ApiErrorShape;
@@ -50,7 +52,7 @@ export function useCreateRequestMutation() {
     },
     onSuccess: async (result) => {
       syncRequestMutationResult(queryClient, result);
-      await invalidateRequestCollections(queryClient);
+      await invalidateRequestCollectionByScope(queryClient, "sent");
     },
   });
 }
@@ -71,9 +73,21 @@ export function useAcceptRequestMutation() {
       }
     },
     onSuccess: async (result, requestId) => {
+      const viewerId = useAppStore.getState().profile?.id;
+      const invalidateScope =
+        viewerId && result?.request
+          ? result.request.buyerId === viewerId
+            ? "sent"
+            : result.request.sellerId === viewerId
+              ? "received"
+              : null
+          : null;
+
       syncRequestMutationResult(queryClient, result);
       await Promise.all([
-        invalidateRequestCollections(queryClient),
+        invalidateScope
+          ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
+          : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, requestId),
       ]);
     },
@@ -96,9 +110,21 @@ export function useRejectRequestMutation() {
       }
     },
     onSuccess: async (result, requestId) => {
+      const viewerId = useAppStore.getState().profile?.id;
+      const invalidateScope =
+        viewerId && result?.request
+          ? result.request.buyerId === viewerId
+            ? "sent"
+            : result.request.sellerId === viewerId
+              ? "received"
+              : null
+          : null;
+
       syncRequestMutationResult(queryClient, result);
       await Promise.all([
-        invalidateRequestCollections(queryClient),
+        invalidateScope
+          ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
+          : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, requestId),
       ]);
     },
@@ -122,9 +148,21 @@ export function useCancelRequestMutation() {
       }
     },
     onSuccess: async (result, variables) => {
+      const viewerId = useAppStore.getState().profile?.id;
+      const invalidateScope =
+        viewerId && result?.request
+          ? result.request.buyerId === viewerId
+            ? "sent"
+            : result.request.sellerId === viewerId
+              ? "received"
+              : null
+          : null;
+
       syncRequestMutationResult(queryClient, result);
       await Promise.all([
-        invalidateRequestCollections(queryClient),
+        invalidateScope
+          ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
+          : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, variables.requestId),
       ]);
     },
@@ -160,9 +198,21 @@ export function useCreateCounterOfferMutation() {
       }
     },
     onSuccess: (result, variables) => {
+      const viewerId = useAppStore.getState().profile?.id;
+      const invalidateScope =
+        viewerId && result?.request
+          ? result.request.buyerId === viewerId
+            ? "sent"
+            : result.request.sellerId === viewerId
+              ? "received"
+              : null
+          : null;
+
       syncRequestMutationResult(queryClient, result);
       void Promise.all([
-        invalidateRequestCollections(queryClient),
+        invalidateScope
+          ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
+          : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, variables.requestId),
       ]);
     },

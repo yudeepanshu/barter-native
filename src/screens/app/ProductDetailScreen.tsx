@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
-import { useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
+import { REQUESTS_SENT_MATCH_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useCreateRequestMutation, toErrorMessage } from "@/hooks/mutations/useRequestMutations";
 import { useSession } from "@/hooks/useSession";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
@@ -78,7 +78,11 @@ export default function ProductDetailScreen() {
     () => Object.values(requestsById).filter((request) => request.buyerId === session?.user.id),
     [requestsById, session?.user.id],
   );
-  const sentRequestsQuery = useRequestsQuery("sent", { limit: 100 }, { enabled: cachedSentRequests.length === 0 });
+  const sentRequestsQuery = useRequestsQuery(
+    "sent",
+    { limit: REQUESTS_SENT_MATCH_LIMIT },
+    { enabled: cachedSentRequests.length === 0 },
+  );
   const { permission, lastKnown } = useDeviceLocation();
 
   const viewerLocation =

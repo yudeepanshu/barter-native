@@ -5,6 +5,7 @@ import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useSyncEntity } from "@/lib/store/useStoreSync";
 
 export function useProductQuery(productId: string) {
+  const cachedProduct = useAppDataStore((state) => (productId ? state.productsById[productId] ?? null : null));
   const upsertProduct = useAppDataStore((state) => state.upsertProduct);
 
   const query = useQuery({
@@ -14,6 +15,9 @@ export function useProductQuery(productId: string) {
       return envelope.data ?? null;
     },
     enabled: Boolean(productId),
+    initialData: cachedProduct ?? undefined,
+    initialDataUpdatedAt: cachedProduct ? new Date(cachedProduct.updatedAt).getTime() : undefined,
+    staleTime: 5 * 60 * 1000,
   });
 
   useSyncEntity(query.data, upsertProduct);

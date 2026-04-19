@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import * as SplashScreen from "expo-splash-screen";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Providers } from "@/providers/Providers";
 import { useAuthStatus } from "@/hooks/useSession";
@@ -10,6 +11,10 @@ import {
 } from "@/lib/notifications/pushRegistration";
 
 const ROUTE_GUARD_LOADING_TIMEOUT_MS = 10000;
+
+void SplashScreen.preventAutoHideAsync().catch(() => {
+  // Best effort. The app can still proceed if splash is already controlled elsewhere.
+});
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const status = useAuthStatus();
@@ -129,9 +134,28 @@ function NotificationNavigationBootstrap() {
   return null;
 }
 
+function SplashScreenBootstrap() {
+  const status = useAuthStatus();
+
+  useEffect(() => {
+    if (status === "loading") {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      void SplashScreen.hideAsync().catch(() => {
+        // Best effort. Ignore if already hidden.
+      });
+    });
+  }, [status]);
+
+  return null;
+}
+
 export default function RootLayout() {
   return (
     <Providers>
+      <SplashScreenBootstrap />
       <NotificationNavigationBootstrap />
       <RouteGuard>
         <Stack screenOptions={{ headerShown: false }} />

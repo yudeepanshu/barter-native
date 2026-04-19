@@ -15,8 +15,8 @@ import {
 } from "@/hooks/mutations/useCreateProductMutation";
 import {
   MAX_PRODUCTS_PER_USER,
+  checkProductCreationLimit,
   getProductCreationLimitMessage,
-  hasReachedProductCreationLimit,
 } from "@/lib/listings/productCreationLimit";
 import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
@@ -136,7 +136,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
 
     if (session?.user.id) {
       try {
-        const atLimit = await hasReachedProductCreationLimit(session.user.id);
+        const atLimit = await checkProductCreationLimit(queryClient, session.user.id);
         if (atLimit) {
           setFormError(getProductCreationLimitMessage(MAX_PRODUCTS_PER_USER));
           return;

@@ -9,7 +9,8 @@ import { AppImage } from "@/components/ui/AppImage";
 
 interface ProductCardProps {
   product: ProductSummary;
-  onPress: () => void;
+  onPress?: () => void;
+  onPressProduct?: (product: ProductSummary) => void;
   showMeta?: boolean;
   isRequested?: boolean;
   viewerLocation?: { latitude: number; longitude: number } | null;
@@ -40,6 +41,7 @@ interface ProductCardProps {
 export const ProductCard = memo(function ProductCard({
   product,
   onPress,
+  onPressProduct,
   showMeta = true,
   isRequested = false,
   viewerLocation = null,
@@ -53,7 +55,14 @@ export const ProductCard = memo(function ProductCard({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        if (onPressProduct) {
+          onPressProduct(product);
+          return;
+        }
+
+        onPress?.();
+      }}
       style={({ pressed }) => [
         styles.card,
         {

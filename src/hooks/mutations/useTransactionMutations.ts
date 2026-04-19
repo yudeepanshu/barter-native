@@ -2,7 +2,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape, VerifyTransactionOtpInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
-import { invalidateTransactionRelated } from "@/lib/query/mutationSync";
+import {
+  invalidateProductCollections,
+  invalidateRequestCollections,
+  invalidateTransactionForRequest,
+  syncTransactionEntity,
+} from "@/lib/query/mutationSync";
+import { queryKeys } from "@/lib/query/queryKeys";
 
 function isDuplicateIdempotencyError(error: unknown) {
   const shaped = ApiClient.toApiError(error) as ApiErrorShape;
@@ -15,8 +21,6 @@ function isDuplicateIdempotencyError(error: unknown) {
 }
 
 export function useGenerateTransactionOtpMutation() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (transactionId: string) => {
       try {
@@ -31,9 +35,6 @@ export function useGenerateTransactionOtpMutation() {
         }
         throw error;
       }
-    },
-    onSuccess: async () => {
-      await invalidateTransactionRelated(queryClient);
     },
   });
 }
@@ -57,8 +58,22 @@ export function useVerifyTransactionOtpMutation() {
         throw error;
       }
     },
-    onSuccess: async () => {
-      await invalidateTransactionRelated(queryClient);
+    onSuccess: async (transaction) => {
+      if (!transaction) {
+        return;
+      }
+
+      syncTransactionEntity(queryClient, transaction);
+      queryClient.setQueryData(queryKeys.transactions.activeByProduct(transaction.productId), transaction);
+
+      await Promise.all([
+        invalidateTransactionForRequest(queryClient, transaction.requestId),
+        queryClient.invalidateQueries({ queryKey: queryKeys.transactions.activeByProduct(transaction.productId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.requests.detail(transaction.requestId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(transaction.productId) }),
+        invalidateRequestCollections(queryClient),
+        invalidateProductCollections(queryClient),
+      ]);
     },
   });
 }

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flippe",
     "slug": "barter-mobile",
-    "version": "3.0.1-alpha.2",
+    "version": "3.0.4-alpha.0",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#133A92"
     },
     "ios": {
       "supportsTablet": true,
@@ -25,7 +25,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#133A92"
       },
       "predictiveBackGestureEnabled": false
     },

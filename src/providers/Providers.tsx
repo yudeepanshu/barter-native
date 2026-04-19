@@ -4,12 +4,22 @@ import * as Font from "expo-font";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
-import type { NotificationsListResult, ProductsListResult } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
-import { PRODUCT_LIMIT_CACHE_QUERY_LIMIT } from "@/lib/listings/productCreationLimit";
 import { queryClient } from "@/lib/query/queryClient";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAuthStore } from "@/lib/auth/authStore";
+import {
+  readStartupCategoriesSnapshot,
+  readStartupFeedSnapshot,
+  readStartupSentRequestsSnapshot,
+} from "@/lib/feed/feedSnapshotCache";
+import {
+  getStartupFeedFilters,
+  prefetchStartupAuxData,
+  prefetchStartupFeed,
+  STARTUP_FEED_LIMIT,
+  STARTUP_SENT_REQUESTS_LIMIT,
+} from "@/lib/feed/startupFeed";
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
 import { useRealtimeConnection } from "@/lib/realtime/useRealtimeConnection";
 import { useAppDataStore } from "@/lib/store/appDataStore";
@@ -19,8 +29,7 @@ import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 5000;
 const AUTH_BOOTSTRAP_GUARD_MS = 7000;
-const NOTIFICATIONS_BOOTSTRAP_FILTERS = { limit: 20, unreadOnly: false } as const;
-const DISCOVERY_BOOTSTRAP_FILTERS = { limit: 20 } as const;
+const AUTH_BOOTSTRAP_FEED_WARMUP_TIMEOUT_MS = 2500;
 
 function isAuthBootstrapFailure(error: unknown) {
   const apiError = ApiClient.toApiError(error);
@@ -119,6 +128,77 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
           useAuthStore.setState({ status: "unauthenticated" });
           completeBootstrap();
           return;
+        }
+
+        // Restore lightweight cached snapshots immediately so key tabs can render
+        // listings while network prefetch runs in the background.
+        const userId = state.session.user.id;
+
+        const [cachedFeedItems, cachedCategories, cachedSentRequests] = await Promise.all([
+          readStartupFeedSnapshot(userId),
+          readStartupCategoriesSnapshot(userId),
+          readStartupSentRequestsSnapshot(userId),
+        ]);
+
+        if (cachedFeedItems?.length) {
+          useAppDataStore.getState().upsertProducts(cachedFeedItems);
+          queryClient.setQueryData(queryKeys.products.infinite(getStartupFeedFilters(userId)), {
+            pages: [
+              {
+                items: cachedFeedItems,
+                nextCursor: null,
+                hasMore: cachedFeedItems.length >= STARTUP_FEED_LIMIT,
+              },
+            ],
+            pageParams: [null],
+          });
+          logAuthBootstrap("info", "startup feed snapshot restored", {
+            itemCount: cachedFeedItems.length,
+          });
+        }
+
+        if (cachedCategories?.length) {
+          useAppDataStore.getState().upsertCategories(cachedCategories);
+          queryClient.setQueryData(queryKeys.categories.all, cachedCategories);
+        }
+
+        if (cachedSentRequests?.length) {
+          useAppDataStore.getState().upsertRequests(cachedSentRequests);
+          queryClient.setQueryData(
+            queryKeys.requests.sentInfinite({ limit: STARTUP_SENT_REQUESTS_LIMIT }),
+            {
+              pages: [
+                {
+                  items: cachedSentRequests,
+                  nextCursor: null,
+                  hasMore: cachedSentRequests.length >= STARTUP_SENT_REQUESTS_LIMIT,
+                },
+              ],
+              pageParams: [null],
+            },
+          );
+        }
+
+        const feedWarmupPromise = prefetchStartupFeed(userId);
+        void feedWarmupPromise.catch(() => {
+          // Best effort warmup.
+        });
+        void prefetchStartupAuxData();
+
+        if (!cachedFeedItems?.length) {
+          try {
+            await Promise.race([
+              feedWarmupPromise,
+              new Promise<never>((_, reject) => {
+                setTimeout(
+                  () => reject(new Error("Startup feed warmup timeout")),
+                  AUTH_BOOTSTRAP_FEED_WARMUP_TIMEOUT_MS,
+                );
+              }),
+            ]);
+          } catch {
+            // Continue with auth flow; feed will keep warming in background.
+          }
         }
 
         try {
@@ -289,101 +369,6 @@ function RealtimeBootstrap() {
   return null;
 }
 
-function NotificationsBootstrap() {
-  const status = useAuthStore((state) => state.status);
-  const session = useAuthStore((state) => state.session);
-  const lastLoadedUserIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id) {
-      return;
-    }
-
-    if (lastLoadedUserIdRef.current === session.user.id) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const bootstrapNotifications = async () => {
-      try {
-        await queryClient.prefetchInfiniteQuery({
-          queryKey: queryKeys.notifications.infinite(NOTIFICATIONS_BOOTSTRAP_FILTERS),
-          queryFn: async ({ pageParam }) => {
-            const envelope = await mobileApiClient.getNotifications({
-              ...NOTIFICATIONS_BOOTSTRAP_FILTERS,
-              cursor: pageParam ?? undefined,
-            });
-
-            return envelope.data ?? { items: [], nextCursor: null, hasMore: false, unreadCount: 0 };
-          },
-          initialPageParam: null as string | null,
-          getNextPageParam: (lastPage: NotificationsListResult) =>
-            (lastPage.hasMore ? lastPage.nextCursor : undefined),
-        });
-
-        if (!cancelled) {
-          lastLoadedUserIdRef.current = session.user.id;
-        }
-      } catch {
-        // Best-effort bootstrap fetch; notification screen can still load on demand.
-      }
-    };
-
-    void bootstrapNotifications();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status, session?.user?.id]);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      lastLoadedUserIdRef.current = null;
-    }
-  }, [status]);
-
-  return null;
-}
-
-function CategoriesBootstrap() {
-  const loadedRef = useRef(false);
-
-  useEffect(() => {
-    if (loadedRef.current) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const bootstrapCategories = async () => {
-      try {
-        await queryClient.prefetchQuery({
-          queryKey: queryKeys.categories.all,
-          queryFn: async () => {
-            const envelope = await mobileApiClient.getCategories();
-            return envelope.data ?? [];
-          },
-          staleTime: 30 * 60 * 1000,
-        });
-
-        if (!cancelled) {
-          loadedRef.current = true;
-        }
-      } catch {
-        // Best effort preload; screens can still fetch on demand.
-      }
-    };
-
-    void bootstrapCategories();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return null;
-}
 
 function IconFontsWarmup() {
   useEffect(() => {
@@ -398,124 +383,6 @@ function IconFontsWarmup() {
   return null;
 }
 
-function UserListingsBootstrap() {
-  const status = useAuthStore((state) => state.status);
-  const session = useAuthStore((state) => state.session);
-  const lastLoadedUserIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id) {
-      return;
-    }
-
-    if (lastLoadedUserIdRef.current === session.user.id) {
-      return;
-    }
-
-    const userId = session.user.id;
-    let cancelled = false;
-
-    const bootstrapListings = async () => {
-      try {
-        await queryClient.prefetchInfiniteQuery({
-          queryKey: queryKeys.products.infinite({ ownerId: userId, limit: PRODUCT_LIMIT_CACHE_QUERY_LIMIT }),
-          queryFn: async ({ pageParam }) => {
-            const envelope = await mobileApiClient.getProducts({
-              ownerId: userId,
-              limit: PRODUCT_LIMIT_CACHE_QUERY_LIMIT,
-              cursor: pageParam ?? undefined,
-            });
-            return envelope.data ?? ({ items: [], nextCursor: null, hasMore: false } as ProductsListResult);
-          },
-          initialPageParam: null as string | null,
-          getNextPageParam: (lastPage: ProductsListResult) =>
-            lastPage.hasMore ? lastPage.nextCursor : undefined,
-        });
-
-        if (!cancelled) {
-          lastLoadedUserIdRef.current = userId;
-        }
-      } catch {
-        // Best-effort; screens can still fetch on demand.
-      }
-    };
-
-    void bootstrapListings();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status, session?.user?.id]);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      lastLoadedUserIdRef.current = null;
-    }
-  }, [status]);
-
-  return null;
-}
-
-function ProductDiscoveryBootstrap() {
-  const status = useAuthStore((state) => state.status);
-  const session = useAuthStore((state) => state.session);
-  const lastLoadedUserIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id) {
-      return;
-    }
-
-    if (lastLoadedUserIdRef.current === session.user.id) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const bootstrapDiscovery = async () => {
-      try {
-        await queryClient.prefetchInfiniteQuery({
-          queryKey: queryKeys.products.infinite({
-            ...DISCOVERY_BOOTSTRAP_FILTERS,
-            excludeOwnerId: session.user.id,
-          }),
-          queryFn: async ({ pageParam }) => {
-            const envelope = await mobileApiClient.getProducts({
-              ...DISCOVERY_BOOTSTRAP_FILTERS,
-              excludeOwnerId: session.user.id,
-              cursor: pageParam ?? undefined,
-            });
-            return envelope.data ?? ({ items: [], nextCursor: null, hasMore: false } as ProductsListResult);
-          },
-          initialPageParam: null as string | null,
-          getNextPageParam: (lastPage: ProductsListResult) =>
-            lastPage.hasMore ? lastPage.nextCursor : undefined,
-        });
-
-        if (!cancelled) {
-          lastLoadedUserIdRef.current = session.user.id;
-        }
-      } catch {
-        // Best-effort; feed can still fetch on demand.
-      }
-    };
-
-    void bootstrapDiscovery();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status, session?.user?.id]);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      lastLoadedUserIdRef.current = null;
-    }
-  }, [status]);
-
-  return null;
-}
-
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -525,10 +392,6 @@ export function Providers({ children }: { children: ReactNode }) {
           <IconFontsWarmup />
           <RealtimeBootstrap />
           <PushNotificationsBootstrap />
-          <CategoriesBootstrap />
-          <NotificationsBootstrap />
-          <UserListingsBootstrap />
-          <ProductDiscoveryBootstrap />
           <TopToastHost />
           {children}
         </AppDialogProvider>

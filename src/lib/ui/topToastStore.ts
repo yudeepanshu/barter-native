@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type TopToastVariant = "info" | "success" | "warning";
+export type TopToastVariant = "info" | "success" | "warning" | "error";
 
 export type TopToastMessage = {
   id: string;

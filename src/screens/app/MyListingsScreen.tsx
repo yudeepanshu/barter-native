@@ -28,12 +28,11 @@ import {
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
 import { Input } from "@/components/ui/Input";
-import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { CollapsibleHeaderCard } from "@/components/ui/CollapsibleHeaderCard";
 import { FilterChip } from "@/components/filters/FilterChip";
 import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
-import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { AnchoredContextMenu, type AnchoredContextMenuItem } from "@/components/ui/AnchoredContextMenu";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
@@ -212,7 +211,6 @@ export default function MyListingsScreen() {
   const [showSortModal, setShowSortModal] = useState(false);
   const [freeOnly, setFreeOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOrder>("newest");
-  const [showHeaderFilters, setShowHeaderFilters] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<ListingFilter>("ALL");
   const [draftFilter, setDraftFilter] = useState<ListingFilter>("ALL");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
@@ -605,53 +603,37 @@ export default function MyListingsScreen() {
       ) : (
         <>
           <View style={styles.fixedTopContent}>
-            <PageHeaderCard
+            <CollapsibleHeaderCard
               title="My Listings"
               subtitle="Manage your active and past listings."
-              rightSlot={
-                <Pressable
-                  onPress={() => setShowHeaderFilters((current) => !current)}
-                  style={[
-                    styles.collapseButton,
-                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
-                  ]}
-                >
-                  <Feather
-                    name={showHeaderFilters ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color={theme.colors.textSecondary}
-                  />
-                </Pressable>
-              }
+              collapseMaxHeight={320}
             >
-              <SmoothCollapse expanded={showHeaderFilters} maxHeight={320}>
-                <View style={styles.collapseContent}>
-                  <Input
-                    label=""
-                    placeholder="Try bicycle, books, guitar..."
-                    value={search}
-                    onChangeText={setSearch}
-                  />
+              <View style={{ marginTop: 10 }}>
+                <Input
+                  label=""
+                  placeholder="Try bicycle, books, guitar..."
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
 
-                  <ListControlsRow
-                    activeFilterCount={activeFilterCount}
-                    freeOnly={freeOnly}
-                    onOpenFilters={onOpenFilterPicker}
-                    onOpenSort={() => setShowSortModal(true)}
-                    onToggleFree={() => setFreeOnly((current) => !current)}
-                  />
+              <ListControlsRow
+                activeFilterCount={activeFilterCount}
+                freeOnly={freeOnly}
+                onOpenFilters={onOpenFilterPicker}
+                onOpenSort={() => setShowSortModal(true)}
+                onToggleFree={() => setFreeOnly((current) => !current)}
+              />
 
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryText, { color: theme.colors.textMuted }]}>Showing {filteredItems.length} listings</Text>
-                    {selectedFilterSummary ? (
-                      <Text style={[styles.summaryText, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                        {selectedFilterSummary}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </SmoothCollapse>
-            </PageHeaderCard>
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryText, { color: theme.colors.textMuted }]}>Showing {filteredItems.length} listings</Text>
+                {selectedFilterSummary ? (
+                  <Text style={[styles.summaryText, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                    {selectedFilterSummary}
+                  </Text>
+                ) : null}
+              </View>
+            </CollapsibleHeaderCard>
           </View>
 
           <FlatList
@@ -959,18 +941,6 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   listContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110 },
-  collapseButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  collapseContent: {
-    gap: 10,
-    paddingBottom: 2,
-  },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",

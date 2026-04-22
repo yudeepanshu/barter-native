@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flippe",
     "slug": "barter-mobile",
-    "version": "3.0.4-alpha.0",
+    "version": "4.0.2-alpha.0",
     "scheme": "barter",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
@@ -34,6 +34,7 @@
     },
     "plugins": [
       "expo-router",
+      "@react-native-google-signin/google-signin",
       "expo-secure-store",
       "expo-image-picker",
       "expo-notifications",

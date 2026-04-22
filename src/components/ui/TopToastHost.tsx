@@ -15,11 +15,17 @@ import { useTopToastStore } from "@/lib/ui/topToastStore";
 const ENTER_DURATION_MS = 210;
 const EXIT_DURATION_MS = 170;
 
-function getToastColors(themeMode: "light" | "dark", variant: "info" | "success" | "warning") {
+function getToastColors(themeMode: "light" | "dark", variant: "info" | "success" | "warning" | "error") {
   if (variant === "success") {
     return themeMode === "dark"
       ? { background: "#123326", border: "#1f7a50", title: "#dcfce7", message: "#bbf7d0", icon: "#4ade80" }
       : { background: "#ecfdf3", border: "#86efac", title: "#14532d", message: "#166534", icon: "#16a34a" };
+  }
+
+  if (variant === "error") {
+    return themeMode === "dark"
+      ? { background: "#3f161c", border: "#9f1239", title: "#fecdd3", message: "#fda4af", icon: "#fb7185" }
+      : { background: "#fff1f2", border: "#fda4af", title: "#9f1239", message: "#be123c", icon: "#e11d48" };
   }
 
   if (variant === "warning") {
@@ -125,7 +131,7 @@ export function TopToastHost() {
           style={styles.toastPressable}
         >
           <View style={styles.iconWrap}>
-            <Feather name="bell" size={16} color={palette.icon} />
+            <Feather name={activeToast.variant === "error" ? "alert-circle" : "bell"} size={16} color={palette.icon} />
           </View>
           <View style={styles.contentWrap}>
             <Text style={[styles.title, { color: palette.title }]} numberOfLines={2}>

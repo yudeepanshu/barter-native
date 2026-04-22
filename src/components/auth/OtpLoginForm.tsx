@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useOtpAuth } from "@/hooks/useOtpAuth";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { OtpCodeField } from "@/components/auth/OtpCodeField";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
-import { sanitizeIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
+import { useTopToastStore } from "@/lib/ui/topToastStore";
+import {
+  isValidEmailIdentifier,
+  sanitizeEmailIdentifierInput,
+  sanitizeOtpInput,
+} from "@/lib/utils/inputSanitizer";
 
 function maskIdentifier(value: string): string {
   const trimmed = value.trim();
@@ -30,12 +35,17 @@ function OtpIllustration() {
     <View style={styles.illustrationWrap}>
       <View style={[styles.illustrationRing, { borderColor: `${theme.colors.primary}33` }]} />
       <View style={[styles.illustrationRingLarge, { borderColor: `${theme.colors.primary}22` }]} />
-      <View style={[styles.phoneShell, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-        <View style={[styles.phoneScreen, { backgroundColor: `${theme.colors.primary}14` }]} />
-        <View style={[styles.phoneSpeaker, { backgroundColor: theme.colors.border }]} />
-      </View>
-      <View style={[styles.checkBubble, { backgroundColor: "#57dd9b" }]}>
-        <Feather name="check" size={26} color="#ffffff" />
+      <View
+        style={[
+          styles.brandIconShell,
+          { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+        ]}
+      >
+        <Image
+          source={require("../../../assets/icon.png")}
+          style={styles.brandIconImage}
+          resizeMode="cover"
+        />
       </View>
     </View>
   );
@@ -48,9 +58,30 @@ export function OtpLoginForm() {
   const [autoVerifying, setAutoVerifying] = useState(false);
   const lastSubmittedCodeRef = useRef<string | null>(null);
   const verifyRequestIdRef = useRef(0);
-  const { step, busy, error, requestOtp, proceedToCode, verifyOtp, goToIdentifierStep, resetError } = useOtpAuth();
+  const {
+    step,
+    busy,
+    error,
+    requestOtp,
+    proceedToCode,
+    verifyOtp,
+    loginWithGoogleIdToken,
+    goToIdentifierStep,
+    resetError,
+  } = useOtpAuth();
+  const { googleEnabled, googleLoading, googleError, startGoogleLogin, resetGoogleError } =
+    useGoogleAuth(loginWithGoogleIdToken);
+  const enqueueToast = useTopToastStore((state) => state.enqueueToast);
   const { theme } = useAppTheme();
   const isOtpStep = step === "sent" || step === "code";
+  const emailValue = sanitizeEmailIdentifierInput(identifier);
+  const canRequestOtp = isValidEmailIdentifier(emailValue);
+  const otpBusy = busy && !googleLoading;
+  const headerTitle = step === "identifier" ? "Welcome to Flippe" : "Check your email";
+  const headerSubtitle =
+    step === "identifier"
+      ? "Sign in to list products, manage requests, and complete secure exchanges."
+      : "You are one step away from getting back into your account.";
 
   useEffect(() => {
     if (step === "sent" && code.trim().length > 0) {
@@ -59,7 +90,7 @@ export function OtpLoginForm() {
   }, [code, proceedToCode, step]);
 
   useEffect(() => {
-    const sanitizedIdentifier = sanitizeIdentifierInput(identifier);
+    const sanitizedIdentifier = sanitizeEmailIdentifierInput(identifier);
     const sanitizedCode = sanitizeOtpInput(code);
 
     if (!isOtpStep || sanitizedCode.length !== 6 || sanitizedIdentifier.length === 0) {
@@ -93,45 +124,104 @@ export function OtpLoginForm() {
     })();
   }, [autoVerifying, busy, code, identifier, isOtpStep, verifyOtp]);
 
+  useEffect(() => {
+    if (!googleError) {
+      return;
+    }
+
+    enqueueToast({
+      title: "Login failed",
+      message: "Google sign-in could not be completed. Please try again in a moment.",
+      variant: "error",
+      durationMs: 3200,
+    });
+  }, [enqueueToast, googleError]);
+
   return (
     <View style={styles.container}>
+      {googleLoading ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.topAuthLoader,
+            {
+              backgroundColor: theme.mode === "dark" ? "#12253b" : "#eff6ff",
+              borderColor: theme.mode === "dark" ? "#1d4f8c" : "#93c5fd",
+            },
+          ]}
+        >
+          <Spinner size={15} />
+          <Text
+            style={[
+              styles.topAuthLoaderText,
+              { color: theme.mode === "dark" ? "#dbeafe" : "#1e3a8a" },
+            ]}
+          >
+            Signing in with Google...
+          </Text>
+        </View>
+      ) : null}
       <OtpIllustration />
-      <Text style={[styles.title, { color: theme.colors.textPrimary }]}>OTP Verification</Text>
+      <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{headerTitle}</Text>
+      <Text style={[styles.welcomeSubtitle, { color: theme.colors.textMuted }]}>{headerSubtitle}</Text>
 
       {step === "identifier" && (
         <>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>We will send you one-time password to your email or mobile number</Text>
           <View style={styles.entryBlock}>
             <Input
               value={identifier}
               onChangeText={(val) => {
-                setIdentifier(sanitizeIdentifierInput(val));
+                setIdentifier(sanitizeEmailIdentifierInput(val));
                 resetError();
+                resetGoogleError();
               }}
               label=""
-              placeholder="Email or mobile number"
+              placeholder="Email address"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
               returnKeyType="done"
-              error={error}
+              error={otpBusy || !error ? null : error}
               style={styles.identifierInput}
             />
           </View>
           <Button
             label="Get OTP"
-            onPress={() => requestOtp(sanitizeIdentifierInput(identifier))}
-            loading={busy}
-            disabled={identifier.trim().length === 0}
+            onPress={() => requestOtp(emailValue)}
+              loading={otpBusy}
+              disabled={!canRequestOtp || otpBusy || googleLoading}
             style={[styles.primaryButton, { backgroundColor: theme.colors.primary, borderRadius: 999 }]}
             labelStyle={styles.primaryButtonLabel}
           />
+
+          {googleEnabled ? (
+            <>
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+                <Text style={[styles.dividerText, { color: theme.colors.textMuted }]}>or</Text>
+                <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+              </View>
+
+              <Button
+                label="Continue with Google"
+                onPress={() => {
+                  resetError();
+                  void startGoogleLogin();
+                }}
+                loading={googleLoading}
+                disabled={busy}
+                variant="ghost"
+                leftIcon={<Image source={require("../../../assets/google-logo.png")} style={styles.googleLogoIcon} />}
+                style={[styles.googleButton, { borderRadius: 999 }]}
+              />
+            </>
+          ) : null}
         </>
       )}
 
       {isOtpStep && (
         <>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Enter the OTP sent to <Text style={[styles.identifierHighlight, { color: theme.colors.textPrimary }]}>{maskIdentifier(identifier)}</Text></Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Enter the 6-digit code sent to <Text style={[styles.identifierHighlight, { color: theme.colors.textPrimary }]}>{maskIdentifier(identifier)}</Text></Text>
           <Pressable
             onPress={() => {
               setCode("");
@@ -174,7 +264,7 @@ export function OtpLoginForm() {
           <View style={styles.resendRow}>
             <Text style={[styles.resendPrompt, { color: theme.colors.textMuted }]}>Didn't you receive the OTP? </Text>
             <Pressable
-              onPress={() => requestOtp(sanitizeIdentifierInput(identifier))}
+              onPress={() => requestOtp(emailValue)}
               disabled={busy}
               style={({ pressed }) => [{ opacity: pressed || busy ? 0.7 : 1 }]}
             >
@@ -201,70 +291,76 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 18,
     width: "100%",
+    position: "relative",
   },
-  illustrationWrap: {
-    width: 170,
-    height: 170,
+  topAuthLoader: {
+    position: "absolute",
+    top: -18,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  topAuthLoaderText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  illustrationWrap: {
+    width: 196,
+    height: 196,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
   illustrationRing: {
     position: "absolute",
-    width: 132,
-    height: 132,
-    borderRadius: 66,
+    width: 156,
+    height: 156,
+    borderRadius: 78,
     borderWidth: 1,
     borderStyle: "dashed",
   },
   illustrationRingLarge: {
     position: "absolute",
-    width: 152,
-    height: 152,
-    borderRadius: 76,
+    width: 178,
+    height: 178,
+    borderRadius: 89,
     borderWidth: 1,
     borderStyle: "dashed",
   },
-  phoneShell: {
-    width: 78,
-    height: 122,
-    borderRadius: 16,
+  brandIconShell: {
+    width: 126,
+    height: 126,
+    borderRadius: 63,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  phoneScreen: {
-    width: 60,
-    height: 96,
-    borderRadius: 10,
-  },
-  phoneSpeaker: {
-    position: "absolute",
-    top: 10,
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-  },
-  checkBubble: {
-    position: "absolute",
-    right: 44,
-    top: 42,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#57dd9b",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+  brandIconImage: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
   },
   title: {
     fontSize: 30,
     lineHeight: 34,
     fontWeight: "800",
     textAlign: "center",
+  },
+  welcomeSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    maxWidth: 330,
+    marginTop: -6,
   },
   subtitle: {
     fontSize: 14,
@@ -338,6 +434,34 @@ const styles = StyleSheet.create({
     minHeight: 54,
     width: "100%",
     marginTop: 8,
+  },
+  googleButton: {
+    minHeight: 50,
+    width: "100%",
+    marginTop: 4,
+  },
+  googleLogoIcon: {
+    width: 18,
+    height: 18,
+  },
+  dividerRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   primaryButtonLabel: {
     fontSize: 15,

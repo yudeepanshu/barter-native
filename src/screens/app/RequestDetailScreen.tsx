@@ -2,7 +2,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestSummary } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
@@ -300,6 +300,70 @@ function OtpExpiryInfo({
   );
 }
 
+/** Isolated expand/collapse section for a product list. State is local so toggling never re-renders RequestDetailScreen. */
+const ExpandableProductsSection = memo(function ExpandableProductsSection({
+  label,
+  products,
+  onPressProduct,
+}: {
+  label: string;
+  products: ProductSummary[];
+  onPressProduct: (id: string) => void;
+}) {
+  const { theme } = useAppTheme();
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setExpanded((v) => !v)}
+        style={[
+          styles.offerHistoryHeader,
+          { marginTop: 4, paddingVertical: 6, paddingHorizontal: 2 },
+        ]}
+      >
+        <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 }]}>
+          {label} ({products.length})
+        </Text>
+        <Feather
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={16}
+          color={theme.colors.textSecondary}
+        />
+      </Pressable>
+      <SmoothCollapse expanded={expanded} maxHeight={460}>
+        {products.length > 2 ? (
+          <ScrollView style={{ maxHeight: 440 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+            <View style={styles.offeredProducts}>
+              {products.map((product) => (
+                <View key={product.id} style={styles.considerationProductWrap}>
+                  <ProductCard
+                    product={product}
+                    showMeta={false}
+                    onPress={() => onPressProduct(product.id)}
+                  />
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.offeredProducts}>
+            {products.map((product) => (
+              <View key={product.id} style={styles.considerationProductWrap}>
+                <ProductCard
+                  product={product}
+                  showMeta={false}
+                  onPress={() => onPressProduct(product.id)}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </SmoothCollapse>
+    </>
+  );
+});
+
 export default function RequestDetailScreen() {
   const router = useRouter();
   const { theme, statusBarStyle } = useAppTheme();
@@ -352,8 +416,10 @@ export default function RequestDetailScreen() {
   const [txFeedback, setTxFeedback] = useState<string | null>(null);
   const [showCounterOfferForm, setShowCounterOfferForm] = useState(false);
   const [considerationTab, setConsiderationTab] = useState<"yours" | "theirs">("yours");
-  const [expandRequesterProducts, setExpandRequesterProducts] = useState(false);
-  const [expandYourProducts, setExpandYourProducts] = useState(false);
+  const onPressConsiderationProduct = useCallback(
+    (id: string) => { router.push(`/(app)/products/${id}`); },
+    [router],
+  );
   const [contactEmailInput, setContactEmailInput] = useState("");
   const [contactPhoneInput, setContactPhoneInput] = useState("");
   const [contactFieldErrors, setContactFieldErrors] = useState<{
@@ -1029,117 +1095,17 @@ export default function RequestDetailScreen() {
                 ) : null
               )}
               {showingYourProducts ? (
-                <>
-                  <Pressable
-                    onPress={() => setExpandYourProducts((current) => !current)}
-                    style={[
-                      styles.offerHistoryHeader,
-                      {
-                        marginTop: 4,
-                        paddingVertical: 6,
-                        paddingHorizontal: 2,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 }]}> 
-                      Yours ({activeProducts.length})
-                    </Text>
-                    <Feather
-                      name={expandYourProducts ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color={theme.colors.textSecondary}
-                    />
-                  </Pressable>
-                  <SmoothCollapse expanded={expandYourProducts} maxHeight={460}>
-                    {activeProducts.length > 2 ? (
-                      <ScrollView
-                        style={{ maxHeight: 440 }}
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                      >
-                        <View style={styles.offeredProducts}>
-                          {activeProducts.map((product) => (
-                            <View key={product.id} style={styles.considerationProductWrap}>
-                              <ProductCard
-                                product={product}
-                                showMeta={false}
-                                onPress={() => router.push(`/(app)/products/${product.id}`)}
-                              />
-                            </View>
-                          ))}
-                        </View>
-                      </ScrollView>
-                    ) : (
-                      <View style={styles.offeredProducts}>
-                        {activeProducts.map((product) => (
-                          <View key={product.id} style={styles.considerationProductWrap}>
-                            <ProductCard
-                              product={product}
-                              showMeta={false}
-                              onPress={() => router.push(`/(app)/products/${product.id}`)}
-                            />
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </SmoothCollapse>
-                </>
+                <ExpandableProductsSection
+                  label="Yours"
+                  products={activeProducts}
+                  onPressProduct={onPressConsiderationProduct}
+                />
               ) : showingRequesterProducts ? (
-                <>
-                  <Pressable
-                    onPress={() => setExpandRequesterProducts((current) => !current)}
-                    style={[
-                      styles.offerHistoryHeader,
-                      {
-                        marginTop: 4,
-                        paddingVertical: 6,
-                        paddingHorizontal: 2,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 }]}>
-                      Requester's Products ({activeProducts.length})
-                    </Text>
-                    <Feather
-                      name={expandRequesterProducts ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color={theme.colors.textSecondary}
-                    />
-                  </Pressable>
-                  <SmoothCollapse expanded={expandRequesterProducts} maxHeight={460}>
-                    {activeProducts.length > 2 ? (
-                      <ScrollView
-                        style={{ maxHeight: 440 }}
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                      >
-                        <View style={styles.offeredProducts}>
-                          {activeProducts.map((product) => (
-                            <View key={product.id} style={styles.considerationProductWrap}>
-                              <ProductCard
-                                product={product}
-                                showMeta={false}
-                                onPress={() => router.push(`/(app)/products/${product.id}`)}
-                              />
-                            </View>
-                          ))}
-                        </View>
-                      </ScrollView>
-                    ) : (
-                      <View style={styles.offeredProducts}>
-                        {activeProducts.map((product) => (
-                          <View key={product.id} style={styles.considerationProductWrap}>
-                            <ProductCard
-                              product={product}
-                              showMeta={false}
-                              onPress={() => router.push(`/(app)/products/${product.id}`)}
-                            />
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </SmoothCollapse>
-                </>
+                <ExpandableProductsSection
+                  label="Requester's Products"
+                  products={activeProducts}
+                  onPressProduct={onPressConsiderationProduct}
+                />
               ) : activeProducts.length > 2 ? (
                 <ScrollView
                   style={{ maxHeight: 440 }}

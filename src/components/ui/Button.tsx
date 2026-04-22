@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
+  View,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -20,6 +22,7 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
   textColor?: string;
+  leftIcon?: ReactNode;
 }
 
 export function Button({
@@ -31,6 +34,7 @@ export function Button({
   style,
   labelStyle,
   textColor,
+  leftIcon,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const { theme } = useAppTheme();
@@ -79,9 +83,12 @@ export function Button({
       {loading ? (
         <ActivityIndicator size={18} color={loadingColor} />
       ) : (
-        <Text style={[styles.label, { color: labelColor }, labelStyle]}>
-          {label}
-        </Text>
+        <View style={styles.content}>
+          {leftIcon ? <View style={styles.iconWrap}>{leftIcon}</View> : null}
+          <Text style={[styles.label, { color: labelColor }, labelStyle]}>
+            {label}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -94,6 +101,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
     overflow: "hidden",
+  },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconWrap: {
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   label: {
     fontSize: 15.5,

@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -20,38 +20,55 @@ export function SmoothCollapse({
   expanded,
   children,
   maxHeight = 360,
-  durationMs = 420,
+  durationMs = 180,
   style,
 }: SmoothCollapseProps) {
-  const progress = useSharedValue(expanded ? 1 : 0);
   const measuredHeight = useSharedValue(0);
+  const animatedHeight = useSharedValue(expanded ? maxHeight : 0);
+
+  const animateTo = (nextHeight: number) => {
+    cancelAnimation(animatedHeight);
+    animatedHeight.value = withTiming(nextHeight, {
+      duration: durationMs,
+      easing: Easing.out(Easing.cubic),
+    });
+  };
 
   useEffect(() => {
-    progress.value = withTiming(expanded ? 1 : 0, {
-      duration: durationMs,
-      easing: Easing.bezier(0.2, 0.0, 0.0, 1.0),
-    });
-  }, [expanded, durationMs, progress]);
+    const targetHeight = expanded
+      ? measuredHeight.value > 0
+        ? measuredHeight.value
+        : maxHeight
+      : 0;
+
+    animateTo(targetHeight);
+  }, [expanded, durationMs, maxHeight, measuredHeight]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
-    if (nextHeight > 0 && nextHeight !== measuredHeight.value) {
+    if (nextHeight > 0 && Math.abs(nextHeight - measuredHeight.value) > 1) {
+      const hadMeasurement = measuredHeight.value > 0;
       measuredHeight.value = nextHeight;
+
+      if (expanded) {
+        if (!hadMeasurement) {
+          // First real measurement after expand: adjust with animation.
+          animateTo(nextHeight);
+        } else {
+          // Content-driven layout updates can fire many times; avoid restarting timing animation.
+          animatedHeight.value = nextHeight;
+        }
+      }
     }
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const resolvedHeight = measuredHeight.value > 0 ? measuredHeight.value : maxHeight;
-
-    return {
-      height: interpolate(progress.value, [0, 1], [0, resolvedHeight]),
-      opacity: interpolate(progress.value, [0, 1], [0, 1]),
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: animatedHeight.value,
+  }));
 
   return (
     <Animated.View style={[styles.container, style, animatedStyle]}>
-      <View style={styles.inner} onLayout={handleLayout}>
+      <View style={styles.inner} onLayout={handleLayout} collapsable={false}>
         {children}
       </View>
     </Animated.View>

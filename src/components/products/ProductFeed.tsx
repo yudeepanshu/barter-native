@@ -33,9 +33,8 @@ import {
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { AppCard } from "@/components/ui/AppCard";
+import { CollapsibleHeaderCard } from "@/components/ui/CollapsibleHeaderCard";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
-import { SmoothCollapse } from "@/components/ui/SmoothCollapse";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { FilterChip } from "@/components/filters/FilterChip";
 import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
@@ -70,6 +69,106 @@ function getDistanceKm(
   return earthRadiusKm * c;
 }
 
+interface FeedHeaderCardProps {
+  userName: string;
+  filterState: {
+    search: string;
+    setSearch: (value: string) => void;
+    isSearchDebouncing: boolean;
+    proximity: { latitude: number; longitude: number; radiusKm: number } | null;
+  };
+  activeFilterCount: number;
+  freeOnly: boolean;
+  onToggleFree: () => void;
+  onOpenFilters: () => void;
+  onOpenSort: () => void;
+  productCount: number;
+  onOpenNotificationsPanel: () => void;
+  unreadCount: number;
+  isBackgroundRefreshing: boolean;
+}
+
+function FeedHeaderCard({
+  userName,
+  filterState,
+  activeFilterCount,
+  freeOnly,
+  onToggleFree,
+  onOpenFilters,
+  onOpenSort,
+  productCount,
+  onOpenNotificationsPanel,
+  unreadCount,
+  isBackgroundRefreshing,
+}: FeedHeaderCardProps) {
+  const { theme } = useAppTheme();
+
+  return (
+    <CollapsibleHeaderCard
+      title={`Hello, ${userName}`}
+      subtitle="Discover listings near you"
+      subtitleRight={
+        isBackgroundRefreshing || filterState.isSearchDebouncing ? (
+          <ActivityIndicator size={12} color={theme.colors.textMuted} />
+        ) : null
+      }
+      rightActions={
+        <Pressable
+          onPress={() => void onOpenNotificationsPanel()}
+          style={[
+            styles.notificationBell,
+            { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+          ]}
+        >
+          <Feather name="bell" size={18} color={theme.colors.textPrimary} />
+          {unreadCount > 0 ? (
+            <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}>
+              <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
+      }
+      collapseMaxHeight={320}
+      collapseDurationMs={160}
+    >
+      <View style={{ marginTop: 10 }}>
+        <Input
+          label=""
+          placeholder="Try bicycle, books, guitar..."
+          value={filterState.search}
+          onChangeText={filterState.setSearch}
+        />
+      </View>
+      <ListControlsRow
+        activeFilterCount={activeFilterCount}
+        freeOnly={freeOnly}
+        onOpenFilters={onOpenFilters}
+        onOpenSort={onOpenSort}
+        onToggleFree={onToggleFree}
+      />
+      <View style={styles.listSummaryRow}>
+        <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}>
+          Showing {productCount} listings
+        </Text>
+        <Text
+          style={[
+            styles.listSummaryText,
+            styles.listSummarySecondaryText,
+            { color: theme.colors.textMuted },
+            !filterState.proximity?.radiusKm && styles.listSummarySecondaryHidden,
+          ]}
+        >
+          {filterState.proximity?.radiusKm
+            ? `Within ${filterState.proximity.radiusKm} km`
+            : "Within 0 km"}
+        </Text>
+      </View>
+    </CollapsibleHeaderCard>
+  );
+}
+
 interface ProductFeedProps {
   userId: string;
   userName: string;
@@ -92,7 +191,6 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const [freeOnly, setFreeOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOrder>("newest");
   const [isDiscoveryReady, setIsDiscoveryReady] = useState(false);
-  const [showHeaderFilters, setShowHeaderFilters] = useState(true);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [draftCategoryIds, setDraftCategoryIds] = useState<string[]>([]);
   const [draftRadiusKm, setDraftRadiusKm] = useState<number | null>(null);
@@ -372,16 +470,18 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     }
   };
 
-  const onOpenNotificationsPanel = () => {
-    setShowNotifications(true);
-  };
+  const onToggleFree = useCallback(() => setFreeOnly((c) => !c), []);
 
-  const onOpenFilters = () => {
+  const onOpenNotificationsPanel = useCallback(() => {
+    setShowNotifications(true);
+  }, []);
+
+  const onOpenFilters = useCallback(() => {
     setDraftCategoryIds(selectedCategoryIds);
     setDraftRadiusKm(permission === "granted" ? (filterState.proximity?.radiusKm ?? null) : null);
     setDraftTradeType(selectedTradeType);
     setShowFilterModal(true);
-  };
+  }, [selectedCategoryIds, permission, filterState.proximity?.radiusKm, selectedTradeType]);
 
   const onRequestEnableNearby = async () => {
     if (permission === "granted") {
@@ -432,9 +532,9 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     setShowFilterModal(false);
   };
 
-  const onOpenSortPicker = () => {
+  const onOpenSortPicker = useCallback(() => {
     setShowSortModal(true);
-  };
+  }, []);
 
   const onSelectSort = async (nextSort: SortOrder) => {
     if (nextSort === "nearest" && !viewerLocation) {
@@ -505,108 +605,25 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     <>
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.listHeaderWrap}>
-          <AppCard>
-            <View style={styles.headerContent}>
-              <View style={styles.greetingRow}>
-                <View style={styles.greetingContent}>
-                  <View style={styles.greetingTitleRow}>
-                    <Text
-                      style={[styles.greeting, { color: theme.colors.textPrimary }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      Hello, {userName}
-                    </Text>
-                    <Pressable
-                      onPress={() => setShowHeaderFilters((current) => !current)}
-                      style={[
-                        styles.headerToggleButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: theme.colors.surfaceMuted,
-                        },
-                      ]}
-                    >
-                      <Feather
-                        name={showHeaderFilters ? "chevron-up" : "chevron-down"}
-                        size={16}
-                        color={theme.colors.textSecondary}
-                      />
-                    </Pressable>
-                  </View>
-                  <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                    Discover high-value listings near you
-                  </Text>
-                  {isBackgroundRefreshing ? (
-                    <View style={styles.refreshHintRow}>
-                      <ActivityIndicator size={12} color={theme.colors.textMuted} />
-                      <Text style={[styles.refreshHintText, { color: theme.colors.textMuted }]}>Refreshing in background</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <Pressable
-                  onPress={() => void onOpenNotificationsPanel()}
-                  style={[
-                    styles.notificationBell,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surfaceMuted,
-                    },
-                  ]}
-                >
-                  <Feather name="bell" size={18} color={theme.colors.textPrimary} />
-                  {unreadCount > 0 ? (
-                    <View style={[styles.notificationBadge, { backgroundColor: theme.colors.danger }]}> 
-                      <Text style={[styles.notificationBadgeText, { color: theme.colors.onPrimary }]}> 
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-              </View>
-
-              <SmoothCollapse expanded={showHeaderFilters} maxHeight={340}>
-                <View style={styles.collapseContent}>
-                  <Input
-                    label=""
-                    placeholder="Try bicycle, books, guitar..."
-                    value={filterState.search}
-                    onChangeText={filterState.setSearch}
-                  />
-                  {filterState.isSearchDebouncing ? (
-                    <Text style={[styles.searchHint, { color: theme.colors.textMuted }]}>Updating results...</Text>
-                  ) : null}
-
-                  <ListControlsRow
-                    activeFilterCount={activeFilterCount}
-                    freeOnly={freeOnly}
-                    onOpenFilters={onOpenFilters}
-                    onOpenSort={onOpenSortPicker}
-                    onToggleFree={() => setFreeOnly((current) => !current)}
-                  />
-
-                  <View style={styles.listSummaryRow}>
-                    <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}> 
-                      Showing {visibleProducts.length} listings
-                    </Text>
-                    {filterState.proximity?.radiusKm ? (
-                      <Text style={[styles.listSummaryText, { color: theme.colors.textMuted }]}> 
-                        Within {filterState.proximity.radiusKm} km
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </SmoothCollapse>
-            </View>
-          </AppCard>
+          <FeedHeaderCard
+            userName={userName}
+            filterState={filterState}
+            activeFilterCount={activeFilterCount}
+            freeOnly={freeOnly}
+            onToggleFree={onToggleFree}
+            onOpenFilters={onOpenFilters}
+            onOpenSort={onOpenSortPicker}
+            productCount={visibleProducts.length}
+            onOpenNotificationsPanel={onOpenNotificationsPanel}
+            unreadCount={unreadCount}
+            isBackgroundRefreshing={isBackgroundRefreshing}
+          />
         </View>
 
         <FlatList
           data={visibleProducts}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          removeClippedSubviews
           initialNumToRender={6}
           maxToRenderPerBatch={8}
           windowSize={7}
@@ -952,35 +969,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: 16, paddingBottom: 108, paddingTop: 2, gap: 2 },
   listHeaderWrap: { marginBottom: 10, paddingHorizontal: 16, paddingTop: 16 },
-  headerContent: {
-    gap: 0,
-  },
-  headerSection: {
-    gap: 14,
-    marginBottom: 12,
-  },
-  greetingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  greetingContent: { flexGrow: 1, flexShrink: 1, minWidth: 180, paddingRight: 2 },
-  greetingTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minWidth: 0,
-  },
-  headerToggleButton: {
-    width: 30,
-    height: 30,
-    borderWidth: 1,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   notificationBell: {
     width: 40,
     height: 40,
@@ -1004,24 +992,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
-  greeting: { flexShrink: 1, fontSize: 24, lineHeight: 29, fontWeight: "800" },
-  subtitle: { fontSize: 14, marginTop: 3 },
-  refreshHintRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  refreshHintText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  collapseContent: {
-    paddingTop: 10,
-    gap: 10,
-    paddingBottom: 2,
-  },
-  searchHint: { fontSize: 12, marginTop: 0 },
   listSummaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1031,6 +1001,13 @@ const styles = StyleSheet.create({
   listSummaryText: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  listSummarySecondaryText: {
+    minWidth: 96,
+    textAlign: "right",
+  },
+  listSummarySecondaryHidden: {
+    opacity: 0,
   },
   endListWrap: {
     alignItems: "center",

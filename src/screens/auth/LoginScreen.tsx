@@ -33,8 +33,6 @@ export default function LoginScreen() {
         >
           <OtpLoginForm />
         </View>
-
-        <Text style={[styles.footerCopy, { color: theme.colors.textMuted }]}>Secure sign-in for listings, requests, and exchange verification.</Text>
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -47,7 +45,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 44,
     paddingBottom: 16,
     gap: 18,
   },

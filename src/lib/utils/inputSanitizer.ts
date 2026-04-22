@@ -43,6 +43,14 @@ export function sanitizeIdentifierInput(value: string): string {
   return hasPlus ? `+${digits}` : digits.slice(0, 10);
 }
 
+export function sanitizeEmailIdentifierInput(value: string): string {
+  return sanitizeSingleLineInput(value, 320).toLowerCase().trimStart();
+}
+
+export function isValidEmailIdentifier(value: string): boolean {
+  return /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
+}
+
 export function sanitizeOtpInput(value: string): string {
   return value.replace(/\D+/g, "").slice(0, 6);
 }

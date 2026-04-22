@@ -1,10 +1,12 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "expo-router";
+import type { VerifyOtpResult } from "@barter/types";
 import { ApiClient } from "@barter/api-client";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
-import { sanitizeIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
+import { sanitizeEmailIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
 
 const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again.";
 const OTP_INVALID_ERROR_MESSAGE = "Invalid OTP. Please try again.";
@@ -18,6 +20,7 @@ interface UseOtpAuthReturn {
   requestOtp: (identifier: string) => Promise<void>;
   proceedToCode: () => void;
   verifyOtp: (identifier: string, code: string) => Promise<boolean>;
+  loginWithGoogleIdToken: (idToken: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   goToIdentifierStep: () => void;
   resetError: () => void;
@@ -33,20 +36,29 @@ export function useOtpAuth(): UseOtpAuthReturn {
   const clearSession = useAuthStore((s) => s.clearSession);
   const session = useAuthStore((s) => s.session);
 
+  const completeAuthenticatedSession = useCallback(
+    (payload: VerifyOtpResult) => {
+      setSession({ user: payload.user, tokens: payload.tokens });
+
+      if (needsProfileCompletion(payload.user.userName)) {
+        router.replace("/(app)/complete-profile");
+      }
+    },
+    [router, setSession],
+  );
+
   const resetError = useCallback(() => setError(null), []);
 
   const requestOtp = useCallback(async (identifier: string) => {
     setBusy(true);
     setError(null);
     try {
-      const sanitizedIdentifier = sanitizeIdentifierInput(identifier);
+      const sanitizedIdentifier = sanitizeEmailIdentifierInput(identifier);
       await mobileApiClient.requestOtp({ identifier: sanitizedIdentifier });
+      setStep("sent");
     } catch {
       setError(OTP_GENERIC_ERROR_MESSAGE);
     } finally {
-      // TEMPORARY: Allow users to proceed to OTP entry even when request-otp fails.
-      // We currently fetch OTP from logs for testing until sender reliability is fixed.
-      setStep("sent");
       setBusy(false);
     }
   }, []);
@@ -61,17 +73,12 @@ export function useOtpAuth(): UseOtpAuthReturn {
       setBusy(true);
       setError(null);
       try {
-        const sanitizedIdentifier = sanitizeIdentifierInput(identifier);
+        const sanitizedIdentifier = sanitizeEmailIdentifierInput(identifier);
         const sanitizedCode = sanitizeOtpInput(code);
         const envelope = await mobileApiClient.verifyOtp({ identifier: sanitizedIdentifier, code: sanitizedCode });
         const payload = envelope.data;
         if (!payload) throw new Error("No payload returned from server");
-        // setSession writes to Zustand; persist middleware persists to SecureStore
-        setSession({ user: payload.user, tokens: payload.tokens });
-
-        if (needsProfileCompletion(payload.user.userName)) {
-          router.replace("/(app)/complete-profile");
-        }
+        completeAuthenticatedSession(payload);
 
         return true;
       } catch (err) {
@@ -81,7 +88,31 @@ export function useOtpAuth(): UseOtpAuthReturn {
         setBusy(false);
       }
     },
-    [router, setSession],
+    [completeAuthenticatedSession],
+  );
+
+  const loginWithGoogleIdToken = useCallback(
+    async (idToken: string) => {
+      setBusy(true);
+      setError(null);
+
+      try {
+        const envelope = await mobileApiClient.loginWithGoogle({ idToken: idToken.trim() });
+        const payload = envelope.data;
+
+        if (!payload) {
+          throw new Error("No payload returned from server");
+        }
+
+        completeAuthenticatedSession(payload);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [completeAuthenticatedSession],
   );
 
   const signOut = useCallback(async () => {
@@ -94,6 +125,13 @@ export function useOtpAuth(): UseOtpAuthReturn {
       // Best-effort logout call: even if network fails, clear local session.
     }
 
+    try {
+      // Clear Google SDK cached account so next login can re-prompt account chooser.
+      await GoogleSignin.signOut();
+    } catch {
+      // Ignore: user may have no active Google session in SDK cache.
+    }
+
     await clearSession();
     setStep("identifier");
     setError(null);
@@ -104,7 +142,18 @@ export function useOtpAuth(): UseOtpAuthReturn {
     setError(null);
   }, []);
 
-  return { step, busy, error, requestOtp, proceedToCode, verifyOtp, signOut, goToIdentifierStep, resetError };
+  return {
+    step,
+    busy,
+    error,
+    requestOtp,
+    proceedToCode,
+    verifyOtp,
+    loginWithGoogleIdToken,
+    signOut,
+    goToIdentifierStep,
+    resetError,
+  };
 }
 
 function getSafeOtpErrorMessage(err: unknown): string {

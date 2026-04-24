@@ -7,10 +7,11 @@ interface PageHeaderCardProps extends PropsWithChildren {
   title: string;
   subtitle?: string;
   rightSlot?: ReactNode;
+  footerSlot?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function PageHeaderCard({ title, subtitle, rightSlot, style, children }: PageHeaderCardProps) {
+export function PageHeaderCard({ title, subtitle, rightSlot, footerSlot, style, children }: PageHeaderCardProps) {
   const { theme } = useAppTheme();
 
   return (
@@ -34,6 +35,8 @@ export function PageHeaderCard({ title, subtitle, rightSlot, style, children }: 
       ) : null}
 
       {children ? <View style={styles.content}>{children}</View> : null}
+
+      {footerSlot ? <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>{footerSlot}</View> : null}
     </View>
   );
 }
@@ -66,5 +69,10 @@ const styles = StyleSheet.create({
   },
   content: {
     marginTop: 10,
+  },
+  footer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
 });

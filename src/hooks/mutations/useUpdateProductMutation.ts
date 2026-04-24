@@ -15,9 +15,9 @@ export function useUpdateProductMutation(productId: string) {
       }
       return envelope.data;
     },
-    onSuccess: async (updatedProduct) => {
+    onSuccess: (updatedProduct) => {
       syncProductEntity(queryClient, updatedProduct);
-      await Promise.all([
+      void Promise.all([
         invalidateProductCollections(queryClient),
         invalidateRequestCollections(queryClient),
       ]);

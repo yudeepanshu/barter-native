@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -37,22 +37,38 @@ export function SwipeableBottomSheet({
 }: SwipeableBottomSheetProps) {
   const { theme } = useAppTheme();
   const [dragOffset, setDragOffset] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const dragStartY = useRef(0);
 
   useEffect(() => {
     if (!visible) {
       setDragOffset(0);
+      setKeyboardHeight(0);
     }
   }, [visible]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const keyboardWillShowListener = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const keyboardWillHideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.keyboardWrap}
-        >
+        <View style={styles.keyboardWrap}>
           <View
             style={[
               styles.sheet,
@@ -61,6 +77,7 @@ export function SwipeableBottomSheet({
                 maxHeight,
                 minHeight,
                 transform: [{ translateY: dragOffset }],
+                marginBottom: keyboardHeight,
               },
               sheetStyle,
             ]}
@@ -107,7 +124,7 @@ export function SwipeableBottomSheet({
               {children}
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );

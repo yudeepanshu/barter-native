@@ -18,15 +18,10 @@ import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
 import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import {
-  askImageSource,
-  requestCameraPermission,
-  requestMediaLibraryPermission,
-  launchCamera,
-  launchImageLibrary,
+  pickListingImages,
   uploadImages as uploadProductImages,
   LISTING_FORM_ERRORS,
 } from "@/lib/forms/listingFormUtils";
-import { validateImageAssets } from "@/lib/utils/imageValidation";
 import {
   sanitizeDescriptionInput,
   sanitizeLocationNameInput,
@@ -66,11 +61,6 @@ export function useEditListingForm(
   const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const pickImages = async () => {
-    const source = await askImageSource(dialog);
-    if (!source) {
-      return;
-    }
-
     const remainingSlots = CREATE_LISTING_RULES.MAX_IMAGES - (existingImages.length + newImages.length);
     if (remainingSlots <= 0) {
       setFieldErrors((prev) => ({
@@ -80,52 +70,16 @@ export function useEditListingForm(
       return;
     }
 
-    if (source === "camera") {
-      const hasPermission = await requestCameraPermission();
-      if (!hasPermission) {
-        setFormError(LISTING_FORM_ERRORS.CAMERA_PERMISSION);
-        return;
-      }
+    const { assets, error } = await pickListingImages({ dialog, selectionLimit: remainingSlots, fallbackError: toErrorMessage });
 
-      const result = await launchCamera();
-      if (!result.canceled && result.assets.length > 0) {
-        // NEW: Validate before adding to state
-        const validationResults = await validateImageAssets(result.assets);
-        
-        // Collect first error, if any
-        const firstError = validationResults.find((r) => !r.isValid);
-        if (firstError?.error) {
-          setFormError(firstError.error);
-          return; // Don't add invalid image
-        }
-
-        // All passed; add valid images only
-        setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
-        setFieldErrors((prev) => ({ ...prev, images: undefined }));
-      }
+    if (error) {
+      setFormError(error);
       return;
     }
 
-    const hasPermission = await requestMediaLibraryPermission();
-    if (!hasPermission) {
-      setFormError(LISTING_FORM_ERRORS.MEDIA_PERMISSION);
-      return;
-    }
-
-    const result = await launchImageLibrary(remainingSlots);
-    if (!result.canceled) {
-      // NEW: Validate before adding to state
-      const validationResults = await validateImageAssets(result.assets);
-      
-      // Check for errors
-      const firstError = validationResults.find((r) => !r.isValid);
-      if (firstError?.error) {
-        setFormError(firstError.error);
-        return; // Don't add invalid images
-      }
-
-      // All passed; add valid images only
-      setNewImages((prev) => [...prev, ...result.assets].slice(0, prev.length + remainingSlots));
+    if (assets.length > 0) {
+      setFormError(null);
+      setNewImages((prev) => [...prev, ...assets].slice(0, prev.length + remainingSlots));
       setFieldErrors((prev) => ({ ...prev, images: undefined }));
     }
   };

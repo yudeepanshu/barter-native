@@ -13,6 +13,7 @@ interface CollapsibleHeaderCardProps extends PropsWithChildren {
   subtitleRight?: ReactNode;
   /** Extra action buttons rendered to the left of the collapse toggle (e.g. notification bell). */
   rightActions?: ReactNode;
+  footerSlot?: ReactNode;
   collapseMaxHeight?: number;
   collapseDurationMs?: number;
   defaultExpanded?: boolean;
@@ -28,6 +29,7 @@ export function CollapsibleHeaderCard({
   subtitle,
   subtitleRight,
   rightActions,
+  footerSlot,
   collapseMaxHeight = 360,
   collapseDurationMs = 180,
   defaultExpanded = false,
@@ -77,6 +79,7 @@ export function CollapsibleHeaderCard({
       <SmoothCollapse expanded={expanded} maxHeight={collapseMaxHeight} durationMs={collapseDurationMs}>
         <View style={styles.collapseContent}>{children}</View>
       </SmoothCollapse>
+      {footerSlot ? <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>{footerSlot}</View> : null}
     </View>
   );
 }
@@ -128,5 +131,9 @@ const styles = StyleSheet.create({
   collapseContent: {
     gap: 10,
     paddingBottom: 2,
+  },
+  footer: {
+    marginTop: 12,
+    paddingTop: 12,
   },
 });

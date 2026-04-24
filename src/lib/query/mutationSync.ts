@@ -6,6 +6,7 @@ import type {
   ProductSummary,
   RequestMutationResult,
   TransactionSummary,
+  RequestsListResult
 } from "@barter/types";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppStore } from "@/lib/store/appStore";
@@ -79,6 +80,38 @@ function sortOffers(
   });
 }
 
+// Patches the request's status/currentTurn in-place in both infinite list caches so
+// the UI reflects the mutation result synchronously, before the background refetch completes.
+function patchRequestInLists(
+  queryClient: QueryClient,
+  request: RequestMutationResult["request"],
+) {
+  const applyPatch = (existing: InfiniteData<RequestsListResult> | undefined) => {
+    if (!existing) return existing;
+    return {
+      ...existing,
+      pages: existing.pages.map((page) => ({
+        ...page,
+        items: page.items.map((item) =>
+          item.id === request.id
+            ? { ...item, status: request.status, currentTurn: request.currentTurn }
+            : item,
+        ),
+      })),
+    };
+  };
+
+  queryClient.setQueriesData<InfiniteData<RequestsListResult>>(
+    { queryKey: ["requests", "sent", "infinite"] },
+    applyPatch,
+  );
+
+  queryClient.setQueriesData<InfiniteData<RequestsListResult>>(
+    { queryKey: ["requests", "received", "infinite"] },
+    applyPatch,
+  );
+}
+
 export function syncRequestMutationResult(
   queryClient: QueryClient,
   result: RequestMutationResult | null | undefined,
@@ -92,6 +125,8 @@ export function syncRequestMutationResult(
 
   store.upsertRequest(request);
   store.upsertOffers(request.id, request.offers ?? []);
+
+  patchRequestInLists(queryClient, request);
 
   queryClient.setQueryData(queryKeys.requests.detail(request.id), request);
 

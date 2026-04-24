@@ -5,7 +5,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 
 type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
 
-export type ProductTagTone = "mint" | "amber" | "violet" | "blue" | "teal" | "slate" | "rose";
+export type ProductTagTone = "mint" | "amber" | "violet" | "blue" | "teal" | "slate" | "rose" | "orange";
 
 export interface ProductTagSpec {
   label: string;
@@ -96,6 +96,16 @@ const TAG_TONES: Record<
       dark: { bg: "#3f0c17", border: "#fb7185", text: "#fda4af" },
     },
   },
+  orange: {
+    top: {
+      light: { bg: "#fff7ed", border: "#fdba74", text: "#c2410c" },
+      dark: { bg: "#3c1a00", border: "#f97316", text: "#fdba74" },
+    },
+    bottom: {
+      light: { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" },
+      dark: { bg: "#3c1a00", border: "#f97316", text: "#fdba74" },
+    },
+  },
 };
 
 export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
@@ -116,7 +126,7 @@ export function getContextTag(product: ProductSummary, isRequested: boolean): Pr
       return { label: "Reserved for you", tone: "blue", icon: "lock" };
     }
 
-    return { label: "Popular now", tone: "amber", icon: "trending-up" };
+    return { label: "Popular now", tone: "orange", icon: "trending-up" };
   }
 
   if (isRequested) {

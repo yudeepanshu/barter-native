@@ -16,9 +16,9 @@ export function useRelistProductMutation() {
       const result = await mobileApiClient.relistProduct(productId);
       return result.data ?? null;
     },
-    onSuccess: async (updated) => {
+    onSuccess: (updated) => {
       if (!updated) {
-        await Promise.all([
+        void Promise.all([
           invalidateProductCollections(queryClient),
           invalidateRequestCollections(queryClient),
         ]);
@@ -26,7 +26,7 @@ export function useRelistProductMutation() {
       }
 
       syncProductEntity(queryClient, updated);
-      await invalidateRequestCollections(queryClient);
+      void invalidateRequestCollections(queryClient);
     },
   });
 }

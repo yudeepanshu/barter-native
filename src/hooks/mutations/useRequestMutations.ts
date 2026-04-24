@@ -50,9 +50,9 @@ export function useCreateRequestMutation() {
         throw error;
       }
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       syncRequestMutationResult(queryClient, result);
-      await invalidateRequestCollectionByScope(queryClient, "sent");
+      void invalidateRequestCollectionByScope(queryClient, "sent");
     },
   });
 }
@@ -72,7 +72,7 @@ export function useAcceptRequestMutation() {
         throw error;
       }
     },
-    onSuccess: async (result, requestId) => {
+    onSuccess: (result, requestId) => {
       const viewerId = useAppStore.getState().profile?.id;
       const invalidateScope =
         viewerId && result?.request
@@ -84,7 +84,7 @@ export function useAcceptRequestMutation() {
           : null;
 
       syncRequestMutationResult(queryClient, result);
-      await Promise.all([
+      void Promise.all([
         invalidateScope
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
@@ -109,7 +109,7 @@ export function useRejectRequestMutation() {
         throw error;
       }
     },
-    onSuccess: async (result, requestId) => {
+    onSuccess: (result, requestId) => {
       const viewerId = useAppStore.getState().profile?.id;
       const invalidateScope =
         viewerId && result?.request
@@ -121,7 +121,7 @@ export function useRejectRequestMutation() {
           : null;
 
       syncRequestMutationResult(queryClient, result);
-      await Promise.all([
+      void Promise.all([
         invalidateScope
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
@@ -147,7 +147,7 @@ export function useCancelRequestMutation() {
         throw error;
       }
     },
-    onSuccess: async (result, variables) => {
+    onSuccess: (result, variables) => {
       const viewerId = useAppStore.getState().profile?.id;
       const invalidateScope =
         viewerId && result?.request
@@ -159,7 +159,7 @@ export function useCancelRequestMutation() {
           : null;
 
       syncRequestMutationResult(queryClient, result);
-      await Promise.all([
+      void Promise.all([
         invalidateScope
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
@@ -241,9 +241,9 @@ export function useRequestContactRevealMutation() {
         throw error;
       }
     },
-    onSuccess: async (result, variables) => {
+    onSuccess: (result, variables) => {
       syncRequestMutationResult(queryClient, result);
-      await invalidateTransactionForRequest(queryClient, variables.requestId);
+      void invalidateTransactionForRequest(queryClient, variables.requestId);
     },
   });
 }
@@ -274,9 +274,9 @@ export function useRespondContactRevealMutation() {
         throw error;
       }
     },
-    onSuccess: async (result, variables) => {
+    onSuccess: (result, variables) => {
       syncRequestMutationResult(queryClient, result);
-      await invalidateTransactionForRequest(queryClient, variables.requestId);
+      void invalidateTransactionForRequest(queryClient, variables.requestId);
     },
   });
 }

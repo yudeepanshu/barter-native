@@ -16,9 +16,9 @@ export function useUnlistProductMutation() {
       const result = await mobileApiClient.updateProduct(productId, { isListed: false });
       return result.data ?? null;
     },
-    onSuccess: async (updated) => {
+    onSuccess: (updated) => {
       if (!updated) {
-        await Promise.all([
+        void Promise.all([
           invalidateProductCollections(queryClient),
           invalidateRequestCollections(queryClient),
         ]);
@@ -26,7 +26,7 @@ export function useUnlistProductMutation() {
       }
 
       syncProductEntity(queryClient, updated);
-      await invalidateRequestCollections(queryClient);
+      void invalidateRequestCollections(queryClient);
     },
   });
 }

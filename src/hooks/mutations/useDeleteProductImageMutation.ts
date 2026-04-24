@@ -13,8 +13,8 @@ export function useDeleteProductImageMutation(productId: string) {
       await mobileApiClient.deleteProductImage(productId, imageId);
       return imageId;
     },
-    onSuccess: async () => {
-      await Promise.all([
+    onSuccess: () => {
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) }),
         invalidateProductCollections(queryClient),
       ]);

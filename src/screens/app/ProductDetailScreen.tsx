@@ -37,6 +37,7 @@ import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
+import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -62,6 +63,10 @@ export default function ProductDetailScreen() {
   const query = useProductQuery(productId);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
   const productData = query.data ?? null;
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
@@ -292,9 +297,13 @@ export default function ProductDetailScreen() {
                 }}
                 style={[styles.imageCarousel, { width: imageFrameSize, backgroundColor: theme.colors.surfaceMuted }]}
               >
-                {product.productImages.map((image) => (
-                  <View
+                {product.productImages.map((image, index) => (
+                  <Pressable
                     key={image.id}
+                    onPress={() => {
+                      setPreviewIndex(index);
+                      setPreviewVisible(true);
+                    }}
                     style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted, flexShrink: 0 }]}
                   >
                     <AppImage
@@ -303,7 +312,7 @@ export default function ProductDetailScreen() {
                     />
                     {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
                     {isOwner && image.isPrimary ? <Text style={styles.imagePrimaryBadge}>Primary</Text> : null}
-                  </View>
+                  </Pressable>
                 ))}
               </ScrollView>
 
@@ -393,6 +402,13 @@ export default function ProductDetailScreen() {
               initialOfferedProductId={offeredProductId}
             />
           ) : null}
+
+          <ImagePreviewModal
+            images={product.productImages}
+            initialIndex={previewIndex}
+            visible={previewVisible}
+            onClose={() => setPreviewVisible(false)}
+          />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );

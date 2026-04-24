@@ -4,6 +4,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ProductSummary } from "@barter/types";
 import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
 import { Button } from "@/components/ui/Button";
+import { useTopToastStore } from "@/lib/ui/topToastStore";
 
 interface CounterOfferFormProps {
   product: ProductSummary & { isFree?: boolean; requestByMoney?: boolean };
@@ -68,6 +69,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   initialAmount,
 }) => {
   const { theme } = useAppTheme();
+  const enqueueToast = useTopToastStore((state) => state.enqueueToast);
   const canOfferOwnProducts = isBuyer;
   const canRequestCounterpartyProducts = counterpartyProducts.length > 0;
   const canUseProductMode =
@@ -88,10 +90,15 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   const [counterMessage, setCounterMessage] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const selectableOwnProducts = ownOfferableProducts.filter((p) => p.id !== product.id);
+
+  const buyerHasNoProducts = isBuyer && selectableOwnProducts.length === 0 && !canRequestCounterpartyProducts;
+  const shouldDisableProductToggle = supportsMixedOffers && buyerHasNoProducts;
+
   const moneyOnlyCounterMode = !product.isFree && !canUseProductMode && Boolean(product.requestByMoney);
-  const wantsMoney = moneyOnlyCounterMode ? true : supportsMixedOffers ? includeMoney : false;
+  const wantsMoney = moneyOnlyCounterMode || shouldDisableProductToggle ? true : supportsMixedOffers ? includeMoney : false;
   const wantsProduct =
-    product.isFree || moneyOnlyCounterMode
+    product.isFree || moneyOnlyCounterMode || shouldDisableProductToggle
       ? false
       : supportsMixedOffers
         ? includeProduct
@@ -106,8 +113,6 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     counterAmount.trim() !== "" &&
     Number.isFinite(parsedAmount) &&
     parsedAmount < effectiveMinAmount;
-
-  const selectableOwnProducts = ownOfferableProducts.filter((p) => p.id !== product.id);
 
   // Visible products: exclude target product and already-offered products
   const visibleOwnProducts = selectableOwnProducts.filter(
@@ -489,6 +494,15 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
       moneyModeLabel="Money"
       productModeLabel="Product"
       includeProductFirst
+      disableIncludeProductToggle={shouldDisableProductToggle}
+      onDisableProductPress={() => {
+        enqueueToast({
+          title: "No listing available",
+          message: "You need atleast one active listing to offer products in this counter offer. Please create a listing first.",
+          variant: "warning",
+          durationMs: 3500
+        });
+      }}
       onToggleIncludeMoney={() => {
         setIncludeMoney((prev) => {
           const next = !prev;

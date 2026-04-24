@@ -42,6 +42,7 @@ import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { RangeSlider } from "../filters/RangeSlider";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
+import { getFirstName } from "@/lib/utils/commonUtils";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -103,10 +104,15 @@ function FeedHeaderCard({
 }: FeedHeaderCardProps) {
   const { theme } = useAppTheme();
 
+  const firstName = useMemo(() => {
+    return getFirstName(userName);
+  }, [userName]);
+
   return (
     <CollapsibleHeaderCard
-      title={`Hello, ${userName}`}
+      title={`Hello, ${firstName}`}
       subtitle="Discover listings near you"
+      defaultExpanded={true}
       subtitleRight={
         isBackgroundRefreshing || filterState.isSearchDebouncing ? (
           <ActivityIndicator size={12} color={theme.colors.textMuted} />
@@ -132,6 +138,26 @@ function FeedHeaderCard({
       }
       collapseMaxHeight={320}
       collapseDurationMs={160}
+      footerSlot={
+        <View style={styles.headerMetaRow}>
+          <View style={[
+            styles.headerMetaCounterPill,
+          ]}>
+            <Text style={[styles.headerMetaCountText, { color: theme.colors.textPrimary }]}>
+              {productCount}
+            </Text>
+            <Text style={[styles.headerMetaCountLabel, { color: theme.colors.textMuted }]}>
+              {(productCount === 1 || productCount === 0) ? "listing" : "listings"}
+            </Text>
+          </View>
+          <Text
+            style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]}
+            numberOfLines={2}
+          >
+            {filterState.proximity?.radiusKm ? `Within ${filterState.proximity.radiusKm} km` : "Showing all matches"}
+          </Text>
+        </View>
+      }
     >
       <View style={{ marginTop: 10 }}>
         <Input
@@ -148,23 +174,6 @@ function FeedHeaderCard({
         onOpenSort={onOpenSort}
         onToggleFree={onToggleFree}
       />
-      <View style={styles.listSummaryRow}>
-        <Text style={[styles.listSummaryText, { color: theme.colors.textSecondary }]}>
-          Showing {productCount} listings
-        </Text>
-        <Text
-          style={[
-            styles.listSummaryText,
-            styles.listSummarySecondaryText,
-            { color: theme.colors.textMuted },
-            !filterState.proximity?.radiusKm && styles.listSummarySecondaryHidden,
-          ]}
-        >
-          {filterState.proximity?.radiusKm
-            ? `Within ${filterState.proximity.radiusKm} km`
-            : "Within 0 km"}
-        </Text>
-      </View>
     </CollapsibleHeaderCard>
   );
 }
@@ -992,11 +1001,34 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
-  listSummaryRow: {
+  headerMetaRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 2,
+    gap: 12,
+  },
+  headerMetaCounterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 22,
+  },
+  headerMetaCountText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  headerMetaCountLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  headerMetaSummaryText: {
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+    minWidth: 0,
+    flex: 1,
+    textAlign: "right",
   },
   listSummaryText: {
     fontSize: 13,

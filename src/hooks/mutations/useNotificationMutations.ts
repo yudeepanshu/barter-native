@@ -222,13 +222,13 @@ export function useMarkNotificationReadMutation() {
     onError: (_error, _notificationId, context) => {
       restoreNotificationsMutationContext(queryClient, context);
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       if (typeof result?.unreadCount === "number") {
         useAppStore.getState().setNotificationsUnreadCount(result.unreadCount);
       }
     },
-    onSettled: async () => {
-      await invalidateNotifications(queryClient);
+    onSettled: () => {
+      void invalidateNotifications(queryClient);
     },
   });
 }
@@ -255,13 +255,13 @@ export function useMarkAllNotificationsReadMutation() {
     onError: (_error, _variables, context) => {
       restoreNotificationsMutationContext(queryClient, context);
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       if (typeof result?.unreadCount === "number") {
         useAppStore.getState().setNotificationsUnreadCount(result.unreadCount);
       }
     },
-    onSettled: async () => {
-      await invalidateNotifications(queryClient);
+    onSettled: () => {
+      void invalidateNotifications(queryClient);
     },
   });
 }
@@ -287,8 +287,8 @@ export function useClearAllNotificationsMutation() {
     onError: (_error, _variables, context) => {
       restoreNotificationsMutationContext(queryClient, context);
     },
-    onSettled: async () => {
-      await invalidateNotifications(queryClient);
+    onSettled: () => {
+      void invalidateNotifications(queryClient);
     },
   });
 }

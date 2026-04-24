@@ -58,7 +58,7 @@ export function useVerifyTransactionOtpMutation() {
         throw error;
       }
     },
-    onSuccess: async (transaction) => {
+    onSuccess: (transaction) => {
       if (!transaction) {
         return;
       }
@@ -66,7 +66,7 @@ export function useVerifyTransactionOtpMutation() {
       syncTransactionEntity(queryClient, transaction);
       queryClient.setQueryData(queryKeys.transactions.activeByProduct(transaction.productId), transaction);
 
-      await Promise.all([
+      void Promise.all([
         invalidateTransactionForRequest(queryClient, transaction.requestId),
         queryClient.invalidateQueries({ queryKey: queryKeys.transactions.activeByProduct(transaction.productId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.requests.detail(transaction.requestId) }),

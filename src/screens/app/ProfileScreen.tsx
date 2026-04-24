@@ -2,7 +2,6 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -74,7 +73,9 @@ export default function ProfileScreen() {
   const updateProfileMutation = useUpdateProfileMutation();
   const { theme, statusBarStyle, preference, resolvedMode, setPreference } = useAppTheme();
   const dialog = useAppDialog();
-  const user = profileQuery.data ?? session?.user ?? null;
+  const sessionUser = session?.user ?? null;
+  const queriedUser = profileQuery.data ?? null;
+  const user = queriedUser && sessionUser && queriedUser.id === sessionUser.id ? queriedUser : sessionUser ?? queriedUser;
   const appVersionLabel = useMemo(() => getCurrentVersionLabel(), []);
 
   const [userName, setUserName] = useState("");
@@ -252,7 +253,7 @@ export default function ProfileScreen() {
           mediaTypes: ["images"],
           allowsEditing: true,
           aspect: [1, 1],
-          quality: 0.85,
+          quality: 1,
         });
       } else {
         const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -265,7 +266,9 @@ export default function ProfileScreen() {
           mediaTypes: ["images"],
           allowsEditing: true,
           aspect: [1, 1],
-          quality: 0.85,
+          quality: 1,
+          shouldDownloadFromNetwork: true,
+          preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         });
       }
 

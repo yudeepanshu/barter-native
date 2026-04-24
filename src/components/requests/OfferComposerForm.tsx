@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable ,StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +21,7 @@ interface OfferComposerFormProps {
   productModeLabel?: string;
   includeProductFirst?: boolean;
   disableIncludeProductToggle?: boolean;
+  onDisableProductPress?: () => void;
   onToggleIncludeMoney: () => void;
   onToggleIncludeProduct: () => void;
   showAmountField: boolean;
@@ -81,6 +82,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
   productModeLabel = "Offer product",
   includeProductFirst = false,
   disableIncludeProductToggle = false,
+  onDisableProductPress,
   onToggleIncludeMoney,
   onToggleIncludeProduct,
   showAmountField,
@@ -149,13 +151,25 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
               <>
                 {includeProductFirst ? (
                   <>
-                    <ToggleChip
-                      label={productModeLabel}
-                      selected={includeProduct}
-                      style={styles.modeChip}
-                      onPress={onToggleIncludeProduct}
-                      disabled={disableIncludeProductToggle}
-                    />
+                    {disableIncludeProductToggle && onDisableProductPress ? (
+                      <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
+                        <ToggleChip
+                          label={productModeLabel}
+                          selected={productModeLabel ? false :includeProduct}
+                          style={{flex: 1}}
+                          disabled={true}
+                          onPress={onToggleIncludeProduct}
+                        />
+                      </Pressable>
+                    ) : (
+                      <ToggleChip
+                        label={productModeLabel}
+                        selected={includeProduct}
+                        style={styles.modeChip}
+                        onPress={onToggleIncludeProduct}
+                        disabled={disableIncludeProductToggle}
+                      />
+                    )}
                     <ToggleChip
                       label={moneyModeLabel}
                       selected={includeMoney}
@@ -171,13 +185,25 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
                       style={styles.modeChip}
                       onPress={onToggleIncludeMoney}
                     />
-                    <ToggleChip
-                      label={productModeLabel}
-                      selected={includeProduct}
-                      style={styles.modeChip}
-                      onPress={onToggleIncludeProduct}
-                      disabled={disableIncludeProductToggle}
-                    />
+                    {disableIncludeProductToggle && onDisableProductPress ? (
+                      <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
+                        <ToggleChip
+                          label={productModeLabel}
+                          selected={includeProduct}
+                          style={{flex: 1}}
+                          disabled={true}
+                          onPress={onToggleIncludeProduct}
+                        />
+                      </Pressable>
+                    ) : (
+                      <ToggleChip
+                        label={productModeLabel}
+                        selected={includeProduct}
+                        style={styles.modeChip}
+                        onPress={onToggleIncludeProduct}
+                        disabled={disableIncludeProductToggle}
+                      />
+                    )}
                   </>
                 )}
               </>
@@ -209,7 +235,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      {showProductSelector ? (
+      {showProductSelector && !disableIncludeProductToggle ? (
         <View style={styles.offerWrap}>
           <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{productSelectorLabel}</Text>
           {offerableProducts.length > 0 ? (
@@ -231,7 +257,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      {showVisibleProductSelector ? (
+      {showVisibleProductSelector && !disableIncludeProductToggle ? (
         <View style={styles.offerWrap}>
           <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{visibleProductSelectorLabel ?? "Show for consideration (optional)"}</Text>
           <SelectableProductGrid

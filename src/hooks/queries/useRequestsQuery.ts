@@ -72,8 +72,7 @@ export function useRequestsQuery(
       return undefined;
     }
 
-    // Keep seeded data fresh for the current stale window to avoid immediate remount refetch.
-    return Date.now();
+    return 0; // Set to 0 to indicate data is fresh, as it's derived from the store which is the source of truth
   }, [initialData]);
 
   const query = useInfiniteQuery<

@@ -9,8 +9,9 @@
  * We check BOTH asset metadata (width/height) AND file size on disk.
  */
 
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
 import type { ImagePickerAsset } from "expo-image-picker";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
 /**
  * Image upload constraints.
@@ -22,8 +23,8 @@ export const IMAGE_CONSTRAINTS = {
    * Reasoning: At typical 4G speeds (10 Mbps), 5MB = ~4 seconds to upload.
    *            Mobile users expect < 5s for single image. Larger = abandoned uploads.
    */
-  MAX_FILE_SIZE_MB: 5,
-  MAX_FILE_SIZE_BYTES: 5 * 1024 * 1024, // 5MB
+  MAX_FILE_SIZE_MB: 8,
+  MAX_FILE_SIZE_BYTES: 8 * 1024 * 1024, // 8MB
 
   /**
    * Max image dimensions: 2400×2400 for thumbnails, 4800×4800 for detail.
@@ -44,6 +45,8 @@ export const IMAGE_CONSTRAINTS = {
    */
   DEFAULT_QUALITY: 0.75,
 
+  QUALITY_STEPS: [0.75, 0.65, 0.50] as const,
+
   /**
    * Max total images per listing.
    */
@@ -56,8 +59,8 @@ export const IMAGE_CONSTRAINTS = {
 export const IMAGE_VALIDATION_ERRORS = {
   FILE_NOT_FOUND: "Could not access the image file. Try selecting again.",
   FILE_TOO_LARGE: `Image exceeds ${IMAGE_CONSTRAINTS.MAX_FILE_SIZE_MB}MB limit. Try a smaller or lower-quality image.`,
-  DIMENSIONS_TOO_SMALL: `Image is too small. Please use images at least ${IMAGE_CONSTRAINTS.MIN_DIMENSIONS}×${IMAGE_CONSTRAINTS.MIN_DIMENSIONS}px.`,
-  DIMENSIONS_TOO_LARGE: `Image is too large. Max ${IMAGE_CONSTRAINTS.MAX_DIMENSIONS}×${IMAGE_CONSTRAINTS.MAX_DIMENSIONS}px. Use a smaller image or crop it.`,
+  DIMENSIONS_TOO_SMALL: `Image is too small.`,
+  DIMENSIONS_TOO_LARGE: `Image is too large. Use a smaller image or crop it.`,
   UNKNOWN_ERROR: "Could not validate image. Try selecting another one.",
 } as const;
 
@@ -71,12 +74,12 @@ export const IMAGE_VALIDATION_ERRORS = {
  */
 export async function getImageFileSizeBytes(assetUri: string): Promise<number> {
   try {
-    const fileInfo = await FileSystem.getInfoAsync(assetUri);
-    if (!fileInfo.exists) {
+    const file = new File(assetUri);
+    if (!file.exists) {
       throw new Error("File does not exist");
     }
-    // fileInfo.size is in bytes
-    return fileInfo.size || 0;
+
+    return file.size;
   } catch (error) {
     throw new Error(IMAGE_VALIDATION_ERRORS.FILE_NOT_FOUND);
   }
@@ -86,6 +89,81 @@ export interface ImageValidationResult {
   isValid: boolean;
   error: string | null;
   sizeMB: number;
+}
+
+function buildNormalizedFileName(fileName: string | null | undefined, index?: number): string {
+  const baseName = (fileName ?? `mobile-image-${(index ?? 0) + 1}`).replace(/\.[^.]+$/, "").trim();
+  return `${baseName || `mobile-image-${(index ?? 0) + 1}`}.jpg`;
+}
+
+function getResizeTarget(width: number, height: number): { width: number; height: number } | null {
+  if(!width || !height) return null;
+
+  const largetSide = Math.max(width, height);
+  if (largetSide <= IMAGE_CONSTRAINTS.MAX_DIMENSIONS) {
+    return null; // No resizing needed
+  }
+
+  const scaleFactor = IMAGE_CONSTRAINTS.MAX_DIMENSIONS / largetSide;
+  return {
+    width: Math.round(width * scaleFactor),
+    height: Math.round(height * scaleFactor),
+  };
+}
+
+async function normalizeImageAssetAtQuality(asset: ImagePickerAsset, quality: number): Promise<ImagePickerAsset> {
+  const resizeTarget = getResizeTarget(asset.width ?? 0, asset.height ?? 0);
+  const actions = resizeTarget ? [{ resize: resizeTarget }] : [];
+
+  const normalized = await manipulateAsync(asset.uri, actions, {
+    compress: quality,
+    format: SaveFormat.JPEG,
+  });
+
+  const fileSizeBytes = await getImageFileSizeBytes(normalized.uri);
+
+  return {
+    ...asset,
+    uri: normalized.uri,
+    width: normalized?.width ?? asset.width,
+    height: normalized?.height ?? asset.height,
+    fileName: buildNormalizedFileName(asset.fileName, 0),
+    mimeType: "image/jpeg",
+    fileSize: fileSizeBytes,
+  };
+}
+
+export async function prepareImageAssetForUpload(asset: ImagePickerAsset): Promise<ImagePickerAsset> {
+  if(asset.width && asset.width < IMAGE_CONSTRAINTS.MIN_DIMENSIONS) {
+    throw new Error(IMAGE_VALIDATION_ERRORS.DIMENSIONS_TOO_SMALL);
+  }
+
+  if(asset.height && asset.height < IMAGE_CONSTRAINTS.MIN_DIMENSIONS) {
+    throw new Error(IMAGE_VALIDATION_ERRORS.DIMENSIONS_TOO_SMALL);
+  }
+
+  let lastPreparedAsset: ImagePickerAsset | null = null;
+
+  for(const quality of IMAGE_CONSTRAINTS.QUALITY_STEPS) {
+    const prepared = await normalizeImageAssetAtQuality(asset, quality);
+    lastPreparedAsset = prepared;
+
+    const fileSizeByBytes = lastPreparedAsset.fileSize ?? await getImageFileSizeBytes(prepared.uri);
+
+    if(fileSizeByBytes <= IMAGE_CONSTRAINTS.MAX_FILE_SIZE_BYTES) {
+      return prepared;
+    }
+  }
+
+  if(lastPreparedAsset) {
+    throw new Error(IMAGE_VALIDATION_ERRORS.FILE_TOO_LARGE);
+  }
+
+  throw new Error(IMAGE_VALIDATION_ERRORS.UNKNOWN_ERROR);
+}
+
+export async function prepareImageAssetsForUpload(assets: ImagePickerAsset[]): Promise<ImagePickerAsset[]> {
+  return Promise.all(assets.map((asset) => prepareImageAssetForUpload(asset)));
 }
 
 /**
@@ -137,7 +215,7 @@ export async function validateImageAsset(
 
   // Check 2: File size on disk (one I/O, but worth it)
   try {
-    const fileSizeBytes = await getImageFileSizeBytes(asset.uri);
+    const fileSizeBytes = asset.fileSize && asset.fileSize > 0 ? asset.fileSize : await getImageFileSizeBytes(asset.uri);
     const sizeMB = fileSizeBytes / (1024 * 1024);
 
     if (fileSizeBytes > IMAGE_CONSTRAINTS.MAX_FILE_SIZE_BYTES) {

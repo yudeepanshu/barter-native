@@ -607,6 +607,23 @@ export default function MyListingsScreen() {
               title="My Listings"
               subtitle="Manage your active and past listings."
               collapseMaxHeight={320}
+              footerSlot={
+                <View style={styles.headerMetaRow}>
+                  <View style={[
+                    styles.headerMetaCountPill,
+                  ]}>
+                    <Text style={[styles.headerMetaCountText, { color: theme.colors.textPrimary }]}>
+                      {filteredItems.length}
+                    </Text>
+                    <Text style={[styles.headerMetaCountLabel, { color: theme.colors.textMuted }]}>
+                      {(filteredItems.length === 1 || filteredItems.length === 0) ? "listing" : "listings"}
+                    </Text>
+                  </View>
+                  <Text style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                    {selectedFilterSummary || "Showing all listings."}
+                  </Text>
+                </View>
+              }
             >
               <View style={{ marginTop: 10 }}>
                 <Input
@@ -624,15 +641,6 @@ export default function MyListingsScreen() {
                 onOpenSort={() => setShowSortModal(true)}
                 onToggleFree={() => setFreeOnly((current) => !current)}
               />
-
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: theme.colors.textMuted }]}>Showing {filteredItems.length} listings</Text>
-                {selectedFilterSummary ? (
-                  <Text style={[styles.summaryText, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                    {selectedFilterSummary}
-                  </Text>
-                ) : null}
-              </View>
             </CollapsibleHeaderCard>
           </View>
 
@@ -941,15 +949,34 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   listContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110 },
-  summaryRow: {
+  headerMetaRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
+    alignItems: "center",
+    gap: 12,
   },
-  summaryText: {
+  headerMetaCountPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 22,
+  },
+  headerMetaCountText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  headerMetaCountLabel: {
     fontSize: 12,
     fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  headerMetaSummaryText: {
+    fontSize: 13,
+    minWidth: 0,
+    flex: 1,
+    lineHeight: 18,
     flexShrink: 1,
+    textAlign: "right",
   },
   endListWrap: {
     alignItems: "center",

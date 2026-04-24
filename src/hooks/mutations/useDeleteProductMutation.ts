@@ -16,10 +16,10 @@ export function useDeleteProductMutation() {
       await mobileApiClient.deleteProduct(productId);
       return productId;
     },
-    onSuccess: async (deletedProductId) => {
+    onSuccess: (deletedProductId) => {
       removeProductEntity(queryClient, deletedProductId);
 
-      await Promise.all([
+      void Promise.all([
         invalidateProductCollections(queryClient),
         invalidateRequestCollections(queryClient),
       ]);

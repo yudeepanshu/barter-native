@@ -7,6 +7,8 @@ import { mobileApiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 import { sanitizeEmailIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
+import { queryClient } from "@/lib/query/queryClient";
+import { queryKeys } from "@/lib/query/queryKeys";
 
 const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again.";
 const OTP_INVALID_ERROR_MESSAGE = "Invalid OTP. Please try again.";
@@ -131,6 +133,9 @@ export function useOtpAuth(): UseOtpAuthReturn {
     } catch {
       // Ignore: user may have no active Google session in SDK cache.
     }
+
+    await queryClient.cancelQueries({queryKey: queryKeys.auth.me, exact: true});
+    queryClient.setQueryData(queryKeys.auth.me, null);
 
     await clearSession();
     setStep("identifier");

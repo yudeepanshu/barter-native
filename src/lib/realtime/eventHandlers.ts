@@ -149,6 +149,7 @@ function patchRequestOffersCache(queryClient: QueryClient, patch: RequestRealtim
         ...existing,
         status: patch.status,
         ...(patch.currentTurn ? { currentTurn: patch.currentTurn } : {}),
+        ...(Object.prototype.hasOwnProperty.call(patch, 'message') ? { message: patch.message } : {}),
       };
     },
   );
@@ -312,8 +313,9 @@ function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient
 
   const foundInActiveCache = detailMatched || sentMatched || receivedMatched;
   const shouldRefetchCollections = action === "CREATED" || !foundInActiveCache;
+  const hasMessageUpdate = Object.prototype.hasOwnProperty.call(event.payload, 'message');
 
-  if (!detailMatched || shouldRefetchRequestDetail(action)) {
+  if (!detailMatched || shouldRefetchRequestDetail(action) || hasMessageUpdate) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.requests.detail(requestId) });
   }
 
@@ -322,7 +324,7 @@ function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient
     void queryClient.invalidateQueries({ queryKey: ["requests", "received", "infinite"] });
   }
 
-  if (shouldRefetchRequestOffers(action)) {
+  if (shouldRefetchRequestOffers(action) || hasMessageUpdate) {
     void queryClient.invalidateQueries({ queryKey: ["requests", requestId, "offers"] });
   }
 }

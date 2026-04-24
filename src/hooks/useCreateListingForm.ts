@@ -22,11 +22,7 @@ import { reverseGeocodeCoords, useDeviceLocation } from "@/hooks/useDeviceLocati
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import {
-  askImageSource,
-  requestCameraPermission,
-  requestMediaLibraryPermission,
-  launchCamera,
-  launchImageLibrary,
+  pickListingImages,
   uploadImages as uploadProductImages,
   LISTING_FORM_ERRORS,
 } from "@/lib/forms/listingFormUtils";
@@ -75,34 +71,15 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const [isLocating, setIsLocating] = useState(false);
 
   const pickImages = async () => {
-    const source = await askImageSource(dialog);
-    if (!source) {
+    const {assets, error} = await pickListingImages({ dialog, selectionLimit: Math.max(0, CREATE_LISTING_RULES.MAX_IMAGES - images.length), fallbackError: toErrorMessage });
+
+    if (error) {
+      setFormError(error);
       return;
     }
 
-    if (source === "camera") {
-      const hasPermission = await requestCameraPermission();
-      if (!hasPermission) {
-        setFormError(LISTING_FORM_ERRORS.CAMERA_PERMISSION);
-        return;
-      }
-
-      const result = await launchCamera();
-      if (!result.canceled && result.assets.length > 0) {
-        setImages((prev) => [...prev, ...result.assets].slice(0, CREATE_LISTING_RULES.MAX_IMAGES));
-      }
-      return;
-    }
-
-    const hasPermission = await requestMediaLibraryPermission();
-    if (!hasPermission) {
-      setFormError(LISTING_FORM_ERRORS.MEDIA_PERMISSION);
-      return;
-    }
-
-    const result = await launchImageLibrary(CREATE_LISTING_RULES.MAX_IMAGES);
-    if (!result.canceled) {
-      setImages((prev) => [...prev, ...result.assets].slice(0, CREATE_LISTING_RULES.MAX_IMAGES));
+    if (assets.length > 0) {
+      setImages((prev) => [...prev, ...assets].slice(0, CREATE_LISTING_RULES.MAX_IMAGES));
     }
   };
 

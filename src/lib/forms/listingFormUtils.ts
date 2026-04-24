@@ -5,12 +5,15 @@ import {
   toUploadErrorMessage,
   uploadImageAssetToPresignedUrl,
 } from "@/lib/uploads/presignedImageUpload";
+import { prepareImageAssetsForUpload } from "../utils/imageValidation";
+
+type AppDialog = ReturnType<typeof import("@/providers/AppDialogProvider").useAppDialog>;
 
 /**
  * Image source dialog options
  */
 export async function askImageSource(
-  dialog: ReturnType<typeof import("@/providers/AppDialogProvider").useAppDialog>,
+  dialog: AppDialog,
 ): Promise<"camera" | "library" | null> {
   const action = await dialog.show({
     title: "Choose image source",
@@ -51,7 +54,7 @@ export async function requestMediaLibraryPermission(): Promise<boolean> {
 export async function launchCamera(): Promise<ImagePicker.ImagePickerResult> {
   return ImagePicker.launchCameraAsync({
     mediaTypes: ["images"],
-    quality: 0.8,
+    quality: 1,
   });
 }
 
@@ -65,7 +68,9 @@ export async function launchImageLibrary(
     mediaTypes: ["images"],
     allowsMultipleSelection: true,
     selectionLimit,
-    quality: 0.8,
+    quality: 1,
+    shouldDownloadFromNetwork: true,
+    preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
   });
 }
 
@@ -85,6 +90,53 @@ export const LISTING_FORM_ERRORS = {
  */
 export function getImageFileName(asset: ImagePicker.ImagePickerAsset, index: number): string {
   return asset.fileName ?? `mobile-image-${index + 1}.jpg`;
+}
+
+export async function pickListingImages({dialog, selectionLimit, fallbackError}: { dialog: AppDialog; selectionLimit: number; fallbackError: (error: unknown)=> string }): Promise<{assets: ImagePicker.ImagePickerAsset[]; error: string | null}> {
+  const source = await askImageSource(dialog);
+  if (!source) {
+    return { assets: [], error: null }; // User cancelled
+  }
+
+  if(source === "camera") {
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      return { assets: [], error: LISTING_FORM_ERRORS.CAMERA_PERMISSION };
+    }
+
+    const result = await launchCamera();
+    if (result.canceled || !result.assets?.length) {
+      return { assets: [], error: null };
+    }
+
+    try {
+      return {
+        assets: await prepareImageAssetsForUpload(result.assets),
+        error: null,
+      }
+    }catch(e) {
+      return { assets: [], error: toUploadErrorMessage(e, fallbackError) };
+    }
+  }
+
+  const hasPermission = await requestMediaLibraryPermission();
+  if (!hasPermission) {
+    return { assets: [], error: LISTING_FORM_ERRORS.MEDIA_PERMISSION };
+  }
+
+  const result = await launchImageLibrary(selectionLimit);
+  if (result.canceled || !result.assets?.length) {
+    return { assets: [], error: null };
+  }
+
+  try {
+    return {
+      assets: await prepareImageAssetsForUpload(result.assets),
+      error: null,
+    }
+  }catch(e) {
+    return { assets: [], error: toUploadErrorMessage(e, fallbackError) };
+  }
 }
 
 /**

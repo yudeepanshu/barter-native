@@ -1,8 +1,8 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ProductSummary, RequestSummary } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
@@ -41,6 +41,7 @@ import {
   useUpdateProfileMutation,
   toErrorMessage as toProfileErrorMessage,
 } from "@/hooks/mutations/useUpdateProfileMutation";
+import { getFirstName } from "@/lib/utils/commonUtils";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -132,10 +133,8 @@ const OfferCard = memo(
     router: ReturnType<typeof useRouter>;
     styles: any; // StyleSheet
   }) {
-    const offeredByLabel =
-      offer.offeredById === sessionUserId
-        ? "You"
-        : offer.offeredBy?.userName || "Unknown";
+    const firstName = offer.offeredById === sessionUserId ? "You" : getFirstName(offer.offeredBy?.userName);
+    const offeredByLabel = firstName || "User";
     const offeredByAvatar =
       offer.offeredById === sessionUserId
         ? sessionProfilePicture
@@ -361,6 +360,80 @@ const ExpandableProductsSection = memo(function ExpandableProductsSection({
         )}
       </SmoothCollapse>
     </>
+  );
+});
+
+const OFFERS_PAGE_SIZE = 10;
+const OFFER_ITEM_ESTIMATED_HEIGHT = 64;
+const OFFER_LIST_MAX_HEIGHT = OFFERS_PAGE_SIZE * OFFER_ITEM_ESTIMATED_HEIGHT + 32; // item height * page size + some padding
+
+const OfferHistorySection = memo(function OfferHistorySection({
+  offers,
+  sessionUserId,
+  sessionProfilePicture,
+  router,
+  theme,
+  passedStyles,
+}: {
+  offers: any[]; // RequestOfferSummary[]
+  sessionUserId: string;
+  sessionProfilePicture: string | null;
+  router: ReturnType<typeof useRouter>;
+  theme: any; // AppTheme
+  passedStyles: any; // StyleSheet
+}) {
+  const [visibleOffersCount, setVisibleOffersCount] = useState(OFFERS_PAGE_SIZE);
+  const visibleOffers = useMemo(() => offers.slice(0, visibleOffersCount), [offers, visibleOffersCount]);
+  const hasMoreOffers = offers.length > visibleOffersCount;
+
+  if(offers.length === 0) {
+    return <View style={{ gap: 10 }}>
+    <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History</Text>
+      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No offers yet.</Text>
+      </View>
+    </View>;
+  }
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History ({offers.length})</Text>
+      <View style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }}>
+        <ScrollView style={{maxHeight: OFFER_LIST_MAX_HEIGHT}} nestedScrollEnabled showsVerticalScrollIndicator>
+          <View style={{gap: 8}}>
+            {visibleOffers.map((offer, index) => (
+              <OfferCard
+                key={offer.id}
+                offer={offer}
+                index={index}
+                totalCount={offers.length}
+                sessionUserId={sessionUserId}
+                sessionProfilePicture={sessionProfilePicture}
+                router={router}
+                styles={passedStyles}
+                theme={theme}
+              />
+            ))}
+            {hasMoreOffers ? (
+            <Pressable
+              onPress={() => setVisibleOffersCount((count) => count + OFFERS_PAGE_SIZE)}
+              style={{
+                paddingVertical: 12,
+                alignItems: "center",
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+                marginTop: 4,
+              }}
+            >
+              <Text style={{ color: theme.colors.textPrimary, fontWeight: "600" }}>Load more offers</Text>
+            </Pressable>
+          ) : null}
+          </View>
+        </ScrollView>
+      </View>
+    </View>
   );
 });
 
@@ -1363,30 +1436,14 @@ export default function RequestDetailScreen() {
 
         {/* Offer History */}
         {
-          <View style={{ gap: 10 }}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History</Text>
-            {historyOffers.length === 0 ? (
-              <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No offers yet.</Text>
-              </View>
-            ) : (
-              <View style={{ gap: 8 }}>
-                {historyOffers.map((offer, index) => (
-                  <OfferCard
-                    key={offer.id}
-                    offer={offer}
-                    index={index}
-                    totalCount={historyOffers.length}
-                    sessionUserId={session.user.id}
-                    sessionProfilePicture={session.user.profilePicture ?? null}
-                    theme={theme}
-                    router={router}
-                    styles={styles}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
+          <OfferHistorySection
+            offers={historyOffers}
+            sessionUserId={session.user.id}
+            sessionProfilePicture={session.user.profilePicture ?? null}
+            theme={theme}
+            router={router}
+            passedStyles={styles}
+          />
         }
 
         {/* Back Button removed from bottom */}

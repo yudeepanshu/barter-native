@@ -51,6 +51,10 @@ const patchedRenderRootComponent = path.resolve(
 const originalResolveRequest = config.resolver?.resolveRequest;
 config.resolver = {
   ...config.resolver,
+    nodeModulesPaths: [
+    path.resolve(projectRoot, "node_modules"),
+    path.resolve(workspaceRoot, "node_modules"),
+  ],
   resolveRequest: (context, moduleName, platform) => {
     if (
       moduleName === 'expo-router/build/renderRootComponent' ||

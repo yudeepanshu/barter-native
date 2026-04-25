@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+import { Alert } from "react-native";
 
 const GOOGLE_GENERIC_ERROR_MESSAGE = "Unable to continue with Google. Please try again.";
 
@@ -67,6 +68,7 @@ export function useGoogleAuth(
         setGoogleError(GOOGLE_GENERIC_ERROR_MESSAGE);
       }
     } catch (error: any) {
+      Alert.alert('Auth Error', `Code: ${error?.code}\nMessage: ${error?.message}`);
       if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
         setGoogleError(null);
       } else if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {

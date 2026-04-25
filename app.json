@@ -1,9 +1,11 @@
 {
   "expo": {
     "name": "Flippe",
-    "slug": "barter-mobile",
-    "version": "4.0.2-alpha.0",
+    "slug": "barter",
+    "version": "4.1.0-alpha.0",
     "scheme": "barter",
+    "workspaceRoot": "../..",
+    "projectRoot": "apps/mobile",
     "orientation": "portrait",
     "softwareKeyboardLayoutMode": "resize",
     "icon": "./assets/icon.png",
@@ -22,7 +24,10 @@
     },
     "android": {
       "package": "com.barter.app",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#133A92"

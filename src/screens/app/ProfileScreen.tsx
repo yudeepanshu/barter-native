@@ -2,6 +2,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -36,6 +37,370 @@ import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 
+// ---------------------------------------------------------------------------
+// Feature flag
+// Set EXPO_PUBLIC_FEEDBACK_ENABLED=true in your .env to show the feedback UI.
+// Defaults to false — safe to deploy before the backend endpoint is live.
+// ---------------------------------------------------------------------------
+const FEEDBACK_ENABLED = process.env.EXPO_PUBLIC_FEEDBACK_ENABLED === "true";
+
+// ---------------------------------------------------------------------------
+// Rating scale — 5 fixed integer steps, one emoji per value
+// Tapping the selected emoji again clears the rating (acts as a toggle).
+// ---------------------------------------------------------------------------
+const RATING_STEPS: { value: number; emoji: string; label: string }[] = [
+  { value: 1, emoji: "😞", label: "Poor" },
+  { value: 2, emoji: "😐", label: "Fair" },
+  { value: 3, emoji: "🙂", label: "Good" },
+  { value: 4, emoji: "😊", label: "Great" },
+  { value: 5, emoji: "😍", label: "Excellent" },
+];
+
+const MAX_FEEDBACK_TEXT = 2000;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+interface FeedbackPayload {
+  positive_feedback?: string;
+  negative_feedback?: string;
+  ui_rating?: number;
+  ux_rating?: number;
+}
+
+interface FeedbackFormErrors {
+  positive_feedback?: string;
+  negative_feedback?: string;
+  atLeastOne?: string;
+  submit?: string;
+}
+
+// ---------------------------------------------------------------------------
+// EmojiRatingPicker
+// A row of 5 emoji buttons. Tap to select; tap selected to deselect.
+// ---------------------------------------------------------------------------
+interface EmojiRatingPickerProps {
+  label: string;
+  hint?: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+  theme: ReturnType<typeof useAppTheme>["theme"];
+}
+
+function EmojiRatingPicker({
+  label,
+  hint,
+  value,
+  onChange,
+  disabled,
+  theme,
+}: EmojiRatingPickerProps) {
+  return (
+    <View style={ratingStyles.wrapper}>
+      <View style={ratingStyles.labelRow}>
+        <Text style={[ratingStyles.label, { color: theme.colors.textSecondary }]}>
+          {label}
+          <Text style={[ratingStyles.optional, { color: theme.colors.textMuted }]}>
+            {" "}(optional)
+          </Text>
+        </Text>
+        {value !== null && (
+          <Pressable onPress={() => !disabled && onChange(null)} hitSlop={8} disabled={disabled}>
+            <Text style={[ratingStyles.clearText, { color: theme.colors.textMuted }]}>
+              Clear
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {hint ? (
+        <Text style={[ratingStyles.hint, { color: theme.colors.textMuted }]}>{hint}</Text>
+      ) : null}
+
+      <View style={ratingStyles.stepsRow}>
+        {RATING_STEPS.map((step) => {
+          const selected = value === step.value;
+          return (
+            <Pressable
+              key={step.value}
+              onPress={() => !disabled && onChange(selected ? null : step.value)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${step.label}, ${step.value} out of 5`}
+              accessibilityState={{ selected }}
+              style={({ pressed }) => [
+                ratingStyles.step,
+                {
+                  backgroundColor: selected
+                    ? theme.colors.primary + "22"
+                    : theme.colors.surfaceMuted,
+                  borderColor: selected ? theme.colors.primary : theme.colors.border,
+                  borderRadius: theme.roundness - 2,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: selected ? 1.08 : pressed ? 0.96 : 1 }],
+                },
+              ]}
+            >
+              <Text style={ratingStyles.stepEmoji}>{step.emoji}</Text>
+              <Text
+                style={[
+                  ratingStyles.stepLabel,
+                  {
+                    color: selected ? theme.colors.primary : theme.colors.textMuted,
+                    fontWeight: selected ? "700" : "400",
+                  },
+                ]}
+              >
+                {step.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FeedbackModal
+// Sheet-style modal anchored to the bottom of the screen.
+// Waits for the API response and surfaces errors inline.
+// ---------------------------------------------------------------------------
+interface FeedbackModalProps {
+  visible: boolean;
+  onClose: () => void;
+  theme: ReturnType<typeof useAppTheme>["theme"];
+}
+
+function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
+  const [positiveFeedback, setPositiveFeedback] = useState("");
+  const [negativeFeedback, setNegativeFeedback] = useState("");
+  const [uiRating, setUiRating] = useState<number | null>(null);
+  const [uxRating, setUxRating] = useState<number | null>(null);
+  const [errors, setErrors] = useState<FeedbackFormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const resetForm = () => {
+    setPositiveFeedback("");
+    setNegativeFeedback("");
+    setUiRating(null);
+    setUxRating(null);
+    setErrors({});
+    setIsSubmitting(false);
+    setSubmitSuccess(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const validate = (): FeedbackFormErrors => {
+    const next: FeedbackFormErrors = {};
+    const trimPos = positiveFeedback.trim();
+    const trimNeg = negativeFeedback.trim();
+
+    if (trimPos.length === 0 && trimNeg.length === 0) {
+      next.atLeastOne =
+        "Please share at least one of: what went well or what could be improved.";
+    }
+    if (trimPos.length > MAX_FEEDBACK_TEXT) {
+      next.positive_feedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimPos.length}).`;
+    }
+    if (trimNeg.length > MAX_FEEDBACK_TEXT) {
+      next.negative_feedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimNeg.length}).`;
+    }
+
+    return next;
+  };
+
+  const onSubmit = async () => {
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const payload: FeedbackPayload = {};
+    const trimPos = positiveFeedback.trim();
+    const trimNeg = negativeFeedback.trim();
+
+    if (trimPos.length > 0) payload.positive_feedback = trimPos;
+    if (trimNeg.length > 0) payload.negative_feedback = trimNeg;
+    if (uiRating !== null) payload.ui_rating = uiRating;
+    if (uxRating !== null) payload.ux_rating = uxRating;
+
+    setIsSubmitting(true);
+    try {
+      await mobileApiClient.submitFeedback(payload);
+      setSubmitSuccess(true);
+    } catch (error) {
+      setErrors({ submit: toErrorMessage(error) });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      {/* Tapping the dim backdrop closes the modal */}
+      <Pressable
+        style={[feedbackStyles.backdrop, { backgroundColor: theme.colors.overlay }]}
+        onPress={handleClose}
+      >
+        {/* Inner card — swallows taps so the backdrop press above doesn't fire */}
+        <Pressable
+          style={[
+            feedbackStyles.card,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderRadius: theme.roundness,
+            },
+          ]}
+          onPress={() => {}}
+        >
+          <Text style={[feedbackStyles.title, { color: theme.colors.textPrimary }]}>
+            Share your feedback
+          </Text>
+          <Text style={[feedbackStyles.subtitle, { color: theme.colors.textSecondary }]}>
+            Your thoughts help us build a better experience. This takes less than a minute.
+          </Text>
+
+          {submitSuccess ? (
+            /* ── Success state ── */
+            <View style={feedbackStyles.successBlock}>
+              <Text style={feedbackStyles.successEmoji}>🎉</Text>
+              <Text style={[feedbackStyles.successTitle, { color: theme.colors.textPrimary }]}>
+                Thank you!
+              </Text>
+              <Text style={[feedbackStyles.successBody, { color: theme.colors.textSecondary }]}>
+                We've received your feedback and will use it to keep improving the app.
+              </Text>
+              <Button label="Done" onPress={handleClose} />
+            </View>
+          ) : (
+            /* ── Form state ── */
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={feedbackStyles.scrollContent}
+            >
+              {/* Positive feedback */}
+              <Input
+                label="What's working well?"
+                placeholder="Tell us what you love — features, speed, design, anything that delights you…"
+                value={positiveFeedback}
+                onChangeText={(v) => {
+                  setPositiveFeedback(v);
+                  setErrors((e) => ({
+                    ...e,
+                    positive_feedback: undefined,
+                    atLeastOne: undefined,
+                  }));
+                }}
+                error={errors.positive_feedback ?? null}
+                multiline
+                numberOfLines={4}
+                maxLength={MAX_FEEDBACK_TEXT}
+                autoCorrect
+                autoCapitalize="sentences"
+                editable={!isSubmitting}
+              />
+              <Text style={[feedbackStyles.charCount, { color: theme.colors.textMuted }]}>
+                {positiveFeedback.trim().length} / {MAX_FEEDBACK_TEXT}
+              </Text>
+
+              {/* Negative feedback */}
+              <Input
+                label="What could be better?"
+                placeholder="Friction points, bugs, confusing flows, missing features — we want to know it all."
+                value={negativeFeedback}
+                onChangeText={(v) => {
+                  setNegativeFeedback(v);
+                  setErrors((e) => ({
+                    ...e,
+                    negative_feedback: undefined,
+                    atLeastOne: undefined,
+                  }));
+                }}
+                error={errors.negative_feedback ?? null}
+                multiline
+                numberOfLines={4}
+                maxLength={MAX_FEEDBACK_TEXT}
+                autoCorrect
+                autoCapitalize="sentences"
+                editable={!isSubmitting}
+              />
+              <Text style={[feedbackStyles.charCount, { color: theme.colors.textMuted }]}>
+                {negativeFeedback.trim().length} / {MAX_FEEDBACK_TEXT}
+              </Text>
+
+              {/* At-least-one validation error */}
+              {errors.atLeastOne ? (
+                <Text style={[feedbackStyles.errorText, { color: theme.colors.danger }]}>
+                  {errors.atLeastOne}
+                </Text>
+              ) : null}
+
+              {/* UI Rating */}
+              <EmojiRatingPicker
+                label="How would you rate the visual design (UI)?"
+                hint="Layout, colours, typography, and how the app looks overall."
+                value={uiRating}
+                onChange={setUiRating}
+                disabled={isSubmitting}
+                theme={theme}
+              />
+
+              {/* UX Rating */}
+              <EmojiRatingPicker
+                label="How easy is the app to use (UX)?"
+                hint="Navigation, flows, and how intuitive everyday interactions feel."
+                value={uxRating}
+                onChange={setUxRating}
+                disabled={isSubmitting}
+                theme={theme}
+              />
+
+              {/* Submit-level error (network, quota exceeded, etc.) */}
+              {errors.submit ? (
+                <Text style={[feedbackStyles.errorText, { color: theme.colors.danger }]}>
+                  {errors.submit}
+                </Text>
+              ) : null}
+
+              {/* Actions */}
+              <View style={feedbackStyles.actions}>
+                <Button
+                  label="Submit feedback"
+                  onPress={() => void onSubmit()}
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                />
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  onPress={handleClose}
+                  disabled={isSubmitting}
+                />
+              </View>
+            </ScrollView>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers (unchanged from original)
+// ---------------------------------------------------------------------------
 const THEME_OPTIONS: { label: string; value: ThemePreference }[] = [
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
@@ -55,15 +420,15 @@ function hasExistingValue(value: string | null | undefined) {
 
 function getCurrentVersionLabel() {
   const fromConfig = Constants.expoConfig?.version?.trim();
-  if (fromConfig) {
-    return `Version ${fromConfig}`;
-  }
-
+  if (fromConfig) return `Version ${fromConfig}`;
   return "Version unavailable";
 }
 
 type ProfilePicturePickMode = "deferred" | "direct";
 
+// ---------------------------------------------------------------------------
+// ProfileScreen
+// ---------------------------------------------------------------------------
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const status = useAuthStatus();
@@ -75,7 +440,10 @@ export default function ProfileScreen() {
   const dialog = useAppDialog();
   const sessionUser = session?.user ?? null;
   const queriedUser = profileQuery.data ?? null;
-  const user = queriedUser && sessionUser && queriedUser.id === sessionUser.id ? queriedUser : sessionUser ?? queriedUser;
+  const user =
+    queriedUser && sessionUser && queriedUser.id === sessionUser.id
+      ? queriedUser
+      : sessionUser ?? queriedUser;
   const appVersionLabel = useMemo(() => getCurrentVersionLabel(), []);
 
   const [userName, setUserName] = useState("");
@@ -88,6 +456,7 @@ export default function ProfileScreen() {
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     userName?: string;
     email?: string;
@@ -96,10 +465,7 @@ export default function ProfileScreen() {
   const [formMessage, setFormMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     setUserName(user.userName ?? "");
     setEmail(user.email ?? "");
     setMobileNumber(user.mobileNumber ?? "");
@@ -110,10 +476,7 @@ export default function ProfileScreen() {
   }, [user]);
 
   const isDirty = useMemo(() => {
-    if (!user) {
-      return false;
-    }
-
+    if (!user) return false;
     return (
       userName.trim() !== (user.userName ?? "") ||
       email.trim() !== (user.email ?? "") ||
@@ -123,10 +486,7 @@ export default function ProfileScreen() {
   }, [email, mobileNumber, pendingProfileAsset, user, userName]);
 
   const onReset = () => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     setUserName(user.userName ?? "");
     setEmail(user.email ?? "");
     setMobileNumber(user.mobileNumber ?? "");
@@ -138,11 +498,7 @@ export default function ProfileScreen() {
 
   const onManualRefresh = () => {
     setIsManualRefreshing(true);
-    profileQuery
-      .refetch()
-      .finally(() => {
-        setIsManualRefreshing(false);
-      });
+    profileQuery.refetch().finally(() => setIsManualRefreshing(false));
   };
 
   const onSave = async () => {
@@ -165,23 +521,26 @@ export default function ProfileScreen() {
 
     if (hasExistingValue(user?.mobileNumber) && trimmedPhone.length === 0) {
       nextErrors.mobileNumber = "Phone number cannot be empty once set.";
-    } else if (trimmedPhone.length > 0 && (trimmedPhone.length < 10 || trimmedPhone.length > 15)) {
+    } else if (
+      trimmedPhone.length > 0 &&
+      (trimmedPhone.length < 10 || trimmedPhone.length > 15)
+    ) {
       nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
     }
 
     setFieldErrors(nextErrors);
     setFormMessage(null);
 
-    if (Object.keys(nextErrors).length > 0 || !user) {
-      return;
-    }
+    if (Object.keys(nextErrors).length > 0 || !user) return;
 
     try {
       let nextProfilePicture: string | undefined;
       if (pendingProfileAsset) {
         setIsUploadingPhoto(true);
         const fileName =
-          pendingProfileFileName ?? pendingProfileAsset.fileName ?? `profile-${Date.now()}.jpg`;
+          pendingProfileFileName ??
+          pendingProfileAsset.fileName ??
+          `profile-${Date.now()}.jpg`;
         nextProfilePicture = await uploadProfilePictureAsset(pendingProfileAsset, fileName);
       }
 
@@ -202,22 +561,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadProfilePictureAsset = async (
-    asset: ImagePickerAsset,
-    fileName: string,
-  ) => {
+  const uploadProfilePictureAsset = async (asset: ImagePickerAsset, fileName: string) => {
     const uploadEnvelope = await mobileApiClient.generateProfilePictureUploadUrl(fileName);
     const upload = uploadEnvelope.data;
-    if (!upload) {
-      throw new Error("Could not generate upload URL");
-    }
-
-    await uploadImageAssetToPresignedUrl({
-      asset,
-      signedUrl: upload.signedUrl,
-      fileName,
-    });
-
+    if (!upload) throw new Error("Could not generate upload URL");
+    await uploadImageAssetToPresignedUrl({ asset, signedUrl: upload.signedUrl, fileName });
     return upload.publicUrl;
   };
 
@@ -235,11 +583,9 @@ export default function ProfileScreen() {
         ],
       });
 
-      const source = sourceAction === "camera" || sourceAction === "library" ? sourceAction : null;
-
-      if (!source) {
-        return;
-      }
+      const source =
+        sourceAction === "camera" || sourceAction === "library" ? sourceAction : null;
+      if (!source) return;
 
       let result: ImagePicker.ImagePickerResult;
       if (source === "camera") {
@@ -248,7 +594,6 @@ export default function ProfileScreen() {
           setFormMessage("Camera permission is required to capture a profile photo.");
           return;
         }
-
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ["images"],
           allowsEditing: true,
@@ -261,25 +606,21 @@ export default function ProfileScreen() {
           setFormMessage("Media library permission is required to choose a profile photo.");
           return;
         }
-
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
           allowsEditing: true,
           aspect: [1, 1],
           quality: 1,
           shouldDownloadFromNetwork: true,
-          preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+          preferredAssetRepresentationMode:
+            ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         });
       }
 
-      if (result.canceled) {
-        return;
-      }
+      if (result.canceled) return;
 
       const asset = result.assets[0];
-      if (!asset) {
-        throw new Error("No image selected");
-      }
+      if (!asset) throw new Error("No image selected");
 
       const fileName = asset.fileName ?? `profile-${Date.now()}.jpg`;
 
@@ -299,15 +640,16 @@ export default function ProfileScreen() {
     } catch (error) {
       setFormMessage(toUploadErrorMessage(error, toErrorMessage));
     } finally {
-      if (mode === "direct") {
-        setIsUploadingPhoto(false);
-      }
+      if (mode === "direct") setIsUploadingPhoto(false);
     }
   };
 
   if (!session) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+        edges={["top"]}
+      >
         <View style={styles.center}>
           <Spinner />
         </View>
@@ -316,7 +658,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+      edges={["top"]}
+    >
       <StatusBar style={statusBarStyle} />
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
@@ -330,12 +675,12 @@ export default function ProfileScreen() {
           />
         }
       >
-        <AppCard title="Profile" subtitle="Update your account details and personalization settings." />
-
         <AppCard
-          title="Appearance"
-          subtitle={`Currently using ${resolvedMode} mode.`}
-        >
+          title="Profile"
+          subtitle="Update your account details and personalization settings."
+        />
+
+        <AppCard title="Appearance" subtitle={`Currently using ${resolvedMode} mode.`}>
           <SegmentedControl value={preference} options={THEME_OPTIONS} onChange={setPreference} />
         </AppCard>
 
@@ -346,10 +691,20 @@ export default function ProfileScreen() {
         ) : user ? (
           <>
             {profileQuery.error && !profileQuery.data ? (
-              <View style={[styles.serverWarningCard, { borderColor: theme.colors.warningSoft, backgroundColor: theme.colors.warningSoft }]}>
-                <Text style={[styles.serverWarningText, { color: theme.colors.textSecondary }]}>
-                  Could not refresh the latest profile from the server. You can still edit using your
-                  saved account info.
+              <View
+                style={[
+                  styles.serverWarningCard,
+                  {
+                    borderColor: theme.colors.warningSoft,
+                    backgroundColor: theme.colors.warningSoft,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.serverWarningText, { color: theme.colors.textSecondary }]}
+                >
+                  Could not refresh the latest profile from the server. You can still edit using
+                  your saved account info.
                 </Text>
                 <Button
                   label="Refresh profile"
@@ -370,7 +725,6 @@ export default function ProfileScreen() {
                   void onSelectProfilePicture("direct");
                   return;
                 }
-
                 setShowPhotoPreview(true);
               }}
               onEditPress={() => {
@@ -390,7 +744,9 @@ export default function ProfileScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Edit details</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                  Edit details
+                </Text>
 
                 <Button
                   label="Change profile picture"
@@ -401,7 +757,9 @@ export default function ProfileScreen() {
                 />
 
                 {pendingProfileAsset ? (
-                  <Text style={[styles.pendingPhotoText, { color: theme.colors.textMuted }]}>New photo selected. It will upload on save.</Text>
+                  <Text style={[styles.pendingPhotoText, { color: theme.colors.textMuted }]}>
+                    New photo selected. It will upload on save.
+                  </Text>
                 ) : null}
 
                 <Input
@@ -445,7 +803,11 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.formMessage,
-                      { color: updateProfileMutation.isError ? theme.colors.danger : theme.colors.textSecondary },
+                      {
+                        color: updateProfileMutation.isError
+                          ? theme.colors.danger
+                          : theme.colors.textSecondary,
+                      },
                     ]}
                   >
                     {formMessage}
@@ -456,14 +818,18 @@ export default function ProfileScreen() {
                   <View style={styles.formActionsRow}>
                     <Pressable
                       onPress={() => {
-                        if (!isDirty || updateProfileMutation.isPending || isUploadingPhoto) {
+                        if (!isDirty || updateProfileMutation.isPending || isUploadingPhoto)
                           return;
-                        }
                         onReset();
                       }}
                       disabled={!isDirty || updateProfileMutation.isPending || isUploadingPhoto}
                       accessibilityRole="button"
-                      android_ripple={{ color: theme.mode === "dark" ? "rgba(248, 113, 113, 0.14)" : "rgba(220, 38, 38, 0.08)" }}
+                      android_ripple={{
+                        color:
+                          theme.mode === "dark"
+                            ? "rgba(248, 113, 113, 0.14)"
+                            : "rgba(220, 38, 38, 0.08)",
+                      }}
                       style={({ pressed }) => [
                         styles.formActionCell,
                         styles.resetButton,
@@ -475,19 +841,14 @@ export default function ProfileScreen() {
                             !isDirty || updateProfileMutation.isPending || isUploadingPhoto
                               ? 0.86
                               : pressed
-                                ? 0.94
-                                : 1,
+                              ? 0.94
+                              : 1,
                           transform: [{ scale: pressed ? 0.99 : 1 }],
                         },
                       ]}
                     >
                       <Text
-                        style={[
-                          styles.resetButtonLabel,
-                          {
-                            color: theme.colors.danger,
-                          },
-                        ]}
+                        style={[styles.resetButtonLabel, { color: theme.colors.danger }]}
                       >
                         Reset
                       </Text>
@@ -516,7 +877,11 @@ export default function ProfileScreen() {
           </>
         ) : (
           <View style={styles.errorCard}>
-            <SessionCard user={session.user} onSignOut={() => void signOut()} signingOut={busy} />
+            <SessionCard
+              user={session.user}
+              onSignOut={() => void signOut()}
+              signingOut={busy}
+            />
             <Button
               label="Refresh profile"
               variant="ghost"
@@ -525,12 +890,50 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <View style={styles.versionFooter}>
-          <Text style={[styles.versionText, { color: theme.colors.textMuted }]}>{appVersionLabel}</Text>
-        </View>
+        {/* ----------------------------------------------------------------
+            Feedback teaser
+            Gated by EXPO_PUBLIC_FEEDBACK_ENABLED env var (default: false).
+            Shown at the bottom of the screen, above the version footer.
+        ---------------------------------------------------------------- */}
+        {FEEDBACK_ENABLED ? (
+          <View
+            style={[
+              styles.feedbackTeaser,
+              {
+                borderColor: theme.colors.border,
+                borderRadius: theme.roundness,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>
+              We'd love to hear from you 💬
+            </Text>
+            <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>
+              Got a feature idea, hit a rough edge, or just want to say something? Every bit of
+              feedback directly shapes what we build next.{" "}
+              <Text
+                style={[styles.feedbackTeaserLink, { color: theme.colors.primary }]}
+                onPress={() => setShowFeedbackModal(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Open feedback form"
+              >
+                Share feedback →
+              </Text>
+            </Text>
+          </View>
+        ) : null}
 
+        <View style={styles.versionFooter}>
+          <Text style={[styles.versionText, { color: theme.colors.textMuted }]}>
+            {appVersionLabel}
+          </Text>
+        </View>
       </KeyboardAwareScrollView>
 
+      {/* ----------------------------------------------------------------
+          Photo preview modal (unchanged from original)
+      ---------------------------------------------------------------- */}
       <Modal
         visible={showPhotoPreview}
         transparent
@@ -551,7 +954,9 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <Text style={[styles.previewTitle, { color: theme.colors.textPrimary }]}>Profile picture</Text>
+            <Text style={[styles.previewTitle, { color: theme.colors.textPrimary }]}>
+              Profile picture
+            </Text>
             {user?.profilePicture && !previewLoadFailed ? (
               <Pressable
                 onPress={() => {
@@ -565,43 +970,128 @@ export default function ProfileScreen() {
                   uri={user.profilePicture}
                   style={[
                     styles.previewImage,
-                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                    },
                   ]}
                   onError={() => setPreviewLoadFailed(true)}
                 />
               </Pressable>
             ) : (
-              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>Profile picture not available.</Text>
+              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
+                Profile picture not available.
+              </Text>
             )}
             {user?.profilePicture && !previewLoadFailed ? (
               <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
                 Tap the image to update profile picture.
               </Text>
             ) : (
-              <>
-                <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
-                  Please{" "}
-                  <Text
-                    style={[styles.previewUploadText, { color: theme.colors.primary }]}
-                    onPress={() => {
-                      setShowPhotoPreview(false);
-                      void onSelectProfilePicture("direct");
-                    }}
-                  >
-                    upload
-                  </Text>{" "}
-                  a profile picture.
-                </Text>
-              </>
+              <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>
+                Please{" "}
+                <Text
+                  style={[styles.previewUploadText, { color: theme.colors.primary }]}
+                  onPress={() => {
+                    setShowPhotoPreview(false);
+                    void onSelectProfilePicture("direct");
+                  }}
+                >
+                  upload
+                </Text>{" "}
+                a profile picture.
+              </Text>
             )}
-            <Button label="Close" variant="ghost" onPress={() => setShowPhotoPreview(false)} />
+            <Button
+              label="Close"
+              variant="ghost"
+              onPress={() => setShowPhotoPreview(false)}
+            />
           </View>
         </Pressable>
       </Modal>
+
+      {/* ----------------------------------------------------------------
+          Feedback modal — only mounted when flag is on
+      ---------------------------------------------------------------- */}
+      {FEEDBACK_ENABLED ? (
+        <FeedbackModal
+          visible={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          theme={theme}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles — EmojiRatingPicker
+// ---------------------------------------------------------------------------
+const ratingStyles = StyleSheet.create({
+  wrapper: { gap: 8 },
+  labelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  label: { fontSize: 13.5, fontWeight: "600" },
+  optional: { fontWeight: "400" },
+  hint: { fontSize: 12, lineHeight: 17 },
+  clearText: { fontSize: 12, textDecorationLine: "underline" },
+  stepsRow: { flexDirection: "row", gap: 6 },
+  step: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderWidth: 1,
+    gap: 4,
+  },
+  stepEmoji: { fontSize: 22 },
+  stepLabel: { fontSize: 10, textAlign: "center" },
+});
+
+// ---------------------------------------------------------------------------
+// Styles — FeedbackModal
+// ---------------------------------------------------------------------------
+const feedbackStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  card: {
+    width: "100%",
+    maxHeight: "90%",
+    borderWidth: 1,
+    // Bottom corners are flush with screen edge (sheet style)
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    padding: 20,
+    paddingBottom: 0,
+    gap: 12,
+  },
+  title: { fontSize: 18, fontWeight: "800" },
+  subtitle: { fontSize: 13.5, lineHeight: 20 },
+  scrollContent: { gap: 14, paddingBottom: 36 },
+  charCount: { fontSize: 11, textAlign: "right", marginTop: -8 },
+  errorText: { fontSize: 13, lineHeight: 18 },
+  actions: { gap: 10, marginTop: 4 },
+  successBlock: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 24,
+    paddingBottom: 36,
+  },
+  successEmoji: { fontSize: 48 },
+  successTitle: { fontSize: 20, fontWeight: "800" },
+  successBody: { fontSize: 14, lineHeight: 21, textAlign: "center" },
+});
+
+// ---------------------------------------------------------------------------
+// Styles — ProfileScreen
+// ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardWrap: { flex: 1 },
@@ -623,6 +1113,16 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "800" },
   formMessage: { fontSize: 13 },
   pendingPhotoText: { fontSize: 12 },
+  // ── Feedback teaser ──
+  feedbackTeaser: {
+    borderWidth: 1,
+    padding: 16,
+    gap: 8,
+  },
+  feedbackTeaserTitle: { fontSize: 15, fontWeight: "700" },
+  feedbackTeaserBody: { fontSize: 13.5, lineHeight: 21 },
+  feedbackTeaserLink: { fontWeight: "700" },
+  // ── Version footer ──
   versionFooter: {
     marginTop: "auto",
     paddingTop: 12,
@@ -634,6 +1134,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     opacity: 0.85,
   },
+  // ── Profile edit form ──
   formActions: { gap: 10 },
   formActionsRow: { flexDirection: "row", gap: 10 },
   formActionCell: { flex: 1 },
@@ -650,6 +1151,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.25,
   },
+  // ── Photo preview modal ──
   previewBackdrop: {
     flex: 1,
     backgroundColor: "rgba(2, 6, 23, 0.7)",
@@ -672,9 +1174,11 @@ const styles = StyleSheet.create({
     borderRadius: 110,
     borderWidth: 1,
   },
-  previewImageButton: {
-    borderRadius: 110,
-  },
+  previewImageButton: { borderRadius: 110 },
   previewHint: { fontSize: 13, textAlign: "center" },
-  previewUploadText: { fontSize: 15, fontWeight: "700", textDecorationLine: "underline" },
+  previewUploadText: {
+    fontSize: 15,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
 });

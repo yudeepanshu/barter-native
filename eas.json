@@ -6,28 +6,43 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
+        "NPM_CONFIG_WORKSPACES": "false"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
+        "NPM_CONFIG_WORKSPACES": "false"
       }
     },
     "simulator": {
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
+        "NPM_CONFIG_WORKSPACES": "false"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
+        "NPM_CONFIG_WORKSPACES": "false"
       }
     }
   },
   "submit": {
-    "production": {
-    }
+    "production": {}
   }
 }

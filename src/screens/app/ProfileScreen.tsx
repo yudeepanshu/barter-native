@@ -63,15 +63,15 @@ const MAX_FEEDBACK_TEXT = 2000;
 // Types
 // ---------------------------------------------------------------------------
 interface FeedbackPayload {
-  positive_feedback?: string;
-  negative_feedback?: string;
-  ui_rating?: number;
-  ux_rating?: number;
+  positiveFeedback?: string;
+  negativeFeedback?: string;
+  uiRating?: number;
+  uxRating?: number;
 }
 
 interface FeedbackFormErrors {
-  positive_feedback?: string;
-  negative_feedback?: string;
+  positiveFeedback?: string;
+  negativeFeedback?: string;
   atLeastOne?: string;
   submit?: string;
 }
@@ -209,10 +209,10 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
         "Please share at least one of: what went well or what could be improved.";
     }
     if (trimPos.length > MAX_FEEDBACK_TEXT) {
-      next.positive_feedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimPos.length}).`;
+      next.positiveFeedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimPos.length}).`;
     }
     if (trimNeg.length > MAX_FEEDBACK_TEXT) {
-      next.negative_feedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimNeg.length}).`;
+      next.negativeFeedback = `Keep it under ${MAX_FEEDBACK_TEXT} characters (currently ${trimNeg.length}).`;
     }
 
     return next;
@@ -227,14 +227,14 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
     const trimPos = positiveFeedback.trim();
     const trimNeg = negativeFeedback.trim();
 
-    if (trimPos.length > 0) payload.positive_feedback = trimPos;
-    if (trimNeg.length > 0) payload.negative_feedback = trimNeg;
-    if (uiRating !== null) payload.ui_rating = uiRating;
-    if (uxRating !== null) payload.ux_rating = uxRating;
+    if (trimPos.length > 0) payload.positiveFeedback = trimPos;
+    if (trimNeg.length > 0) payload.negativeFeedback = trimNeg;
+    if (uiRating !== null) payload.uiRating = uiRating;
+    if (uxRating !== null) payload.uxRating = uxRating;
 
     setIsSubmitting(true);
     try {
-      // await mobileApiClient.submitFeedback(payload);
+      await mobileApiClient.submitFeedback(payload);
       setSubmitSuccess(true);
     } catch (error) {
       setErrors({ submit: toErrorMessage(error) });
@@ -267,12 +267,14 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
           ]}
           onPress={() => {}}
         >
-          <Text style={[feedbackStyles.title, { color: theme.colors.textPrimary }]}>
-            Share your feedback
-          </Text>
-          <Text style={[feedbackStyles.subtitle, { color: theme.colors.textSecondary }]}>
-            Your thoughts help us build a better experience. This takes less than a minute.
-          </Text>
+          {!submitSuccess ? <View>
+            <Text style={[feedbackStyles.title, { color: theme.colors.textPrimary }]}>
+              Share your feedback
+            </Text>
+            <Text style={[feedbackStyles.subtitle, { color: theme.colors.textSecondary }]}>
+              Your thoughts help us build a better experience. This takes less than a minute.
+            </Text>
+          </View> : null}
 
           {submitSuccess ? (
             /* ── Success state ── */
@@ -302,11 +304,11 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
                   setPositiveFeedback(v);
                   setErrors((e) => ({
                     ...e,
-                    positive_feedback: undefined,
+                    positiveFeedback: undefined,
                     atLeastOne: undefined,
                   }));
                 }}
-                error={errors.positive_feedback ?? null}
+                error={errors.positiveFeedback ?? null}
                 multiline
                 numberOfLines={4}
                 maxLength={MAX_FEEDBACK_TEXT}
@@ -327,11 +329,11 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
                   setNegativeFeedback(v);
                   setErrors((e) => ({
                     ...e,
-                    negative_feedback: undefined,
+                    negativeFeedback: undefined,
                     atLeastOne: undefined,
                   }));
                 }}
-                error={errors.negative_feedback ?? null}
+                error={errors.negativeFeedback ?? null}
                 multiline
                 numberOfLines={4}
                 maxLength={MAX_FEEDBACK_TEXT}

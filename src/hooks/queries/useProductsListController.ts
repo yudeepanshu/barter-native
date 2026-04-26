@@ -24,6 +24,8 @@ export function useProductsListController(
   const fallbackItems = useMemo(() => {
     const allProducts = Object.values(storeProducts);
     return allProducts.filter((item) => {
+      // Only show listed items in the fallback, since the query is for listed items
+      if(!item.isListed) return false;
       if (filters.status && item.status !== filters.status) return false;
       if (filters.ownerId && item.currentOwnerId !== filters.ownerId) return false;
       if (filters.excludeOwnerId && item.currentOwnerId === filters.excludeOwnerId) return false;

@@ -218,15 +218,24 @@ function patchProductInInfiniteCollections(
       let didChange = false;
       const nextPages = existing.pages.map((page) => {
         let pageChanged = false;
-        const nextItems = page.items.map((item) => {
+        const nextItems: ProductSummary[] = [];
+        
+        for(const item of page.items) {
           if (item.id !== patch.productId) {
-            return item;
+            nextItems.push(item);
+            continue;
           }
 
           matched = true;
           pageChanged = true;
-          return patchProductSummary(item, patch);
-        });
+
+          if(!patch.isListed) {
+            // If the product is no longer listed, remove it from the infinite collection
+            continue;
+          }
+
+          nextItems.push(patchProductSummary(item, patch));
+        }
 
         if (!pageChanged) {
           return page;

@@ -141,20 +141,23 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
         ]);
 
         if (cachedFeedItems?.length) {
-          useAppDataStore.getState().upsertProducts(cachedFeedItems);
-          queryClient.setQueryData(queryKeys.products.infinite(getStartupFeedFilters(userId)), {
-            pages: [
-              {
-                items: cachedFeedItems,
-                nextCursor: null,
-                hasMore: cachedFeedItems.length >= STARTUP_FEED_LIMIT,
-              },
-            ],
-            pageParams: [null],
-          });
-          logAuthBootstrap("info", "startup feed snapshot restored", {
-            itemCount: cachedFeedItems.length,
-          });
+          const listedCachedFeedItems = cachedFeedItems.filter((item) => item.isListed);
+          if(listedCachedFeedItems.length) {
+            useAppDataStore.getState().upsertProducts(listedCachedFeedItems);
+            queryClient.setQueryData(queryKeys.products.infinite(getStartupFeedFilters(userId)), {
+              pages: [
+                {
+                  items: listedCachedFeedItems,
+                  nextCursor: null,
+                  hasMore: listedCachedFeedItems.length >= STARTUP_FEED_LIMIT,
+                },
+              ],
+              pageParams: [null],
+            });
+            logAuthBootstrap("info", "startup feed snapshot restored", {
+              itemCount: listedCachedFeedItems.length,
+            });
+          }
         }
 
         if (cachedCategories?.length) {

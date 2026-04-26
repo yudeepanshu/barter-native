@@ -11,7 +11,7 @@
     "web": "expo start --web",
     "apk:debug": "cd android && gradlew.bat assembleDebug",
     "apk:standalone": "cd android && gradlew.bat assembleDebug -PembedDebugBundle=true",
-    "apk:release": "cd android && gradlew.bat assembleRelease --warning-mode all --stacktrace 2>&1",
+    "apk:release": "cd android && gradlew.bat assembleRelease --rerun-tasks",
     "apk:clean": "cd android && gradlew.bat clean",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"

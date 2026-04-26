@@ -8,6 +8,7 @@ const INDEX_LOADING_TIMEOUT_MS = 10000;
 
 export default function Index() {
   const status = useAuthStatus();
+  const isHydrated = useAuthStore((state) => state._hasHydrated);
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
@@ -22,6 +23,10 @@ export default function Index() {
 
     return () => clearTimeout(timeout);
   }, [status]);
+
+  if (!isHydrated) { // Gates everything below until bootstrap is done
+    return <StartupLoadingScreen timedOut={false} onContinue={() => {}} />;
+  }
 
   if (status === "authenticated") {
     return <Redirect href="/(app)/(tabs)/home" />;

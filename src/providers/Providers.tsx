@@ -90,6 +90,8 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
         useAuthStore.setState({ status: "unauthenticated" });
       }
 
+      useAuthStore.setState({ _hasHydrated: true });
+
       logAuthBootstrap("info", "bootstrap completed", {
         statusBeforeComplete: currentStatus,
         elapsedMs: Date.now() - startedAt,

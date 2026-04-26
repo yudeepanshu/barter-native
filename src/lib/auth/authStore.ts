@@ -4,15 +4,6 @@ import * as SecureStore from "expo-secure-store";
 import type { AuthSession, AuthStatus } from "@barter/types";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 
-/**
- * Custom storage adapter that delegates to expo-secure-store.
- * Tokens and user profile are encrypted at rest on the device.
- *
- * getItem returns null instead of throwing so that a transient Keystore
- * error (e.g. Android hardware key not yet ready on first boot) causes
- * Zustand to treat the store as empty rather than propagating a rejection
- * out of rehydrate().
- */
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
@@ -28,6 +19,7 @@ const secureStorage = {
 interface AuthState {
   session: AuthSession | null;
   status: AuthStatus;
+  _hasHydrated: boolean; // 1️⃣ New flag
   setSession: (session: AuthSession) => void;
   clearSession: () => void;
 }
@@ -36,8 +28,8 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       session: null,
-      // Starts loading until SecureStore async rehydration completes
       status: "loading" as AuthStatus,
+      _hasHydrated: false, // 2️⃣ Default false before SecureStore is read
       setSession: (session) => {
         const previousUserId = useAuthStore.getState().session?.user.id;
         if (previousUserId && previousUserId !== session.user.id) {
@@ -55,9 +47,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "barter-auth",
       storage: createJSONStorage(() => secureStorage),
-      // Only persist the session object; status is derived on rehydration
       partialize: (state) => ({ session: state.session }),
-      // Skip auto-hydration --- Providers triggers it after mounting
       skipHydration: true,
     },
   ),

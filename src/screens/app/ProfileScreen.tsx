@@ -36,6 +36,7 @@ import { AppCard } from "@/components/ui/AppCard";
 import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -101,9 +102,9 @@ function EmojiRatingPicker({
       <View style={ratingStyles.labelRow}>
         <Text style={[ratingStyles.label, { color: theme.colors.textSecondary }]}>
           {label}
-          <Text style={[ratingStyles.optional, { color: theme.colors.textMuted }]}>
+          {/* <Text style={[ratingStyles.optional, { color: theme.colors.textMuted }]}>
             {" "}(optional)
-          </Text>
+          </Text> */}
         </Text>
         {value !== null && (
           <Pressable onPress={() => !disabled && onChange(null)} hitSlop={8} disabled={disabled}>
@@ -137,8 +138,9 @@ function EmojiRatingPicker({
                     : theme.colors.surfaceMuted,
                   borderColor: selected ? theme.colors.primary : theme.colors.border,
                   borderRadius: theme.roundness - 2,
+                  borderWidth: selected ? 2 : 1,        // ← thicker border instead of scale
                   opacity: pressed ? 0.8 : 1,
-                  transform: [{ scale: selected ? 1.08 : pressed ? 0.96 : 1 }],
+                  // removed transform scale entirely
                 },
               ]}
             >
@@ -232,7 +234,7 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
 
     setIsSubmitting(true);
     try {
-      await mobileApiClient.submitFeedback(payload);
+      // await mobileApiClient.submitFeedback(payload);
       setSubmitSuccess(true);
     } catch (error) {
       setErrors({ submit: toErrorMessage(error) });
@@ -294,7 +296,7 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
               {/* Positive feedback */}
               <Input
                 label="What's working well?"
-                placeholder="Tell us what you love — features, speed, design, anything that delights you…"
+                placeholder="Tell us what you love, anything that delights you…"
                 value={positiveFeedback}
                 onChangeText={(v) => {
                   setPositiveFeedback(v);
@@ -319,7 +321,7 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
               {/* Negative feedback */}
               <Input
                 label="What could be better?"
-                placeholder="Friction points, bugs, confusing flows, missing features — we want to know it all."
+                placeholder="Friction points, bugs, confusing flows, missing features..."
                 value={negativeFeedback}
                 onChangeText={(v) => {
                   setNegativeFeedback(v);
@@ -350,8 +352,8 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
 
               {/* UI Rating */}
               <EmojiRatingPicker
-                label="How would you rate the visual design (UI)?"
-                hint="Layout, colours, typography, and how the app looks overall."
+                label="How would you rate the visual design?"
+                // hint="Layout, colours, typography, and how the app looks overall."
                 value={uiRating}
                 onChange={setUiRating}
                 disabled={isSubmitting}
@@ -360,8 +362,8 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
 
               {/* UX Rating */}
               <EmojiRatingPicker
-                label="How easy is the app to use (UX)?"
-                hint="Navigation, flows, and how intuitive everyday interactions feel."
+                label="How easy is the app to use?"
+                // hint="Navigation, flows, and how intuitive everyday interactions feel."
                 value={uxRating}
                 onChange={setUxRating}
                 disabled={isSubmitting}
@@ -896,7 +898,10 @@ export default function ProfileScreen() {
             Shown at the bottom of the screen, above the version footer.
         ---------------------------------------------------------------- */}
         {FEEDBACK_ENABLED ? (
-          <View
+          <Pressable
+            onPress={() => setShowFeedbackModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open feedback form"
             style={[
               styles.feedbackTeaser,
               {
@@ -906,22 +911,25 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>
-              We'd love to hear from you 💬
-            </Text>
-            <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>
-              Got a feature idea, hit a rough edge, or just want to say something? Every bit of
-              feedback directly shapes what we build next.{" "}
-              <Text
-                style={[styles.feedbackTeaserLink, { color: theme.colors.primary }]}
-                onPress={() => setShowFeedbackModal(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Open feedback form"
-              >
-                Share feedback →
+            {/* Icon */}
+            <View style={[styles.feedbackIconCircle, { backgroundColor: theme.colors.surfaceMuted ?? '#EEF2FF' }]}>
+              <MaterialCommunityIcons
+                name="message-text-outline"
+                size={22}
+                color={theme.colors.primary}
+              />
+            </View>
+
+            {/* Texts */}
+            <View style={styles.feedbackTextGroup}>
+              <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>
+                Feedback
               </Text>
-            </Text>
-          </View>
+              <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>
+                Tell us what you think of our App
+              </Text>
+            </View>
+          </Pressable>
         ) : null}
 
         <View style={styles.versionFooter}>
@@ -1039,7 +1047,7 @@ const ratingStyles = StyleSheet.create({
   optional: { fontWeight: "400" },
   hint: { fontSize: 12, lineHeight: 17 },
   clearText: { fontSize: 12, textDecorationLine: "underline" },
-  stepsRow: { flexDirection: "row", gap: 6 },
+  stepsRow: { flexDirection: "row", gap: 6, paddingHorizontal: 1 },
   step: {
     flex: 1,
     alignItems: "center",
@@ -1109,6 +1117,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
     gap: 12,
+    overflow: "visible",
   },
   sectionTitle: { fontSize: 16, fontWeight: "800" },
   formMessage: { fontSize: 13 },
@@ -1117,11 +1126,31 @@ const styles = StyleSheet.create({
   feedbackTeaser: {
     borderWidth: 1,
     padding: 16,
-    gap: 8,
+    flexDirection: 'row',       // icon + text side by side
+    alignItems: 'center',
+    gap: 14,
   },
-  feedbackTeaserTitle: { fontSize: 15, fontWeight: "700" },
-  feedbackTeaserBody: { fontSize: 13.5, lineHeight: 21 },
-  feedbackTeaserLink: { fontWeight: "700" },
+  feedbackIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,              // prevent icon from shrinking
+  },
+  feedbackTextGroup: {
+    flex: 1,                    // take remaining width
+    gap: 3,
+  },
+  feedbackTeaserTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  feedbackTeaserBody: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  feedbackTeaserLink: { fontWeight: '700' },
   // ── Version footer ──
   versionFooter: {
     marginTop: "auto",

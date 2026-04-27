@@ -518,19 +518,34 @@ export default function ProfileScreen() {
       nextErrors.userName = "Name must be at least 3 characters.";
     }
 
-    if (hasExistingValue(user?.email) && trimmedEmail.length === 0) {
-      nextErrors.email = "Email cannot be empty once set.";
-    } else if (trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)) {
-      nextErrors.email = "Enter a valid email address.";
+    // if (hasExistingValue(user?.email) && trimmedEmail.length === 0) {
+    //   nextErrors.email = "Email cannot be empty once set.";
+    // } else if (trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)) {
+    //   nextErrors.email = "Enter a valid email address.";
+    // }
+
+    // if (hasExistingValue(user?.mobileNumber) && trimmedPhone.length === 0) {
+    //   nextErrors.mobileNumber = "Phone number cannot be empty once set.";
+    // } else if (
+    //   trimmedPhone.length > 0 &&
+    //   (trimmedPhone.length < 10 || trimmedPhone.length > 15)
+    // ) {
+    //   nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
+    // }
+
+    if (!hasExistingValue(user?.email)) {
+      if (trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)) {
+        nextErrors.email = "Enter a valid email address.";
+      }
     }
 
-    if (hasExistingValue(user?.mobileNumber) && trimmedPhone.length === 0) {
-      nextErrors.mobileNumber = "Phone number cannot be empty once set.";
-    } else if (
-      trimmedPhone.length > 0 &&
-      (trimmedPhone.length < 10 || trimmedPhone.length > 15)
-    ) {
-      nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
+    if (!hasExistingValue(user?.mobileNumber)) {
+      if (
+        trimmedPhone.length > 0 &&
+        (trimmedPhone.length < 10 || trimmedPhone.length > 15)
+      ) {
+        nextErrors.mobileNumber = "Phone number must be 10 to 15 digits.";
+      }
     }
 
     setFieldErrors(nextErrors);
@@ -791,6 +806,8 @@ export default function ProfileScreen() {
                   keyboardType="email-address"
                   autoCorrect={false}
                   placeholder="Optional"
+                  editable={!hasExistingValue(user?.email)}
+                  disabled={hasExistingValue(user?.email)}
                 />
 
                 <Input
@@ -803,6 +820,8 @@ export default function ProfileScreen() {
                   error={fieldErrors.mobileNumber ?? null}
                   keyboardType="phone-pad"
                   placeholder="Optional"
+                  editable={!hasExistingValue(user?.mobileNumber)}
+                  disabled={hasExistingValue(user?.mobileNumber)}
                 />
 
                 {formMessage ? (

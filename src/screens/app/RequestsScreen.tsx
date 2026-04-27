@@ -28,6 +28,7 @@ import {
 } from "@/hooks/queries/useRequestsQuery";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { EmptyView } from "@/components/ui/EmptyView";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + paddings + gaps
@@ -304,11 +305,10 @@ export default function RequestsScreen() {
               }
               keyboardDismissMode="on-drag"
             >
-              <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-                <Feather name="inbox" size={20} color={theme.colors.textMuted} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Nothing here yet</Text>
-                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Your sent and received requests will show up here once activity begins.</Text>
-              </View>
+              <EmptyView
+                title="Nothing here yet"
+                message="Your sent and received requests will show up here once activity begins."
+              />
             </ScrollView>
           ) : null}
 

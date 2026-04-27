@@ -22,7 +22,6 @@ import {
   useUnlistProductMutation,
 } from "@/hooks/mutations/useUnlistProductMutation";
 import {
-  ProductListEmptyState,
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
@@ -44,6 +43,7 @@ import { mobileApiClient } from "@/lib/api/client";
 import { syncProductEntity } from "@/lib/query/mutationSync";
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
 import { ErrorView } from "@/components/ui/ErrorView";
+import { EmptyView } from "@/components/ui/EmptyView";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
@@ -658,11 +658,21 @@ export default function MyListingsScreen() {
             onEndReachedThreshold={0.35}
             onEndReached={products.loadMore}
             ListEmptyComponent={
-              <ProductListEmptyState
+              <EmptyView
+                title={
+                  selectedFilter === 'ALL' 
+                    ? "You haven't listed anything yet."
+                    : `No ${selectedFilterLabel.toLowerCase()} listings found.`
+                }
                 message={
-                  selectedFilter === "ALL"
-                    ? "You do not have any listings yet."
-                    : `No ${selectedFilter.toLowerCase()} listings found.`
+                  selectedFilter === 'ALL'
+                    ? "Create your first listing and it will show up here."
+                    : "Try adjusting your filters to see more results."
+                }
+                buttons={
+                  selectedFilter === 'ALL'
+                    ? [{label: "Create listing", onPress: () => router.push("/(app)/(tabs)/create")}]
+                    : undefined
                 }
               />
             }

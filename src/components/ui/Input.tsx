@@ -14,6 +14,7 @@ interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
   error?: string | null;
   style?: ComponentProps<typeof TextInput>["style"];
   showCharacterCount?: boolean;
+  disabled?: boolean;
 }
 
 export function Input({
@@ -21,6 +22,11 @@ export function Input({
   error,
   style,
   showCharacterCount = false,
+  disabled = false,
+  editable,
+  onChangeText,
+  onFocus,
+  onBlur, 
   ...rest
 }: InputProps) {
   const { theme } = useAppTheme();
@@ -37,6 +43,8 @@ export function Input({
 
   const maxLength =
     typeof rest.maxLength === "number" ? rest.maxLength : null;
+
+  const isNumeric = rest.keyboardType === "numeric" || rest.keyboardType === "number-pad" || rest.keyboardType === "phone-pad";
 
   return (
     <View style={styles.container}>
@@ -55,27 +63,32 @@ export function Input({
           style={[
             styles.input,
             {
-              color: theme.colors.textPrimary,
-              backgroundColor: theme.colors.surface,
-              borderColor: focused
+              color: disabled ? theme.colors.textMuted : theme.colors.textPrimary,
+              backgroundColor: disabled ? theme.colors.surfaceMuted : theme.colors.surface,
+              borderColor: disabled
+                ? theme.colors.border
+                : focused
                 ? theme.colors.primary
                 : theme.colors.border,
               borderRadius: theme.roundness - 4,
+              opacity: disabled ? 0.7 : 1,
             },
-            error && { borderColor: theme.colors.danger },
+            error && !disabled && { borderColor: theme.colors.danger },
             style,
           ]}
+          editable={!disabled}
+            onChangeText={(value) => {
+              const next = isNumeric ? value.replace(/[^0-9]/g, "") : value;
+              onChangeText?.(next);
+            }}
           onFocus={(event) => {
             setFocused(true);
-
-            // ✅ Just notify — no timing logic
             keyboardAware?.notifyInputFocused(inputRef.current);
-
-            rest.onFocus?.(event);
+            onFocus?.(event);
           }}
           onBlur={(event) => {
             setFocused(false);
-            rest.onBlur?.(event);
+            onBlur?.(event);
           }}
           {...rest}
         />

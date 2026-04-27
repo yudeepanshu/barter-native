@@ -9,7 +9,7 @@
     "android:standalone": "npm run apk:standalone && adb install -r android\\app\\build\\outputs\\apk\\debug\\app-debug.apk && adb shell am start -n com.barter.app/.MainActivity",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "apk:debug": "cd android && gradlew.bat assembleDebug",
+    "apk:debug": "cd android && gradlew.bat assembleDebug --rerun-tasks",
     "apk:standalone": "cd android && gradlew.bat assembleDebug -PembedDebugBundle=true",
     "apk:release": "cd android && gradlew.bat assembleRelease --rerun-tasks",
     "apk:clean": "cd android && gradlew.bat clean",

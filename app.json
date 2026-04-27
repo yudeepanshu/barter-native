@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flippe",
     "slug": "barter",
-    "version": "4.1.0-alpha.0",
+    "version": "4.2.1-alpha.0",
     "scheme": "barter",
     "workspaceRoot": "../..",
     "projectRoot": "apps/mobile",

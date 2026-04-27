@@ -27,7 +27,6 @@ import { useProductFeedFilters } from "@/hooks/useProductFeedFilters";
 import { Input } from "@/components/ui/Input";
 import { ProductCard } from "@/components/products/ProductCard";
 import {
-  ProductListEmptyState,
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
@@ -43,6 +42,7 @@ import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottom
 import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
 import { getFirstName } from "@/lib/utils/commonUtils";
 import { ErrorView } from "../ui/ErrorView";
+import { EmptyView } from "../ui/EmptyView";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -669,7 +669,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 ]}
               />
             ) : (
-              <ProductListEmptyState message="No listings found for the current filters." />
+              <EmptyView
+                title="No listings found"
+                message="Try adjusting your filters to see more results."
+              />
             )
           }
           ListFooterComponent={

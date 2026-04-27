@@ -24,7 +24,7 @@ export default function Index() {
     return () => clearTimeout(timeout);
   }, [status]);
 
-  if (!isHydrated) { // Gates everything below until bootstrap is done
+  if (!isHydrated || status === "loading") { // Gates everything below until bootstrap is done
     return <StartupLoadingScreen timedOut={false} onContinue={() => {}} />;
   }
 

@@ -37,6 +37,7 @@ import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -667,6 +668,12 @@ export default function ProfileScreen() {
       edges={["top"]}
     >
       <StatusBar style={statusBarStyle} />
+      <View style={styles.fixedTopContent}>
+        <PageHeaderCard
+          title="Profile"
+          subtitle="Update your account details and personalization settings."
+        />
+      </View>
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={12}
@@ -679,11 +686,6 @@ export default function ProfileScreen() {
           />
         }
       >
-        <AppCard
-          title="Profile"
-          subtitle="Update your account details and personalization settings."
-        />
-
         <AppCard title="Appearance" subtitle={`Currently using ${resolvedMode} mode.`}>
           <SegmentedControl value={preference} options={THEME_OPTIONS} onChange={setPreference} />
         </AppCard>
@@ -1104,6 +1106,12 @@ const feedbackStyles = StyleSheet.create({
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  fixedTopContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+    marginBottom: -8,
+  },
   keyboardWrap: { flex: 1 },
   content: { flexGrow: 1, padding: 16, gap: 12 },
   center: { paddingTop: 40, alignItems: "center" },

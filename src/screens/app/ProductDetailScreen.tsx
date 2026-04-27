@@ -38,6 +38,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
+import { ErrorView } from "@/components/ui/ErrorView";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -139,14 +140,21 @@ export default function ProductDetailScreen() {
   if (query.error || !query.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={styles.errorWrap}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Product not found</Text>
-          <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this listing.</Text>
-          <View style={styles.actions}>
-            <Button label="Retry" onPress={() => void query.refetch()} />
-            <Button label="Back" variant="ghost" onPress={handleBack} />
-          </View>
-        </View>
+        <ErrorView
+          title="Product not found"
+          message="We could not load this listing."
+          buttons={[
+            {
+              label: "Retry",
+              onPress: () => void query.refetch(),
+            },
+            {
+              label: "Back",
+              variant: "ghost",
+              onPress: handleBack,
+            },
+          ]}
+        />
       </SafeAreaView>
     );
   }

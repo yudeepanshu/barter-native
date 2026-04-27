@@ -23,7 +23,6 @@ import {
 } from "@/hooks/mutations/useUnlistProductMutation";
 import {
   ProductListEmptyState,
-  ProductListErrorState,
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
@@ -44,6 +43,7 @@ import { uploadImages as uploadProductImages } from "@/lib/forms/listingFormUtil
 import { mobileApiClient } from "@/lib/api/client";
 import { syncProductEntity } from "@/lib/query/mutationSync";
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
+import { ErrorView } from "@/components/ui/ErrorView";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
@@ -594,12 +594,16 @@ export default function MyListingsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       {products.query.error ? (
-        <View style={styles.errorWrap}>
-          <ProductListErrorState
-            message="Could not load your listings. Please try again."
-            onRetry={products.refresh}
-          />
-        </View>
+        <ErrorView
+          title="Could not load your listing"
+          message="Something went wrong. Please try again."
+          buttons={[
+            {
+              label: 'Retry',
+              onPress: () => void products.refresh(),
+            },
+          ]}
+        />
       ) : (
         <>
           <View style={styles.fixedTopContent}>

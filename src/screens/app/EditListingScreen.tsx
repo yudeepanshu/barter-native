@@ -26,6 +26,7 @@ import { ListingLocationSection } from "@/components/products/ListingLocationSec
 import { ListingTextFields } from "@/components/products/ListingTextFields";
 import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { ErrorView } from "@/components/ui/ErrorView";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -55,14 +56,21 @@ export default function EditListingScreen() {
   if (productQuery.error || !productQuery.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={[styles.errorCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Listing not found</Text>
-          <Text style={[styles.description, { color: theme.colors.textMuted }]}>We could not load this listing.</Text>
-          <View style={styles.actions}>
-            <Button label="Retry" onPress={() => void productQuery.refetch()} />
-            <Button label="Back" variant="ghost" onPress={() => router.back()} />
-          </View>
-        </View>
+        <ErrorView
+          title='Listing not found'
+          message='We could not load this listing.'
+          buttons={[
+            {
+              label: 'Retry',
+              onPress: () => void productQuery.refetch(),
+            },
+            {
+              label: 'Back',
+              variant: 'ghost',
+              onPress: () => router.back(),
+            },
+          ]}
+        />
       </SafeAreaView>
     );
   }
@@ -70,13 +78,17 @@ export default function EditListingScreen() {
   if (productQuery.data.currentOwnerId !== session.user.id) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={[styles.errorCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Not allowed</Text>
-          <Text style={[styles.description, { color: theme.colors.textMuted }]}>You can only edit your own listings.</Text>
-          <View style={styles.actions}>
-            <Button label="Back" variant="ghost" onPress={() => router.back()} />
-          </View>
-        </View>
+        <ErrorView
+          title='Not allowed'
+          message='You can only edit your own listings.'
+          buttons={[
+            {
+              label: 'Back',
+              variant: 'ghost',
+              onPress: () => router.back(),
+            },
+          ]}
+        />
       </SafeAreaView>
     );
   }

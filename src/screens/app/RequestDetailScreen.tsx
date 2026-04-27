@@ -1,4 +1,4 @@
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -42,6 +42,7 @@ import {
   toErrorMessage as toProfileErrorMessage,
 } from "@/hooks/mutations/useUpdateProfileMutation";
 import { getFirstName } from "@/lib/utils/commonUtils";
+import { ErrorView } from "@/components/ui/ErrorView";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -540,7 +541,7 @@ export default function RequestDetailScreen() {
   if (requestQuery.error || !requestQuery.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        <View style={[styles.center, styles.errorContent]}>
+        {/* <View style={[styles.center, styles.errorContent]}>
           <View style={[styles.errorIconContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Feather name="alert-circle" size={48} color={theme.colors.danger} />
           </View>
@@ -559,7 +560,22 @@ export default function RequestDetailScreen() {
               style={{ flex: 1, backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff", borderColor: theme.colors.border, borderWidth: 1 }}
             />
           </View>
-        </View>
+        </View> */}
+        <ErrorView
+          title="Request not found"
+          message="We couldn't load this request. It may have been deleted or you don't have access to it."
+          buttons={[
+            {
+              label: "Retry",
+              onPress: () => void requestQuery.refetch(),
+            },
+            {
+              label: "Back",
+              variant: "ghost",
+              onPress: () => router.back(),
+            },
+          ]}
+        />
       </SafeAreaView>
     );
   }

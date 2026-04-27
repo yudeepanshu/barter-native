@@ -28,7 +28,6 @@ import { Input } from "@/components/ui/Input";
 import { ProductCard } from "@/components/products/ProductCard";
 import {
   ProductListEmptyState,
-  ProductListErrorState,
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
@@ -43,6 +42,7 @@ import { RangeSlider } from "../filters/RangeSlider";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
 import { getFirstName } from "@/lib/utils/commonUtils";
+import { ErrorView } from "../ui/ErrorView";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -644,17 +644,29 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
           ListEmptyComponent={
             showInitialLoading ? (
               initialLoadTimedOut ? (
-                <ProductListErrorState
-                  message="Loading is taking longer than expected. Check your connection and retry."
-                  onRetry={products.refresh}
+                <ErrorView
+                  title='Taking longer than expected'
+                  message='Loading is taking longer than expected. Check your connection and retry.'
+                  buttons={[
+                    {
+                      label: 'Retry',
+                      onPress: products.refresh,
+                    },
+                  ]}
                 />
               ) : (
                 <ProductListLoadingState spinnerSize={30} />
               )
             ) : showInitialError ? (
-              <ProductListErrorState
-                message="Could not load listings. Please try again."
-                onRetry={products.refresh}
+              <ErrorView
+                title='Could not load listings'
+                message='Something went wrong. Please try again.'
+                buttons={[
+                  {
+                    label: 'Retry',
+                    onPress: products.refresh,
+                  },
+                ]}
               />
             ) : (
               <ProductListEmptyState message="No listings found for the current filters." />

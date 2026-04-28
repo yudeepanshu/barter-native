@@ -17,7 +17,6 @@ export function useGoogleAuth(
 ): UseGoogleAuthResult {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-
   const config = useMemo(
     () => ({
       webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined,
@@ -30,7 +29,7 @@ export function useGoogleAuth(
 
   useEffect(() => {
     GoogleSignin.configure({
-      scopes: ["openid", "profile", "email"],
+      // scopes: ["openid", "profile", "email"],
       webClientId: config.webClientId,
       offlineAccess: false,
     });

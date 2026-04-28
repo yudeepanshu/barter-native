@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "Flippe",
-    "slug": "barter",
+    "slug": "flippe",
     "version": "4.2.1-alpha.0",
-    "scheme": "barter",
+    "scheme": "flippe",
     "workspaceRoot": "../..",
     "projectRoot": "apps/mobile",
     "orientation": "portrait",
@@ -20,10 +20,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Flippe uses your location to auto-fill listing location details and show nearby listings."
       },
-      "bundleIdentifier": "com.barter.app"
+      "bundleIdentifier": "com.shinichi.flippeapp"
     },
     "android": {
-      "package": "com.barter.app",
+      "package": "com.shinichi.flippeapp",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "enableProguardInReleaseBuilds": true,
@@ -56,7 +56,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "6c1f7076-0070-40a7-8df1-045d67c38d41"
+        "projectId": "3c3b2566-29ab-42d1-9573-7d9f1e69ff97"
       }
     }
   }

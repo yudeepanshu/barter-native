@@ -15,7 +15,7 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "env": {
         "NPM_CONFIG_INSTALL_STRATEGY": "nested",

@@ -8,8 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
-        "NPM_CONFIG_WORKSPACES": "false"
+        "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
+        "NPM_CONFIG_WORKSPACES": "true"
       }
     },
     "preview": {
@@ -18,17 +18,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
-        "NPM_CONFIG_WORKSPACES": "false"
-      }
-    },
-    "simulator": {
-      "ios": {
-        "simulator": true
-      },
-      "env": {
-        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
-        "NPM_CONFIG_WORKSPACES": "false"
+        "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
+        "NPM_CONFIG_WORKSPACES": "true"
       }
     },
     "production": {
@@ -37,8 +28,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "NPM_CONFIG_INSTALL_STRATEGY": "nested",
-        "NPM_CONFIG_WORKSPACES": "false"
+        "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
+        "NPM_CONFIG_WORKSPACES": "true"
       }
     }
   },

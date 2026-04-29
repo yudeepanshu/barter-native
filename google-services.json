@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "123265556349-etau601bvqis582vnkpuoofd3nlfjcsp.apps.googleusercontent.com",
+          "client_id": "123265556349-a4ja3srduq6r15rqea12aen6e6fshm5r.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.shinichi.flippeapp",
-            "certificate_hash": "ff07e03549fe551e9ad0c1eee93112632e61a2ea"
+            "certificate_hash": "a5828d5adc05316144ab587d4a41b3eca81d5d28"
           }
         },
         {

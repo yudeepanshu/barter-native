@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
@@ -25,18 +24,29 @@ import { ListingTextFields } from "@/components/products/ListingTextFields";
 import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { useUnsavedChangesPrompt } from "@/hooks/useUnsavedChangesPrompt";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
+import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
-  const router = useRouter();
   const params = useLocalSearchParams<{ returnToProductId?: string }>();
   const returnToProductId = typeof params.returnToProductId === "string" ? params.returnToProductId : undefined;
+  const navigation = useNavigation();
   const categoriesQuery = useCategoriesQuery();
   const form = useCreateListingForm({ returnToProductId });
-  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const categories = categoriesQuery.data ?? [];
   const hasAttachedLocation = form.state.manualLatitude != null && form.state.manualLongitude != null;
+  const previewImages = form.state.images.map((asset) => ({ id: asset.uri, url: asset.uri }));
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    });
+
+    return unsubscribe;
+  }, [navigation]);
   const hasUnsavedChanges =
     form.state.title.trim().length > 0 ||
     form.state.description.trim().length > 0 ||
@@ -45,9 +55,18 @@ export default function CreateListingScreen() {
     form.state.manualLongitude != null ||
     form.state.categoryId.length > 0 ||
     form.state.isFree ||
-    form.state.requestByMoney ||
+    !form.state.requestByMoney ||
     form.state.minMoneyAmount.trim().length > 0 ||
     form.state.images.length > 0;
+
+  const switchTrackOffColor = theme.mode === "light" ? "#64748b" : "#475569";
+  const switchTrackColor = {
+    false: switchTrackOffColor,
+    true: theme.colors.success,
+  };
+
+  const getSwitchThumbColor = (enabled: boolean) =>
+    enabled ? theme.colors.onSuccess : theme.colors.surface;
   const setHasUnsavedChanges = useCreateListingDraftGuardStore((state) => state.setHasUnsavedChanges);
   const setResetDraft = useCreateListingDraftGuardStore((state) => state.setResetDraft);
 
@@ -89,6 +108,7 @@ export default function CreateListingScreen() {
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={16}
         contentContainerStyle={styles.content}
+        scrollRef={scrollViewRef}
       >
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <ListingTextFields
@@ -138,22 +158,31 @@ export default function CreateListingScreen() {
           <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
             <View style={styles.switchRow}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Mark as free</Text>
-              <Switch value={form.state.isFree} onValueChange={form.actions.setIsFree} />
+              <Switch
+                value={form.state.isFree}
+                onValueChange={form.actions.setIsFree}
+                trackColor={switchTrackColor}
+                thumbColor={getSwitchThumbColor(form.state.isFree)}
+                ios_backgroundColor={switchTrackOffColor}
+              />
             </View>
             <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Open to money offers</Text>
+              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Enable money offers</Text>
               <Switch
                 value={form.state.requestByMoney}
                 onValueChange={form.actions.setRequestByMoney}
+                trackColor={switchTrackColor}
+                thumbColor={getSwitchThumbColor(form.state.requestByMoney)}
+                ios_backgroundColor={switchTrackOffColor}
               />
             </View>
             {form.state.requestByMoney ? (
               <Input
-                label="Minimum amount (₹)"
+                // label="Minimum amount (₹)"
                 value={form.state.minMoneyAmount}
                 onChangeText={form.actions.setMinMoneyAmount}
                 keyboardType="numeric"
-                placeholder="Enter minimum accepted amount"
+                placeholder="Enter minimum accepted amount (₹)"
                 error={form.state.fieldErrors.minMoneyAmount ?? null}
               />
             ) : null}
@@ -163,11 +192,6 @@ export default function CreateListingScreen() {
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.imageBlock}>
             <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Product images (up to {form.rules.MAX_IMAGES})</Text>
-            <Button
-              label="Choose images"
-              variant="ghost"
-              onPress={() => void form.actions.pickImages()}
-            />
             {form.state.images.length > 0 ? (
               <>
                 <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>{form.state.images.length} image(s) selected.</Text>
@@ -185,7 +209,7 @@ export default function CreateListingScreen() {
                       ]}
                     >
                       <Pressable
-                        onPress={() => setPreviewImageUri(asset.uri)}
+                        onPress={() => setPreviewIndex(index)}
                         style={styles.imagePreviewTouchArea}
                       >
                         <Image source={{ uri: asset.uri }} style={styles.imagePreviewThumb} />
@@ -193,8 +217,8 @@ export default function CreateListingScreen() {
                       <Pressable
                         onPress={() => {
                           form.actions.removeImageAt(index);
-                          if (previewImageUri === asset.uri) {
-                            setPreviewImageUri(null);
+                          if (previewIndex === index) {
+                            setPreviewIndex(null);
                           }
                         }}
                         style={styles.removeImageButton}
@@ -204,14 +228,26 @@ export default function CreateListingScreen() {
                       </Pressable>
                     </View>
                   ))}
+                  {form.state.images.length < form.rules.MAX_IMAGES ? (
+                    <Pressable
+                      onPress={() => void form.actions.pickImages()}
+                      style={[styles.imageAddButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                      hitSlop={8}
+                    >
+                      <Feather name="plus" size={20} color={theme.colors.textSecondary} />
+                    </Pressable>
+                  ) : null}
                 </ScrollView>
                 <Text style={[styles.imagePreviewHint, { color: theme.colors.textMuted }]}>Tap an image to preview. Tap x to remove.</Text>
               </>
             ) : (
-              <View style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-                <Feather name="image" size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>Add 1 or more images before publishing.</Text>
-              </View>
+              <Pressable
+                onPress={() => void form.actions.pickImages()}
+                style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                hitSlop={8}
+              >
+                <Text style={{ color: theme.colors.textSecondary }}>Tap to add Images.</Text>
+              </Pressable>
             )}
             {form.state.fieldErrors.images ? (
               <Text style={styles.errorText}>{form.state.fieldErrors.images}</Text>
@@ -220,6 +256,13 @@ export default function CreateListingScreen() {
         </View>
 
         {form.state.formError ? <Text style={styles.errorText}>{form.state.formError}</Text> : null}
+
+        <ImagePreviewModal
+          images={previewImages}
+          initialIndex={previewIndex ?? 0}
+          visible={previewIndex !== null}
+          onClose={() => setPreviewIndex(null)}
+        />
 
         <View style={styles.actions}>
           <Button
@@ -230,32 +273,6 @@ export default function CreateListingScreen() {
           <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
         </View>
       </KeyboardAwareScrollView>
-
-      <Modal
-        visible={Boolean(previewImageUri)}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewImageUri(null)}
-      >
-        <Pressable
-          style={[styles.previewBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setPreviewImageUri(null)}
-        >
-          <View
-            style={[
-              styles.previewCard,
-              {
-                borderColor: theme.colors.border,
-                borderRadius: theme.roundness,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-          >
-            {previewImageUri ? <Image source={{ uri: previewImageUri }} style={styles.previewImage} /> : null}
-            <Button label="Close" variant="ghost" onPress={() => setPreviewImageUri(null)} />
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -305,6 +322,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  imageAddButton: {
+    width: 72,
+    height: 72,
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   removeImageButton: {
     position: "absolute",
     top: 4,
@@ -327,20 +352,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 80,
-  },
-  previewBackdrop: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 18,
-  },
-  previewCard: {
-    borderWidth: 1,
-    padding: 12,
-    gap: 10,
-  },
-  previewImage: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
   },
 });

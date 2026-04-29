@@ -7,11 +7,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
+import { useNavigation } from "expo-router";
 import type { ImagePickerAsset } from "expo-image-picker";
 import { useAuthStatus, useSession } from "@/hooks/useSession";
 import { useProfileQuery } from "@/hooks/queries/useProfileQuery";
@@ -442,6 +443,7 @@ export default function ProfileScreen() {
   const { signOut, busy } = useOtpAuth();
   const updateProfileMutation = useUpdateProfileMutation();
   const { theme, statusBarStyle, preference, resolvedMode, setPreference } = useAppTheme();
+  const navigation = useNavigation();
   const dialog = useAppDialog();
   const sessionUser = session?.user ?? null;
   const queriedUser = profileQuery.data ?? null;
@@ -450,6 +452,16 @@ export default function ProfileScreen() {
       ? queriedUser
       : sessionUser ?? queriedUser;
   const appVersionLabel = useMemo(() => getCurrentVersionLabel(), []);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
@@ -693,6 +705,7 @@ export default function ProfileScreen() {
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={12}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 78 }]}
+        scrollRef={scrollViewRef}
         refreshControl={
           <RefreshControl
             refreshing={isManualRefreshing}

@@ -341,9 +341,9 @@ export default function MyListingsScreen() {
       : `${selectedCategoryIds.length} categories`;
   const selectedTradeTypeLabel =
     selectedTradeType === "BARTER_ONLY"
-      ? "Barter only"
+      ? "Trade only"
       : selectedTradeType === "OPEN_FOR_MONEY"
-        ? "Open for money"
+        ? "Cash or Trade"
         : "All";
   const activeFilterCount =
     (selectedCategoryIds.length > 0 ? 1 : 0) +

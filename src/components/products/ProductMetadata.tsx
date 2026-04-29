@@ -78,8 +78,8 @@ export function getDistanceBadgeLabel(
 
 export function getProductTypeLabel(product: ProductSummary) {
   if (product.isFree) return "Free";
-  if (product.requestByMoney) return "Open to money offers";
-  return "Barter only";
+  if (product.requestByMoney) return "Cash or Trade";
+  return "Trade Only";
 }
 
 const INACTIVE_EXPIRY_DAYS = 7;

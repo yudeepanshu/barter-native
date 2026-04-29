@@ -150,12 +150,17 @@ function FeedHeaderCard({
               {(productCount === 1 || productCount === 0) ? "listing" : "listings"}
             </Text>
           </View>
-          <Text
-            style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]}
-            numberOfLines={2}
-          >
-            {filterState.proximity?.radiusKm ? `Within ${filterState.proximity.radiusKm} km` : "Showing all matches"}
-          </Text>
+          <View style={styles.headerMetaSummaryContainer}>
+            {filterState.proximity?.radiusKm ? (
+              <Feather name="map-pin" size={14} color={theme.colors.textMuted} />
+            ) : null}
+            <Text
+              style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]}
+              numberOfLines={2}
+            >
+              {filterState.proximity?.radiusKm ? `Within ${filterState.proximity.radiusKm} km` : "Showing all matches"}
+            </Text>
+          </View>
         </View>
       }
     >
@@ -796,12 +801,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 />
                 <FilterChip
                   active={draftTradeType === "BARTER_ONLY"}
-                  label="Barter only"
+                  label="Trade only"
                   onPress={() => setDraftTradeType("BARTER_ONLY")}
                 />
                 <FilterChip
                   active={draftTradeType === "OPEN_FOR_MONEY"}
-                  label="Open for money"
+                  label="Cash or Trade"
                   onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
                 />
               </View>
@@ -1021,6 +1026,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  headerMetaSummaryContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+  },
   headerMetaCounterPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1041,9 +1053,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
-    minWidth: 0,
-    flex: 1,
-    textAlign: "right",
   },
   listSummaryText: {
     fontSize: 13,

@@ -7,6 +7,7 @@ import {
   View,
   Image,
 } from "react-native";
+import { useState } from "react";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -25,6 +26,7 @@ import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScroll
 import { ListingLocationSection } from "@/components/products/ListingLocationSection";
 import { ListingTextFields } from "@/components/products/ListingTextFields";
 import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
+import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { ErrorView } from "@/components/ui/ErrorView";
 
@@ -111,6 +113,20 @@ function EditListingFormSection({
   const form = useEditListingForm(product, { returnTo });
   const dialog = useAppDialog();
   const hasAttachedLocation = form.state.manualLatitude != null && form.state.manualLongitude != null;
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewImages = [
+    ...form.state.existingImages.map((image) => ({ id: image.id, url: image.url })),
+    ...form.state.newImages.map((asset) => ({ id: asset.uri, url: asset.uri })),
+  ];
+
+  const switchTrackOffColor = theme.mode === "light" ? "#64748b" : "#475569";
+  const switchTrackColor = {
+    false: switchTrackOffColor,
+    true: theme.colors.success,
+  };
+
+  const getSwitchThumbColor = (enabled: boolean) =>
+    enabled ? theme.colors.onSuccess : theme.colors.surface;
 
   if (!form.state.hasInitialized) {
     return (
@@ -178,17 +194,22 @@ function EditListingFormSection({
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <View style={styles.imageBlock}>
             <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Images (up to {form.rules.MAX_IMAGES})</Text>
-            <Button label="Choose images" variant="ghost" onPress={() => void form.actions.pickImages()} />
 
             {form.state.existingImages.length + form.state.newImages.length > 0 ? (
               <>
-                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>
+                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}> 
                   {form.state.existingImages.length + form.state.newImages.length} image(s).
                 </Text>
-                <View style={styles.imagesGrid}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.imagesRow}
+                >
                   {form.state.existingImages.map((image) => (
                     <View key={image.id} style={styles.imageCard}>
-                      <Image source={{ uri: image.url }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      <Pressable onPress={() => setPreviewIndex(form.state.existingImages.findIndex((item) => item.id === image.id))}>
+                        <Image source={{ uri: image.url }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      </Pressable>
                       {image.isPrimary && (
                         <View style={styles.primaryBadge}>
                           <Text style={styles.primaryBadgeText}>Primary</Text>
@@ -202,7 +223,9 @@ function EditListingFormSection({
 
                   {form.state.newImages.map((asset, index) => (
                     <View key={`${asset.uri}-${index}`} style={styles.imageCard}>
-                      <Image source={{ uri: asset.uri }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      <Pressable onPress={() => setPreviewIndex(form.state.existingImages.length + index)}>
+                        <Image source={{ uri: asset.uri }} style={[styles.productImage, { backgroundColor: theme.colors.surfaceMuted }]} />
+                      </Pressable>
                       <View style={styles.newBadge}>
                         <Text style={styles.newBadgeText}>New</Text>
                       </View>
@@ -211,21 +234,40 @@ function EditListingFormSection({
                       </Pressable>
                     </View>
                   ))}
-                </View>
+
+                  {form.state.existingImages.length + form.state.newImages.length < form.rules.MAX_IMAGES ? (
+                    <Pressable
+                      onPress={() => void form.actions.pickImages()}
+                      style={[styles.imageAddCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                      hitSlop={8}
+                    >
+                      <Feather name="plus" size={24} color={theme.colors.textSecondary} />
+                    </Pressable>
+                  ) : null}
+                </ScrollView>
                 <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>Changes apply only after you save.</Text>
               </>
             ) : (
-              <View style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-                <Feather name="image" size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>No images in draft. Add one or more before saving.</Text>
-              </View>
+              <Pressable
+                onPress={() => void form.actions.pickImages()}
+                style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
+                hitSlop={8}
+              >
+                <Text style={{ color: theme.colors.textSecondary }}>Tap to add Images.</Text>
+              </Pressable>
             )}
-
             {form.state.fieldErrors.images ? (
               <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.fieldErrors.images}</Text>
             ) : null}
           </View>
         </View>
+
+        <ImagePreviewModal
+          images={previewImages}
+          initialIndex={previewIndex ?? 0}
+          visible={previewIndex !== null}
+          onClose={() => setPreviewIndex(null)}
+        />
 
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <View style={styles.categoryBlock}>
@@ -254,22 +296,31 @@ function EditListingFormSection({
           <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
             <View style={styles.switchRow}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Mark as free</Text>
-              <Switch value={form.state.isFree} onValueChange={form.actions.setIsFree} />
+              <Switch
+                value={form.state.isFree}
+                onValueChange={form.actions.setIsFree}
+                trackColor={switchTrackColor}
+                thumbColor={getSwitchThumbColor(form.state.isFree)}
+                ios_backgroundColor={switchTrackOffColor}
+              />
             </View>
             <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Open to money offers</Text>
+              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Enable money offers</Text>
               <Switch
                 value={form.state.requestByMoney}
                 onValueChange={form.actions.setRequestByMoney}
+                trackColor={switchTrackColor}
+                thumbColor={getSwitchThumbColor(form.state.requestByMoney)}
+                ios_backgroundColor={switchTrackOffColor}
               />
             </View>
             {form.state.requestByMoney ? (
               <Input
-                label="Minimum amount (₹)"
+                // label="Minimum amount (₹)"
                 value={form.state.minMoneyAmount}
                 onChangeText={form.actions.setMinMoneyAmount}
                 keyboardType="numeric"
-                placeholder="Enter minimum accepted amount"
+                placeholder="Enter minimum accepted amount (₹)"
                 error={form.state.fieldErrors.minMoneyAmount ?? null}
               />
             ) : null}
@@ -332,17 +383,25 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 13 },
   imageBlock: { gap: 8 },
   imageHint: { fontSize: 12 },
-  imagesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  imageCard: { position: "relative", width: "32%" },
+  imagesRow: { flexDirection: "row", gap: 10, paddingVertical: 6 },
+  imageCard: { position: "relative", width: 120 },
+  imageAddCard: {
+    width: 120,
+    height: 120,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   productImage: { width: "100%", height: 120, borderRadius: 8 },
   emptyImagesCard: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    padding: 16,
     gap: 8,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 80,
   },
   primaryBadge: {
     position: "absolute",

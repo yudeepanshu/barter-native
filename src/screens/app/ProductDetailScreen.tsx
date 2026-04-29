@@ -39,6 +39,7 @@ import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { ErrorView } from "@/components/ui/ErrorView";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -193,7 +194,7 @@ export default function ProductDetailScreen() {
       >
         <View style={styles.backRow}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Text style={[styles.backButtonText, { color: theme.colors.textPrimary }]}>← Back</Text>
+            <Feather name="arrow-left" size={20} color={theme.colors.textPrimary} />
           </Pressable>
         </View>
 
@@ -326,9 +327,9 @@ export default function ProductDetailScreen() {
 
               {product.productImages.length > 1 ? (
                 <View style={styles.imagePagerWrap}>
-                  <Text style={[styles.imagePagerText, { color: theme.colors.textMuted }]}>
-                    Image {activeImageIndex + 1} of {product.productImages.length}
-                  </Text>
+                  {/* <Text style={[styles.imagePagerText, { color: theme.colors.textMuted }]}>
+                    {activeImageIndex + 1} of {product.productImages.length}
+                  </Text> */}
                   <View style={styles.imageDotsRow}>
                     {product.productImages.map((image, index) => (
                       <View
@@ -608,8 +609,16 @@ function RequestComposer({
         },
       ]}
     >
-      <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
-      <Text style={[styles.requestSubtitle, { color: theme.colors.textMuted }]}>Start a negotiation for this listing.</Text>
+      <View style={styles.requestTitleRow}>
+        <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
+        <InfoTooltip text={
+          product.isFree 
+            ? "This listing is marked as free. You can only send a request without offering money or a product for trade. Deselect both if you'd like."
+            : supportsMixedOffers
+              ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
+              : "This listing accepts a trade offer. You must include at least one of your listings in the request."
+        } />
+      </View>
 
       {!requestable ? (
         <Text style={styles.warnText}>This listing is not currently requestable.</Text>
@@ -646,7 +655,7 @@ function RequestComposer({
           amountPlaceholder="Enter amount"
           amountHelperText={
             product.requestByMoney && effectiveMinMoneyAmount != null
-              ? `Minimum accepted: ${formatCurrency(effectiveMinMoneyAmount)}`
+              ? `This listing accepts offers starting: ${formatCurrency(effectiveMinMoneyAmount)}`
               : undefined
           }
           amountWarningText={
@@ -670,7 +679,7 @@ function RequestComposer({
           selectedProductIds={offeredProductIds}
           onToggleProduct={toggleOfferedProduct}
           selectedProductsHint={offeredProductIds.length > 0 ? `${offeredProductIds.length} listing(s) selected.` : undefined}
-          showVisibleProductSelector={wantsProduct}
+          showVisibleProductSelector={wantsProduct && ownOfferableProducts.length > 0}
           visibleProductSelectorLabel="Show for consideration"
           visibleProducts={visibleOwnProducts}
           selectedVisibleProductIds={visibleProductIds}
@@ -710,7 +719,7 @@ function RequestComposer({
                 ) : (
                   <>
                     <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
-                      Create one first, then come back and include it in this request.
+                      Create one by clicking the "Create listing" button.
                     </Text>
                     <Button
                       label="Create listing"
@@ -765,10 +774,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 4,
     paddingVertical: 4,
-  },
-  backButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
   },
   card: {
     borderWidth: 1,
@@ -984,4 +989,9 @@ const styles = StyleSheet.create({
   minAmountWarning: { fontSize: 12, fontWeight: "600", marginTop: 2 },
   feedback: { fontSize: 13, fontStyle: "italic" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  requestTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
 });

@@ -61,7 +61,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const [manualLongitude, setManualLongitude] = useState<number | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [isFree, setIsFree] = useState(false);
-  const [requestByMoney, setRequestByMoney] = useState(false);
+  const [requestByMoney, setRequestByMoney] = useState(true);
   const [minMoneyAmount, setMinMoneyAmount] = useState("");
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [fieldErrors, setFieldErrors] = useState<CreateListingValidationResult["fieldErrors"]>({});
@@ -92,7 +92,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     setManualLongitude(null);
     setCategoryId("");
     setIsFree(false);
-    setRequestByMoney(false);
+    setRequestByMoney(true);
     setMinMoneyAmount("");
     setImages([]);
     setFieldErrors({});

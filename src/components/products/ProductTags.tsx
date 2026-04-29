@@ -114,10 +114,10 @@ export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
   }
 
   if (product.requestByMoney) {
-    return { label: "Open for money", tone: "amber" };
+    return { label: "Cash or Trade", tone: "amber" };
   }
 
-  return { label: "Barter only", tone: "violet" };
+  return { label: "Trade Only", tone: "violet" };
 }
 
 export function getContextTag(product: ProductSummary, isRequested: boolean): ProductTagSpec | null {

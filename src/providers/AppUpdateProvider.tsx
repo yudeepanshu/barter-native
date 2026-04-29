@@ -147,37 +147,66 @@ export function AppUpdateProvider() {
     setIsVisible(false);
   }, [policy]);
 
-  const openUpdateUrl = useCallback(async (url: string, source: 'primary' | 'secondary') => {
-    if (!url) {
-      return;
+  // Determine whether the primary button should be shown based on
+  // preferredSource and the presence of the corresponding URL.
+  const shouldShowPrimaryButton = useMemo(() => {
+    if (!policy) return false;
+    if (policy.preferredSource === 'direct-apk') {
+      return !!policy.directApkUrl;
     }
-
-    if (source === 'primary') {
-      setIsOpeningPrimary(true);
-    } else {
-      setIsOpeningSecondary(true);
+    if (policy.preferredSource === 'play-store') {
+      return !!policy.primaryUpdateUrl;
     }
+    // Fallback: show if any primary URL is present
+    return !!policy.primaryUpdateUrl;
+  }, [policy]);
 
-    try {
-      // Try direct open first for regular http(s) links to avoid canOpenURL false negatives.
-      await Linking.openURL(url);
-    } catch {
-      try {
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-          await Linking.openURL(url);
-        }
-      } catch {
-        // Best effort: keep app usable even if update URL cannot be opened.
-      }
-    } finally {
+  // Secondary button requires both URL and label to be present.
+  const shouldShowSecondaryButton = useMemo(() => {
+    if (!policy) return false;
+    return !!policy.secondaryUpdateUrl && !!policy.secondaryCtaLabel;
+  }, [policy]);
+
+  // Resolves the correct URL based on preferredSource and opens it.
+  const openUpdateUrl = useCallback(
+    async (source: 'primary' | 'secondary') => {
+      const url =
+        source === 'primary'
+          ? policy?.preferredSource === 'direct-apk'
+            ? policy?.directApkUrl
+            : policy?.primaryUpdateUrl
+          : policy?.secondaryUpdateUrl;
+
+      if (!url) return;
+
       if (source === 'primary') {
-        setIsOpeningPrimary(false);
+        setIsOpeningPrimary(true);
       } else {
-        setIsOpeningSecondary(false);
+        setIsOpeningSecondary(true);
       }
-    }
-  }, []);
+
+      try {
+        // Try direct open first for regular http(s) links to avoid canOpenURL false negatives.
+        await Linking.openURL(url);
+      } catch {
+        try {
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) {
+            await Linking.openURL(url);
+          }
+        } catch {
+          // Best effort: keep app usable even if update URL cannot be opened.
+        }
+      } finally {
+        if (source === 'primary') {
+          setIsOpeningPrimary(false);
+        } else {
+          setIsOpeningSecondary(false);
+        }
+      }
+    },
+    [policy],
+  );
 
   if (!policy) {
     return null;
@@ -226,32 +255,31 @@ export function AppUpdateProvider() {
               </Pressable>
             ) : null}
 
-            <Pressable
-              style={[
-                styles.primaryButton,
-                {
-                  borderColor: theme.colors.primary,
-                  backgroundColor: theme.colors.primary,
-                  opacity: policy.primaryUpdateUrl ? 1 : 0.7,
-                },
-              ]}
-              disabled={!policy.primaryUpdateUrl || isOpeningPrimary}
-              onPress={() => {
-                if (policy.primaryUpdateUrl) {
-                  void openUpdateUrl(policy.primaryUpdateUrl, 'primary');
-                }
-              }}
-            >
-              {isOpeningPrimary ? (
-                <ActivityIndicator size={14} color={theme.colors.onPrimary} />
-              ) : (
-                <Text style={[styles.primaryButtonText, { color: theme.colors.onPrimary }]}>
-                  {policy.primaryCtaLabel}
-                </Text>
-              )}
-            </Pressable>
+            {/* Primary button: only rendered when source + URL are both valid */}
+            {shouldShowPrimaryButton ? (
+              <Pressable
+                style={[
+                  styles.primaryButton,
+                  {
+                    borderColor: theme.colors.primary,
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                disabled={isOpeningPrimary}
+                onPress={() => void openUpdateUrl('primary')}
+              >
+                {isOpeningPrimary ? (
+                  <ActivityIndicator size={14} color={theme.colors.onPrimary} />
+                ) : (
+                  <Text style={[styles.primaryButtonText, { color: theme.colors.onPrimary }]}>
+                    {policy.primaryCtaLabel}
+                  </Text>
+                )}
+              </Pressable>
+            ) : null}
 
-            {policy.secondaryUpdateUrl && policy.secondaryCtaLabel ? (
+            {/* Secondary button: only rendered when both URL and label are present */}
+            {shouldShowSecondaryButton ? (
               <Pressable
                 style={[
                   styles.tertiaryButton,
@@ -261,9 +289,7 @@ export function AppUpdateProvider() {
                   },
                 ]}
                 disabled={isOpeningSecondary}
-                onPress={() => {
-                  void openUpdateUrl(policy.secondaryUpdateUrl as string, 'secondary');
-                }}
+                onPress={() => void openUpdateUrl('secondary')}
               >
                 {isOpeningSecondary ? (
                   <ActivityIndicator size={14} color={theme.colors.textSecondary} />

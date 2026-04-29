@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type MutableRefObject,
   type PropsWithChildren,
 } from "react";
 import {
@@ -37,6 +38,7 @@ interface KeyboardAwareScrollViewProps extends PropsWithChildren {
   extraScrollPadding?: number;
   androidKeyboardHandling?: "auto" | "resize" | "pan";
   autoScrollToFocusedInput?: boolean;
+  scrollRef?: any;
 }
 
 export function KeyboardAwareScrollView({
@@ -51,6 +53,7 @@ export function KeyboardAwareScrollView({
   extraScrollPadding = 10,
   androidKeyboardHandling = "auto",
   autoScrollToFocusedInput = true,
+  scrollRef = null,
 }: KeyboardAwareScrollViewProps) {
   const behavior: KeyboardAvoidingViewProps["behavior"] =
     Platform.OS === "ios" ? "padding" : "height";
@@ -59,10 +62,20 @@ export function KeyboardAwareScrollView({
   const windowDimensions = useWindowDimensions();
   const keyboard = useKeyboardMetrics();
 
-  const scrollRef = useRef<ScrollView>(null);
+  const innerScrollRef = useRef<ScrollView>(null);
   const focusedInputRef = useRef<TextInput | null>(null);
   const scrollOffsetYRef = useRef(0);
   const baselineWindowHeightRef = useRef(windowDimensions.height);
+
+  const handleScrollRef = useCallback(
+    (node: ScrollView | null) => {
+      innerScrollRef.current = node;
+      if (scrollRef) {
+        scrollRef.current = node;
+      }
+    },
+    [scrollRef],
+  );
 
   useEffect(() => {
     if (!keyboard.isVisible) {
@@ -97,7 +110,7 @@ export function KeyboardAwareScrollView({
     if (!autoScrollToFocusedInput) return;
 
     const input = focusedInputRef.current;
-    const scroll = scrollRef.current;
+    const scroll = innerScrollRef.current;
 
     if (!input || !scroll || !keyboard.isVisible) return;
 
@@ -182,7 +195,7 @@ export function KeyboardAwareScrollView({
         }
       >
         <ScrollView
-          ref={scrollRef}
+          ref={handleScrollRef}
           contentContainerStyle={resolvedContentContainerStyle}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}
           keyboardDismissMode={

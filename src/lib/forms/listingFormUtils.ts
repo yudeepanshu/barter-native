@@ -55,6 +55,7 @@ export async function launchCamera(): Promise<ImagePicker.ImagePickerResult> {
   return ImagePicker.launchCameraAsync({
     mediaTypes: ["images"],
     quality: 1,
+    cameraType: ImagePicker.CameraType.back,
   });
 }
 

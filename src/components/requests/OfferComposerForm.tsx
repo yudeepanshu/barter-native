@@ -207,9 +207,12 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
                   </>
                 )}
               </>
-            ) : (
+            ) 
+            :
+             (
               <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts product offers only.</Text>
-            )}
+            )
+            }
           </View>
         ) : null
       )}
@@ -237,7 +240,9 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
 
       {showProductSelector && !disableIncludeProductToggle ? (
         <View style={styles.offerWrap}>
-          <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{productSelectorLabel}</Text>
+          {offerableProducts.length > 0 ? (
+            <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{productSelectorLabel}</Text>
+          ) : null}
           {offerableProducts.length > 0 ? (
             <>
               <SelectableProductGrid
@@ -282,14 +287,15 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      <Input
-        label={messageLabel}
-        value={message}
-        onChangeText={onChangeMessage}
-        placeholder={messagePlaceholder}
-        maxLength={60}
-        showCharacterCount
-      />
+      {offerableProducts.length > 0 ?
+        <Input
+          label={messageLabel}
+          value={message}
+          onChangeText={onChangeMessage}
+          placeholder={messagePlaceholder}
+          maxLength={60}
+          showCharacterCount
+      /> : null}
 
       {warning ? (
         <Text style={[styles.warning, { color: warningColor }]}>{warning}</Text>
@@ -307,7 +313,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         label={submitLabel}
         loading={submitLoading}
         onPress={onSubmit}
-        disabled={disabled}
+        disabled={disabled || (offerableProducts.length === 0 &&  includeProduct) || (includeMoney && amount.trim() === "") || (includeProduct && selectedProductIds.length === 0)}
       />
 
       {onCancel ? <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={disabled} /> : null}

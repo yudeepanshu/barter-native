@@ -43,13 +43,15 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
     };
   }, [anchor, panelLayout, screenHeight, screenWidth]);
 
+  const centeredPanelWidth = Math.min(368, screenWidth - 32);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
         style={[
           styles.backdrop,
           { backgroundColor: theme.colors.overlay },
-          anchor ? styles.backdropAnchor : null,
+          anchor ? styles.backdropAnchor : styles.backdropCenter,
         ]}
         onPress={onClose}
       >
@@ -57,7 +59,7 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
           style={[
             styles.panel,
             { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-            position ? { position: "absolute", ...position } : null,
+            position ? { position: "absolute", ...position } : { width: centeredPanelWidth },
           ]}
           onPress={() => {
             // Keep modal open when tapping inside.
@@ -94,11 +96,17 @@ const styles = StyleSheet.create({
   backdropAnchor: {
     paddingTop: 0,
   },
+  backdropCenter: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
   panel: {
     borderWidth: 1,
     borderRadius: 24,
     overflow: "hidden",
     padding: 16,
+    maxHeight: "90%",
   },
   headerRow: {
     flexDirection: "row",

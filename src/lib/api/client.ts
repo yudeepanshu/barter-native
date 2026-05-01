@@ -35,3 +35,4 @@ export const mobileApiClient = new ApiClient({
     useAuthStore.getState().clearSession();
   },
 });
+

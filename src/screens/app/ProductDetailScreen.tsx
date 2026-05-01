@@ -42,6 +42,8 @@ import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScroll
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { useReportProductMutation } from "@/hooks/mutations/useReportProductMutation";
+import { ReportProductModal } from "@/components/products/ReportProductModal";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -66,6 +68,11 @@ export default function ProductDetailScreen() {
   const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;
   const routeDistanceOverrideKm = Number.isFinite(routeDistanceKm) ? routeDistanceKm : null;
   const query = useProductQuery(productId);
+
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const { mutate: reportProduct, isPending } = useReportProductMutation(productId);
+
+
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
@@ -99,6 +106,31 @@ export default function ProductDetailScreen() {
     permission === "granted" && lastKnown
       ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
       : null;
+
+  const handleReportListing = () => {
+    if (!productData?.id) return;
+
+    if (productData.viewerHasReported) {
+      dialog.alert("Already Reported", "You have already reported this listing. Thank you.");
+      return;
+    }
+
+    setReportModalVisible(true);
+  };
+
+  const handleReportSubmit = (payload: { reportType: string; reason?: string; description?: string }) => {
+    setReportModalVisible(false);
+    dialog.alert("Report Submitted", "Thank you for your report. We will review this listing shortly.");
+
+    // Fire and forget — invalidation on success will update viewerHasReported
+    reportProduct(payload, {
+      onError: () => {
+        dialog.alert("Failed", "Something went wrong. Please try again.");
+      },
+    });
+  };
+
+
   const activeRequest = useMemo(() => {
     if (isOwner || !productData) {
       return null;
@@ -163,7 +195,7 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const product = query.data;
+  const product = productData as ProductSummary;
   const canEditListing =
     isOwner &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
@@ -187,6 +219,12 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <ReportProductModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onSubmit={handleReportSubmit}
+        isSubmitting={isPending}
+      />
       <MenuHeader
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
@@ -195,7 +233,7 @@ export default function ProductDetailScreen() {
             key: "report-listing",
             label: "Report listing",
             icon: "flag",
-            onPress: () => void dialog.alert("Listing Reported", "Thank you for your report. We will review this listing shortly."),
+            onPress: handleReportListing,
           },
         ]}
       />

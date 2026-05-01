@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ProductSummary, RequestStatus } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -34,7 +34,9 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
 import { AppImage } from "@/components/ui/AppImage";
+import { MenuHeader } from "@/components/ui/MenuHeader";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppDialog } from "@/providers/AppDialogProvider";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
@@ -47,6 +49,7 @@ const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACC
 export default function ProductDetailScreen() {
   const router = useRouter();
   const { theme, statusBarStyle } = useAppTheme();
+  const dialog = useAppDialog();
   const session = useSession();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{
@@ -184,22 +187,28 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <MenuHeader
+        onBack={handleBack}
+        textColor={theme.colors.textPrimary}
+        contextMenuItems={[
+          {
+            key: "report-listing",
+            label: "Report listing",
+            icon: "flag",
+            onPress: () => void dialog.alert("Listing Reported", "Thank you for your report. We will review this listing shortly."),
+          },
+        ]}
+      />
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={12}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: 10 }]}
         refreshControl={
           <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} />
         }
       >
-        <View style={styles.backRow}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Feather name="arrow-left" size={20} color={theme.colors.textPrimary} />
-          </Pressable>
-        </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.eyebrow, { color: theme.colors.textMuted }]}>LISTING</Text>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
               {product.title}

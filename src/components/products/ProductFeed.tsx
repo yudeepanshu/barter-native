@@ -32,12 +32,14 @@ import {
 } from "@/components/products/ProductListStates";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CollapsibleHeaderCard } from "@/components/ui/CollapsibleHeaderCard";
+import { FloatingModal } from "@/components/ui/FloatingModal";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { FilterChip } from "@/components/filters/FilterChip";
 import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { RangeSlider } from "../filters/RangeSlider";
+import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
 import { getFirstName } from "@/lib/utils/commonUtils";
@@ -82,7 +84,10 @@ interface FeedHeaderCardProps {
   freeOnly: boolean;
   onToggleFree: () => void;
   onOpenFilters: () => void;
+  onFilterAnchor?: (anchor: ContextMenuAnchor) => void;
   onOpenSort: () => void;
+  onSortAnchor?: (anchor: ContextMenuAnchor) => void;
+  sortActive?: boolean;
   productCount: number;
   onOpenNotificationsPanel: () => void;
   unreadCount: number;
@@ -96,7 +101,10 @@ function FeedHeaderCard({
   freeOnly,
   onToggleFree,
   onOpenFilters,
+  onFilterAnchor,
   onOpenSort,
+  onSortAnchor,
+  sortActive = false,
   productCount,
   onOpenNotificationsPanel,
   unreadCount,
@@ -175,8 +183,11 @@ function FeedHeaderCard({
       <ListControlsRow
         activeFilterCount={activeFilterCount}
         freeOnly={freeOnly}
+        sortActive={sortActive}
         onOpenFilters={onOpenFilters}
+        onFilterAnchor={onFilterAnchor}
         onOpenSort={onOpenSort}
+        onSortAnchor={onSortAnchor}
         onToggleFree={onToggleFree}
       />
     </CollapsibleHeaderCard>
@@ -202,6 +213,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
+  const [filterAnchor, setFilterAnchor] = useState<ContextMenuAnchor | null>(null);
+  const [sortAnchor, setSortAnchor] = useState<ContextMenuAnchor | null>(null);
   const [freeOnly, setFreeOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOrder>("newest");
   const [isDiscoveryReady, setIsDiscoveryReady] = useState(false);
@@ -497,6 +510,14 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     setShowFilterModal(true);
   }, [selectedCategoryIds, permission, filterState.proximity?.radiusKm, selectedTradeType]);
 
+  const onOpenFilterAnchor = useCallback((anchor: ContextMenuAnchor) => {
+    setFilterAnchor(anchor);
+  }, []);
+
+  const onOpenSortAnchor = useCallback((anchor: ContextMenuAnchor) => {
+    setSortAnchor(anchor);
+  }, []);
+
   const onRequestEnableNearby = async () => {
     if (permission === "granted") {
       setDraftRadiusKm((current) => current ?? DEFAULT_NEAREST_RADIUS_KM);
@@ -549,6 +570,16 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const onOpenSortPicker = useCallback(() => {
     setShowSortModal(true);
   }, []);
+
+  const closeFilterModal = () => {
+    setShowFilterModal(false);
+    setFilterAnchor(null);
+  };
+
+  const closeSortModal = () => {
+    setShowSortModal(false);
+    setSortAnchor(null);
+  };
 
   const onSelectSort = async (nextSort: SortOrder) => {
     if (nextSort === "nearest" && !viewerLocation) {
@@ -626,7 +657,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             freeOnly={freeOnly}
             onToggleFree={onToggleFree}
             onOpenFilters={onOpenFilters}
+            onFilterAnchor={onOpenFilterAnchor}
             onOpenSort={onOpenSortPicker}
+            onSortAnchor={onOpenSortAnchor}
+            sortActive={sortBy !== "newest"}
             productCount={visibleProducts.length}
             onOpenNotificationsPanel={onOpenNotificationsPanel}
             unreadCount={unreadCount}
@@ -694,35 +728,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         />
       </View>
 
-      <Modal
+      <FloatingModal
         visible={showFilterModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFilterModal(false)}
+        title="Filters"
+        onClose={closeFilterModal}
+        anchor={filterAnchor}
       >
-        <Pressable
-          style={[styles.notificationsBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setShowFilterModal(false)}
-        >
-          <Pressable
-            style={[
-              styles.notificationsPanel,
-              {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-            onPress={() => {
-              // Keep modal open when tapping inside.
-            }}
-          >
-            <View style={styles.notificationsHeaderRow}>
-              <Text style={[styles.notificationsTitle, { color: theme.colors.textPrimary }]}>Filters</Text>
-              <Pressable onPress={() => setShowFilterModal(false)}>
-                <Feather name="x" size={18} color={theme.colors.textSecondary} />
-              </Pressable>
-            </View>
-
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
               <CategoryMultiSelectChips
@@ -844,14 +855,13 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                 <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </FloatingModal>
 
       <SortBottomSheet
         visible={showSortModal}
+        anchor={sortAnchor}
         value={sortBy}
-        onClose={() => setShowSortModal(false)}
+        onClose={closeSortModal}
         onChange={onSelectSort}
         canUseNearest={permission === "granted" && viewerLocation != null}
       />

@@ -5,19 +5,21 @@ interface FilterChipProps {
   label: string;
   active: boolean;
   onPress: () => void;
+  disabled?: boolean;
 }
 
-export function FilterChip({ label, active, onPress }: FilterChipProps) {
+export function FilterChip({ label, active, onPress, disabled = false }: FilterChipProps) {
   const { theme } = useAppTheme();
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
       style={[
         styles.chip,
         {
           borderColor: active ? theme.colors.chipActiveBg : theme.colors.border,
           backgroundColor: active ? theme.colors.chipActiveBg : theme.colors.chipBg,
+          opacity: disabled ? 0.45 : 1,
         },
       ]}
     >

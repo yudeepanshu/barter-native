@@ -277,9 +277,7 @@ export function OtpLoginForm() {
               <Spinner size={16} />
               <Text style={[styles.autoVerifyText, { color: theme.colors.textMuted }]}>Verifying OTP...</Text>
             </View>
-          ) : (
-            <Text style={[styles.autoVerifyHint, { color: theme.colors.textMuted }]}>OTP is verified automatically once all 6 digits are entered.</Text>
-          )}
+          ) : null}
         </>
       )}
     </View>

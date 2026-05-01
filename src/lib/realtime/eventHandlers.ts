@@ -161,6 +161,7 @@ function patchProductSummary(
     status: ProductStatus;
     isListed: boolean;
     updatedAt: string;
+    currentOwnerId?: string;
   },
 ): ProductSummary {
   return {
@@ -168,6 +169,7 @@ function patchProductSummary(
     status: patch.status,
     isListed: patch.isListed,
     updatedAt: patch.updatedAt,
+    ...(patch.currentOwnerId ? { currentOwnerId: patch.currentOwnerId } : {}),
   };
 }
 
@@ -178,6 +180,7 @@ function patchProductDetailCache(
     status: ProductStatus;
     isListed: boolean;
     updatedAt: string;
+    currentOwnerId?: string;
   },
 ) {
   let matched = false;
@@ -204,6 +207,7 @@ function patchProductInInfiniteCollections(
     status: ProductStatus;
     isListed: boolean;
     updatedAt: string;
+    currentOwnerId?: string;
   },
 ) {
   let matched = false;
@@ -339,17 +343,21 @@ function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient
 }
 
 function handleProductUpdated(event: DomainEvent<"product.updated">, queryClient: QueryClient) {
-  const { action, productId, status, isListed, relatedRequestId } = event.payload;
+  const { action, productId, ownerId, status, isListed, relatedRequestId } = event.payload;
+
+  const isOwnershipTransfer = action === "OWNERSHIP_TRANSFERRED";
 
   const patch = {
     status: status as ProductStatus,
     isListed,
     updatedAt: event.occurredAt,
+    ...(isOwnershipTransfer ? { currentOwnerId: ownerId } : {}),
   };
 
   useAppStore.getState().patchProduct(productId, {
     status: patch.status,
     isListed: patch.isListed,
+    ...(patch.currentOwnerId ? { currentOwnerId: patch.currentOwnerId } : {}),
   });
 
   const detailMatched = patchProductDetailCache(queryClient, productId, patch);
@@ -358,7 +366,7 @@ function handleProductUpdated(event: DomainEvent<"product.updated">, queryClient
     ...patch,
   });
 
-  if (!detailMatched) {
+  if (!detailMatched || isOwnershipTransfer) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) });
   }
 

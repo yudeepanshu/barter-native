@@ -31,6 +31,7 @@ import { SwipeableBottomSheet } from "@/components/ui/SwipeableBottomSheet";
 import { ProductCard } from "@/components/products/ProductCard";
 import { OtpCodeField } from "@/components/auth/OtpCodeField";
 import { Input } from "@/components/ui/Input";
+import { MenuHeader } from "@/components/ui/MenuHeader";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
 import { AppImage } from "@/components/ui/AppImage";
@@ -41,7 +42,7 @@ import {
   useUpdateProfileMutation,
   toErrorMessage as toProfileErrorMessage,
 } from "@/hooks/mutations/useUpdateProfileMutation";
-import { getFirstName } from "@/lib/utils/commonUtils";
+import { getFirstName, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { ErrorView } from "@/components/ui/ErrorView";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
@@ -200,13 +201,7 @@ const OfferCard = memo(
           <View style={passedStyles.detailRow}>
             <Text style={[passedStyles.label, { color: theme.colors.textMuted }]}>Type</Text>
             <Text style={[passedStyles.value, { color: theme.colors.textPrimary }]}>
-              {offer.type === "MIXED"
-                ? "Product + Money"
-                : offer.type === "PRODUCT"
-                  ? "Product swap"
-                  : offer.type === "MONEY"
-                    ? "Money offer"
-                    : offer.type}
+              {getOfferTypeLabel(offer.type)}
             </Text>
           </View>
         )}
@@ -886,8 +881,12 @@ export default function RequestDetailScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
+      <MenuHeader
+        onBack={() => router.back()}
+        textColor={theme.colors.textPrimary}
+      />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: 10 }]}
         refreshControl={
           <RefreshControl
             refreshing={isManualRefreshing}
@@ -895,22 +894,6 @@ export default function RequestDetailScreen() {
           />
         }
       >
-        {/* Top Back Button */}
-        <View style={styles.topBackButtonRow}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [
-              styles.topBackButton,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-            accessibilityRole="button"
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Feather name="arrow-left" size={18} color={theme.colors.textPrimary} />
-              <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: "600", marginLeft: 4 }}>Back</Text>
-            </View>
-          </Pressable>
-        </View>
         {/* Request Header */}
         <View style={[styles.headerCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
           <View style={styles.headerRow}>
@@ -997,7 +980,7 @@ export default function RequestDetailScreen() {
                 <View style={styles.detailRow}>
                   <Text style={[styles.label, { color: theme.colors.textMuted }]}>Latest Offer</Text>
                   <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                    {latestActiveOffer.type === "MIXED" ? "Product + money" : latestActiveOffer.type === "PRODUCT" ? "Product swap" : latestActiveOffer.type === "MONEY" ? "Money offer" : latestActiveOffer.type}
+                    {getOfferTypeLabel(latestActiveOffer.type)}
                   </Text>
                 </View>
 
@@ -1500,17 +1483,6 @@ export default function RequestDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  topBackButtonRow: {
-    marginBottom: 2,
-    marginLeft: -4,
-    marginTop: 2,
-    alignSelf: "flex-start",
-  },
-  topBackButton: {
-    paddingHorizontal: 0,
-    minHeight: 32,
-    minWidth: 0,
-  },
   safeArea: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },

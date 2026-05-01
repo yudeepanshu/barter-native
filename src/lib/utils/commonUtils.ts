@@ -27,3 +27,16 @@ export function getFirstName(fullName: string | null | undefined): string {
 
   return firstName;
 }
+
+export function getOfferTypeLabel(type: string) {
+  switch (type) {
+    case "MIXED":
+      return "CASH + TRADE";
+    case "PRODUCT":
+      return "TRADE";
+    case "MONEY":
+      return "CASH";
+    default:
+      return type;
+  }
+}

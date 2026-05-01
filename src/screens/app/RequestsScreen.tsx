@@ -29,6 +29,7 @@ import {
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
+import { getOfferTypeLabel } from "@/lib/utils/commonUtils";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + paddings + gaps
@@ -378,7 +379,7 @@ export default function RequestsScreen() {
               }}
             >
               <View style={styles.filterModalHeaderRow}>
-                <Text style={[styles.filterModalTitle, { color: theme.colors.textPrimary }]}>Filter by product</Text>
+                <Text style={[styles.filterModalTitle, { color: theme.colors.textPrimary }]}>Filter by listing</Text>
                 <Pressable onPress={() => setShowProductFilterModal(false)}>
                   <Feather name="x" size={18} color={theme.colors.textSecondary} />
                 </Pressable>
@@ -661,7 +662,7 @@ const RequestItem = memo(function RequestItem({
             <View style={styles.detailRow}>
               <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest Offer</Text>
               <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                {activeOffer.type === "MIXED" ? "PRODUCT + MONEY" : activeOffer.type}
+                {getOfferTypeLabel(activeOffer.type)}
               </Text>
             </View>
           ) : null}

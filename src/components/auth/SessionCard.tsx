@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { useEffect, useMemo, useState } from "react";
 import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { Feather } from "@expo/vector-icons";
 
 interface SessionCardProps {
   user: AuthUser;
@@ -80,7 +81,9 @@ export function SessionCard({
                 onPress={onEditPress}
                 hitSlop={8}
               >
-                <Text style={[styles.editIconText, { color: theme.colors.textPrimary }]}>✎</Text>
+                <Text style={[styles.editIconText, { color: theme.colors.textPrimary }]}>
+                  <Feather name="edit-2" size={16} />
+                </Text>
               </Pressable>
             ) : null}
           </View>

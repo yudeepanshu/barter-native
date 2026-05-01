@@ -778,9 +778,39 @@ export default function ProfileScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-                  Edit details
-                </Text>
+                <View style={styles.formHeaderRow}>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}> 
+                    Edit details
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      if (updateProfileMutation.isPending || isUploadingPhoto) return;
+                      onReset();
+                      setIsEditing(false);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: updateProfileMutation.isPending || isUploadingPhoto }}
+                    accessibilityLabel="Close edit form"
+                    style={({ pressed }) => [
+                      styles.closeButton,
+                      {
+                        opacity:
+                          updateProfileMutation.isPending || isUploadingPhoto
+                            ? 0.5
+                            : pressed
+                            ? 0.7
+                            : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={14}
+                      color={theme.colors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
 
                 <Button
                   label="Change profile picture"
@@ -900,15 +930,6 @@ export default function ProfileScreen() {
                       />
                     </View>
                   </View>
-                  <Button
-                    label="Close"
-                    variant="ghost"
-                    onPress={() => {
-                      onReset();
-                      setIsEditing(false);
-                    }}
-                    disabled={updateProfileMutation.isPending || isUploadingPhoto}
-                  />
                 </View>
               </View>
             ) : null}
@@ -1160,6 +1181,20 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     overflow: "visible",
+  },
+  formHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  closeButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionTitle: { fontSize: 16, fontWeight: "800" },
   formMessage: { fontSize: 13 },

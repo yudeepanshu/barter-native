@@ -1,13 +1,18 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef } from "react";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
 
 interface ListControlsRowProps {
   activeFilterCount: number;
   freeOnly: boolean;
+  sortActive?: boolean;
   onOpenFilters: () => void;
   onOpenSort?: () => void;
   onToggleFree?: () => void;
+  onFilterAnchor?: (anchor: ContextMenuAnchor) => void;
+  onSortAnchor?: (anchor: ContextMenuAnchor) => void;
   showSort?: boolean;
   showFree?: boolean;
   filterLabel?: string;
@@ -16,19 +21,49 @@ interface ListControlsRowProps {
 export function ListControlsRow({
   activeFilterCount,
   freeOnly,
+  sortActive = false,
   onOpenFilters,
   onOpenSort,
   onToggleFree,
+  onFilterAnchor,
+  onSortAnchor,
   showSort = true,
   showFree = true,
   filterLabel = "Filters",
 }: ListControlsRowProps) {
   const { theme } = useAppTheme();
+  const filterButtonRef = useRef<any>(null);
+  const sortButtonRef = useRef<any>(null);
+
+  const handleOpenFilters = () => {
+    if (filterButtonRef.current?.measureInWindow) {
+      filterButtonRef.current.measureInWindow((left: number, top: number, width: number, height: number) => {
+        onFilterAnchor?.({ left, top, bottom: top + height });
+        onOpenFilters();
+      });
+      return;
+    }
+
+    onOpenFilters();
+  };
+
+  const handleOpenSort = () => {
+    if (sortButtonRef.current?.measureInWindow) {
+      sortButtonRef.current.measureInWindow((left: number, top: number, width: number, height: number) => {
+        onSortAnchor?.({ left, top, bottom: top + height });
+        onOpenSort?.();
+      });
+      return;
+    }
+
+    onOpenSort?.();
+  };
 
   return (
     <View style={styles.controlsWrap}>
       <Pressable
-        onPress={onOpenFilters}
+        ref={filterButtonRef}
+        onPress={handleOpenFilters}
         style={[
           styles.controlButton,
           {
@@ -48,17 +83,29 @@ export function ListControlsRow({
 
       {showSort ? (
         <Pressable
-          onPress={onOpenSort}
+          ref={sortButtonRef}
+          onPress={handleOpenSort}
           style={[
             styles.controlButton,
             {
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
+              borderColor: sortActive ? theme.colors.primary : theme.colors.border,
+              backgroundColor: sortActive ? theme.colors.chipActiveBg : theme.colors.surface,
             },
           ]}
         >
-          <Feather name="repeat" size={15} color={theme.colors.textSecondary} />
-          <Text style={[styles.controlButtonText, { color: theme.colors.textPrimary }]}>Sort</Text>
+          <Feather
+            name="repeat"
+            size={15}
+            color={sortActive ? theme.colors.chipActiveText : theme.colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.controlButtonText,
+              { color: sortActive ? theme.colors.chipActiveText : theme.colors.textPrimary },
+            ]}
+          >
+            Sort
+          </Text>
         </Pressable>
       ) : null}
 

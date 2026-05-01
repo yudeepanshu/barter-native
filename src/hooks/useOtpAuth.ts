@@ -12,6 +12,7 @@ import { queryKeys } from "@/lib/query/queryKeys";
 
 const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again.";
 const OTP_INVALID_ERROR_MESSAGE = "Invalid OTP. Please try again.";
+const OTP_SEND_ERROR_MESSAGE = "Unable to send OTP right now. Please try again.";
 
 export type OtpStep = "identifier" | "sent" | "code";
 
@@ -59,7 +60,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
       await mobileApiClient.requestOtp({ identifier: sanitizedIdentifier });
       setStep("sent");
     } catch {
-      setError(OTP_GENERIC_ERROR_MESSAGE);
+      setError(OTP_SEND_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }

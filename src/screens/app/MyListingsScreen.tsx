@@ -1,7 +1,7 @@
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useMemo, useState, memo } from "react";
+import { useEffect, useMemo, useState, memo, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ProductSummary, RequestStatus } from "@barter/types";
@@ -31,7 +31,7 @@ import { FilterChip } from "@/components/filters/FilterChip";
 import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
-import { AnchoredContextMenu, type AnchoredContextMenuItem } from "@/components/ui/AnchoredContextMenu";
+import { AnchoredContextMenu, ContextMenuAnchor, type AnchoredContextMenuItem } from "@/components/ui/AnchoredContextMenu";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, hasExchangeHistory } from "@/components/products/ProductMetadata";
 import { AppImage } from "@/components/ui/AppImage";
@@ -231,9 +231,16 @@ export default function MyListingsScreen() {
   const markFailed = useListingImagePreparationStore((state) => state.markFailed);
   const clearPreparing = useListingImagePreparationStore((state) => state.clearPreparing);
 
+  const [sortAnchor, setSortAnchor] = useState<ContextMenuAnchor | null>(null);
+
   const closeContextMenu = () => {
     setContextMenuProductId(null);
     setContextMenuAnchor(null);
+  };
+
+  const closeSortModal = () => {
+    setShowSortModal(false);
+    setSortAnchor(null);
   };
 
   useEffect(() => {
@@ -249,13 +256,24 @@ export default function MyListingsScreen() {
     [products.items],
   );
 
+  const onOpenSortAnchor = useCallback((anchor: ContextMenuAnchor) => {
+    setSortAnchor(anchor);
+  }, []);
+
   useEffect(() => {
     for (const item of visibleItems) {
-      if (pendingByProductId[item.id] && (item.productImages?.length ?? 0) > 0) {
+      const prepState = pendingByProductId[item.id];
+      if (!prepState) continue;
+
+      const hasServerImage = (item.productImages?.length ?? 0) > 0;
+      const isFullyActive = item.status === "ACTIVE" && hasServerImage;
+
+      if (isFullyActive && prepState.phase !== "failed") {
         clearPreparing(item.id);
       }
     }
   }, [clearPreparing, pendingByProductId, visibleItems]);
+
   const filteredWithoutType = useMemo(() => {
     const normalizedQuery = debouncedSearch.trim().toLowerCase();
 
@@ -641,9 +659,11 @@ export default function MyListingsScreen() {
               <ListControlsRow
                 activeFilterCount={activeFilterCount}
                 freeOnly={freeOnly}
+                sortActive={sortBy !== "newest"}
                 onOpenFilters={onOpenFilterPicker}
                 onOpenSort={() => setShowSortModal(true)}
                 onToggleFree={() => setFreeOnly((current) => !current)}
+                onSortAnchor={onOpenSortAnchor}
               />
             </CollapsibleHeaderCard>
           </View>
@@ -844,8 +864,10 @@ export default function MyListingsScreen() {
       <SortBottomSheet
         visible={showSortModal}
         value={sortBy}
-        onClose={() => setShowSortModal(false)}
+        onClose={closeSortModal}
         onChange={setSortBy}
+        anchor={sortAnchor}
+        showNearestOption={false}
       />
 
       <AnchoredContextMenu

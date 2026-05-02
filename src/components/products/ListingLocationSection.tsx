@@ -29,9 +29,8 @@ export function ListingLocationSection({
 
       {locationName ? (
         <Text style={[styles.locationHintStrong, { color: theme.colors.textPrimary }]}>{locationName}</Text>
-      ) : null}
+      ) : <Text style={[styles.locationHint, { color: theme.colors.textMuted }]}>Attach your current device location to this listing.</Text>}
 
-      <Text style={[styles.locationHint, { color: theme.colors.textMuted }]}>Attach your current device location to this listing.</Text>
       {locationWarning ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{locationWarning}</Text> : null}
       {fieldError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{fieldError}</Text> : null}
 

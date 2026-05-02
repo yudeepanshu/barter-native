@@ -1,4 +1,3 @@
-import { useAppTheme } from "@/hooks/useAppTheme";
 import { FloatingModal } from "@/components/ui/FloatingModal";
 import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
 import { OptionPillMenu } from "./OptionPillMenu";
@@ -13,6 +12,7 @@ interface SortBottomSheetProps {
   onChange: (value: SortOrder) => void | Promise<void>;
   canUseNearest?: boolean;
   title?: string;
+  showNearestOption?: boolean;
 }
 
 export function SortBottomSheet({
@@ -23,16 +23,21 @@ export function SortBottomSheet({
   onChange,
   canUseNearest = true,
   title = "Sort by",
+  showNearestOption = true,
 }: SortBottomSheetProps) {
-  const { theme } = useAppTheme();
 
   return (
     <FloatingModal visible={visible} title={title} onClose={onClose} anchor={anchor}>
       <OptionPillMenu
         items={[
-          { key: "nearest", label: "Nearest first", value: "nearest", disabled: !canUseNearest },
           { key: "newest", label: "Newest first", value: "newest" },
           { key: "oldest", label: "Oldest first", value: "oldest" },
+          ...(showNearestOption ? [{
+            key: "nearest",
+            label: "Nearest first",
+            value: "nearest",
+            disabled: !canUseNearest
+          }] : [])
         ]}
         selectedValue={value}
         onSelect={(nextSort: string) => {

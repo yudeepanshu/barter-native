@@ -104,7 +104,7 @@ export function ReportProductModal({
           <Text
             style={[
               styles.submitLabel,
-              { color: canSubmit ? "#ffffff" : theme.colors.textMuted },
+              { color: canSubmit ? theme.colors.textPrimary : theme.colors.textMuted },
             ]}
           >
             {isSubmitting ? "Submitting..." : "Submit Report"}

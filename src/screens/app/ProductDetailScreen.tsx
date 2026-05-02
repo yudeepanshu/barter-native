@@ -228,14 +228,18 @@ export default function ProductDetailScreen() {
       <MenuHeader
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
-        contextMenuItems={[
-          {
-            key: "report-listing",
-            label: "Report listing",
-            icon: "flag",
-            onPress: handleReportListing,
-          },
-        ]}
+        contextMenuItems={
+          productData?.status === "ACTIVE" && !isOwner
+            ? [
+                {
+                  key: "report-listing",
+                  label: "Report listing",
+                  icon: "flag",
+                  onPress: handleReportListing,
+                },
+              ]
+            : []
+        }
       />
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}

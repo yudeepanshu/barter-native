@@ -770,6 +770,10 @@ export default function MyListingsScreen() {
                       ? filteredWithoutType.length
                       : statusCounts[filter.key as ProductSummary["status"]];
 
+                  if(count === 0 && filter.key !== "ALL") {
+                    return null;
+                  }
+
                   return (
                     <FilterChip
                       key={filter.key}

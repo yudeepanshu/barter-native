@@ -32,18 +32,41 @@ import { EmptyView } from "@/components/ui/EmptyView";
 import { getOfferTypeLabel } from "@/lib/utils/commonUtils";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
-// Fixed chrome inside the modal: header row + action buttons row + paddings + gaps
-const MODAL_CHROME_HEIGHT = 130;
-const FILTER_SCROLL_MAX_HEIGHT = SCREEN_HEIGHT * 0.5 - MODAL_CHROME_HEIGHT;
+// Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
+const MODAL_CHROME_HEIGHT = 200;
+const FILTER_SCROLL_MAX_HEIGHT = SCREEN_HEIGHT * 0.65 - MODAL_CHROME_HEIGHT;
 
 const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
+
+const ALL_REQUEST_STATUSES: RequestStatus[] = [
+  "PENDING",
+  "NEGOTIATING",
+  "ACCEPTED",
+  "REJECTED",
+  "CANCELLED",
+  "COMPLETED",
+];
+
+type TurnFilter = "MY_TURN" | "THEIR_TURN" | null;
 
 type ProductRequestGroup = {
   productId: string;
   productTitle: string;
   requests: RequestSummary[];
   latestUpdatedAtMs: number;
+};
+
+type TabFilterState = {
+  productId: string;
+  statuses: RequestStatus[];
+  turn: TurnFilter;
+};
+
+const DEFAULT_TAB_FILTER: TabFilterState = {
+  productId: ALL_PRODUCTS_FILTER,
+  statuses: [],
+  turn: null,
 };
 
 function buildProductRequestGroups(items: RequestSummary[]) {
@@ -89,6 +112,57 @@ function getStatusBadgeStyle(status: string): { bg: string; text: string } {
   }
 }
 
+function getStatusLabel(status: RequestStatus): string {
+  switch (status) {
+    case "PENDING": return "Pending";
+    case "NEGOTIATING": return "Negotiating";
+    case "ACCEPTED": return "Accepted";
+    case "REJECTED": return "Rejected";
+    case "CANCELLED": return "Cancelled";
+    case "COMPLETED": return "Completed";
+    default: return status;
+  }
+}
+
+/**
+ * Applies status and turn filters to requests within each product group,
+ * then drops groups that become empty after filtering.
+ */
+function applyRequestFilters(
+  groups: ProductRequestGroup[],
+  statuses: RequestStatus[],
+  turn: TurnFilter,
+  actorTurn: RequestTurn,
+): ProductRequestGroup[] {
+  return groups
+    .map((group) => {
+      const filtered = group.requests.filter((req) => {
+        // Status filter: if any statuses selected, request must match one.
+        // Treat COMPLETED as matching both "COMPLETED" status and ACCEPTED+EXCHANGED.
+        if (statuses.length > 0) {
+          const isExchangeFinalized = req.product.status === "EXCHANGED";
+          const effectiveStatus: RequestStatus =
+            req.status === "ACCEPTED" && isExchangeFinalized ? "COMPLETED" : req.status;
+          if (!statuses.includes(effectiveStatus)) return false;
+        }
+
+        // Turn filter: only applies to open requests.
+        if (turn !== null) {
+          const isOpen = OPEN_STATUSES.includes(req.status);
+          if (!isOpen) return false;
+          const isMyTurn = req.currentTurn === actorTurn;
+          if (turn === "MY_TURN" && !isMyTurn) return false;
+          if (turn === "THEIR_TURN" && isMyTurn) return false;
+        }
+
+        return true;
+      });
+
+      return { ...group, requests: filtered };
+    })
+    .filter((group) => group.requests.length > 0);
+}
+
 export default function RequestsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; productId?: string, _t?: string }>();
@@ -101,22 +175,25 @@ export default function RequestsScreen() {
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedGroups = useMemo(() => buildProductRequestGroups(receivedItems), [receivedItems]);
   const sentGroups = useMemo(() => buildProductRequestGroups(sentItems), [sentItems]);
+
   const [activeTab, setActiveTab] = useState<"received" | "sent">(
     params.tab === "sent" ? "sent" : "received",
   );
-  const [selectedProductByTab, setSelectedProductByTab] = useState<{
-    received: string;
-    sent: string;
-  }>({
-    received: ALL_PRODUCTS_FILTER,
-    sent: ALL_PRODUCTS_FILTER,
+
+  // ── Per-tab applied filter state ────────────────────────────────────────────
+  const [filterByTab, setFilterByTab] = useState<{ received: TabFilterState; sent: TabFilterState }>({
+    received: { ...DEFAULT_TAB_FILTER },
+    sent: { ...DEFAULT_TAB_FILTER },
   });
+
+  // ── Draft state (used inside the open modal before Apply is pressed) ────────
   const [showProductFilterModal, setShowProductFilterModal] = useState(false);
-  const [draftProductFilter, setDraftProductFilter] = useState(ALL_PRODUCTS_FILTER);
-  const [isViewTransitioning, setIsViewTransitioning] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<TabFilterState>({ ...DEFAULT_TAB_FILTER });
+
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const lastNonEmptyTabOptionsRef = useRef<Array<{ value: "received" | "sent"; label: string }>>([]);
   const lastAppliedParamKeyRef = useRef<string | null>(null);
+
   const hasReceivedItems = receivedItems.length > 0;
   const hasSentItems = sentItems.length > 0;
   const isInitialLoading =
@@ -174,14 +251,22 @@ export default function RequestsScreen() {
     receivedItems.length === 0;
 
   const currentGroups = activeTab === "received" ? receivedGroups : sentGroups;
-  const selectedProductId = activeTab === "received" ? selectedProductByTab.received : selectedProductByTab.sent;
-  const filteredGroups = useMemo(() => {
-    if (selectedProductId === ALL_PRODUCTS_FILTER) {
-      return currentGroups;
-    }
+  const currentFilter = filterByTab[activeTab];
+  const actorTurn: RequestTurn = activeTab === "received" ? "SELLER" : "BUYER";
 
-    return currentGroups.filter((group) => group.productId === selectedProductId);
-  }, [currentGroups, selectedProductId]);
+  // ── Filtered groups: listing → status → turn ────────────────────────────────
+  const filteredGroups = useMemo(() => {
+    // Step 1: listing filter
+    let groups = currentFilter.productId === ALL_PRODUCTS_FILTER
+      ? currentGroups
+      : currentGroups.filter((g) => g.productId === currentFilter.productId);
+
+    // Step 2: status + turn filters
+    groups = applyRequestFilters(groups, currentFilter.statuses, currentFilter.turn, actorTurn);
+
+    return groups;
+  }, [currentGroups, currentFilter, actorTurn]);
+
   const productFilterOptions = useMemo(
     () => [
       {
@@ -197,70 +282,90 @@ export default function RequestsScreen() {
     ],
     [currentGroups],
   );
-  const selectedProductLabel =
-    productFilterOptions.find((option) => option.value === selectedProductId)?.label ?? "All products";
-  const requestFilterActiveCount = selectedProductId === ALL_PRODUCTS_FILTER ? 0 : 1;
 
+  const selectedProductLabel =
+    productFilterOptions.find((option) => option.value === currentFilter.productId)?.label ?? "All products";
+
+  const activeFilterCount =
+    (currentFilter.productId === ALL_PRODUCTS_FILTER ? 0 : 1) +
+    currentFilter.statuses.length +
+    (currentFilter.turn !== null ? 1 : 0);
+
+  // Turn filter is only shown when Pending or Negotiating is explicitly selected in the draft.
+  const draftHasOpenStatus = draftFilter.statuses.some((s) => OPEN_STATUSES.includes(s));
+
+  // ── Deep-link param handling ─────────────────────────────────────────────────
   useEffect(() => {
     const requestedProductId = typeof params.productId === "string" ? params.productId : null;
-    if (!requestedProductId) {
-      return;
-    }
+    if (!requestedProductId) return;
 
     const tab = params.tab === "sent" ? "sent" : "received";
     const paramKey = `${tab}:${requestedProductId}:${params._t ?? ""}`;
-    if (lastAppliedParamKeyRef.current === paramKey) {
-      return;
-    }
+    if (lastAppliedParamKeyRef.current === paramKey) return;
 
     const hasRequestedProduct = (tab === "sent" ? sentGroups : receivedGroups).some(
       (group) => group.productId === requestedProductId,
     );
-
-    if (!hasRequestedProduct) {
-      return;
-    }
+    if (!hasRequestedProduct) return;
 
     setActiveTab(tab);
-    setSelectedProductByTab((prev) => ({
+    setFilterByTab((prev) => ({
       ...prev,
-      [tab]: requestedProductId,
+      [tab]: { ...prev[tab], productId: requestedProductId },
     }));
     lastAppliedParamKeyRef.current = paramKey;
   }, [params.productId, params.tab, receivedGroups, sentGroups]);
 
-  useEffect(() => {
-    setIsViewTransitioning(true);
-    const timer = setTimeout(() => setIsViewTransitioning(false), 180);
-    return () => clearTimeout(timer);
-  }, [activeTab, selectedProductByTab.received, selectedProductByTab.sent]);
-
   const onOpenProductFilter = () => {
-    setDraftProductFilter(selectedProductId);
+    setDraftFilter({ ...currentFilter });
     setShowProductFilterModal(true);
   };
 
   const onApplyProductFilter = () => {
-    setSelectedProductByTab((prev) => ({
+    setFilterByTab((prev) => ({
       ...prev,
-      [activeTab]: draftProductFilter,
+      [activeTab]: { ...draftFilter },
     }));
     setShowProductFilterModal(false);
   };
 
+  const onClearAllFilters = () => {
+    setDraftFilter({ ...DEFAULT_TAB_FILTER });
+  };
+
+  // ── Draft helpers ────────────────────────────────────────────────────────────
+  const toggleDraftStatus = (status: RequestStatus) => {
+    setDraftFilter((prev) => {
+      const exists = prev.statuses.includes(status);
+      const nextStatuses = exists
+        ? prev.statuses.filter((s) => s !== status)
+        : [...prev.statuses, status];
+
+      // If no open statuses remain explicitly selected, clear the turn filter.
+      const nextHasOpenStatus = nextStatuses.some((s) => OPEN_STATUSES.includes(s));
+
+      return {
+        ...prev,
+        statuses: nextStatuses,
+        turn: nextHasOpenStatus ? prev.turn : null,
+      };
+    });
+  };
+
+  const setDraftTurn = (turn: TurnFilter) => {
+    setDraftFilter((prev) => ({
+      ...prev,
+      turn: prev.turn === turn ? null : turn,
+    }));
+  };
+
   const onRefreshAll = () => {
-    if (isManualRefreshing) {
-      return;
-    }
-
+    if (isManualRefreshing) return;
     setIsManualRefreshing(true);
-
     void Promise.allSettled([
       sentQuery.refetch(),
       receivedQuery.refetch(),
-    ]).finally(() => {
-      setIsManualRefreshing(false);
-    });
+    ]).finally(() => setIsManualRefreshing(false));
   };
 
   return (
@@ -268,30 +373,29 @@ export default function RequestsScreen() {
       <StatusBar style={statusBarStyle} />
       <View style={styles.screen}>
         <View style={styles.fixedTopContent}>
-        <PageHeaderCard
-          title="Requests"
-          subtitle="Manage incoming and outgoing negotiations."
-          style={styles.headerCard}
-        />
+          <PageHeaderCard
+            title="Requests"
+            subtitle="Manage incoming and outgoing negotiations."
+            style={styles.headerCard}
+          />
 
-        {!isInitialLoading && stableTabOptions.length > 0 ? (
-          <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-            <SegmentedControl
-              value={activeTab}
-              options={stableTabOptions}
-              onChange={setActiveTab}
-            />
-          </View>
-        ) : null}
+          {!isInitialLoading && stableTabOptions.length > 0 ? (
+            <View style={[styles.tabsCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <SegmentedControl
+                value={activeTab}
+                options={stableTabOptions}
+                onChange={setActiveTab}
+              />
+            </View>
+          ) : null}
 
-        {isInitialLoading ? (
-          <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Spinner size={20} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
-            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>
-          </View>
-        ) : null}
-
+          {isInitialLoading ? (
+            <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <Spinner size={20} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
+              <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.scrollArea}>
@@ -299,10 +403,7 @@ export default function RequestsScreen() {
             <ScrollView
               contentContainerStyle={styles.scrollAreaContent}
               refreshControl={
-                <RefreshControl
-                  refreshing={isManualRefreshing}
-                  onRefresh={onRefreshAll}
-                />
+                <RefreshControl refreshing={isManualRefreshing} onRefresh={onRefreshAll} />
               }
               keyboardDismissMode="on-drag"
             >
@@ -326,7 +427,7 @@ export default function RequestsScreen() {
               loadingNext={receivedQuery.isFetchingNextPage}
               onLoadMore={() => void receivedQuery.fetchNextPage()}
               selectedProductLabel={selectedProductLabel}
-              activeFilterCount={requestFilterActiveCount}
+              activeFilterCount={activeFilterCount}
               onOpenFilter={onOpenProductFilter}
               sessionUserId={session?.user.id ?? ""}
               isRefreshing={isManualRefreshing}
@@ -347,7 +448,7 @@ export default function RequestsScreen() {
               loadingNext={sentQuery.isFetchingNextPage}
               onLoadMore={() => void sentQuery.fetchNextPage()}
               selectedProductLabel={selectedProductLabel}
-              activeFilterCount={requestFilterActiveCount}
+              activeFilterCount={activeFilterCount}
               onOpenFilter={onOpenProductFilter}
               sessionUserId={session?.user.id ?? ""}
               isRefreshing={isManualRefreshing}
@@ -356,6 +457,7 @@ export default function RequestsScreen() {
           ) : null}
         </View>
 
+        {/* ── Filter Modal ──────────────────────────────────────────────────── */}
         <Modal
           visible={showProductFilterModal}
           transparent
@@ -369,69 +471,96 @@ export default function RequestsScreen() {
             <Pressable
               style={[
                 styles.filterModalSheet,
-                {
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.surface,
-                },
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
               ]}
-              onPress={() => {
-                // Keep modal open when tapping inside.
-              }}
+              onPress={() => {/* Keep modal open when tapping inside */}}
             >
+              {/* Header */}
               <View style={styles.filterModalHeaderRow}>
-                <Text style={[styles.filterModalTitle, { color: theme.colors.textPrimary }]}>Filter by listing</Text>
+                <Text style={[styles.filterModalTitle, { color: theme.colors.textPrimary }]}>Filters</Text>
                 <Pressable onPress={() => setShowProductFilterModal(false)}>
                   <Feather name="x" size={18} color={theme.colors.textSecondary} />
                 </Pressable>
               </View>
 
-              {/* 
-                filterScrollWrapper has a maxHeight capped at (50% screen - fixed chrome).
-                When content is short, the ScrollView shrinks to fit naturally.
-                When content overflows, scroll kicks in and the sheet stays within 50%.
+              {/*
+                Scrollable filter sections — capped at FILTER_SCROLL_MAX_HEIGHT.
+                When content is short, ScrollView shrinks naturally.
+                When content overflows, scroll kicks in without growing past 65% screen.
               */}
               <View style={[styles.filterScrollWrapper, { maxHeight: FILTER_SCROLL_MAX_HEIGHT }]}>
                 <ScrollView
                   contentContainerStyle={styles.filterScrollContentContainer}
                   showsVerticalScrollIndicator={true}
                 >
+                  {/* ── Section 1: Filter by listing ── */}
+                  <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary }]}>
+                    Listing
+                  </Text>
                   <View style={styles.filterChipsContainer}>
-                    {productFilterOptions && productFilterOptions.length > 0 ? (
-                      productFilterOptions.map((option) => (
-                        <FilterChip
-                          key={option.value}
-                          active={draftProductFilter === option.value}
-                          label={`${option.label} (${option.count})`}
-                          onPress={() => setDraftProductFilter(option.value)}
-                        />
-                      ))
-                    ) : (
-                      <Text style={{ color: theme.colors.textMuted }}>No products available</Text>
-                    )}
+                    {productFilterOptions.map((option) => (
+                      <FilterChip
+                        key={option.value}
+                        active={draftFilter.productId === option.value}
+                        label={`${option.label} (${option.count})`}
+                        onPress={() => setDraftFilter((prev) => ({ ...prev, productId: option.value }))}
+                      />
+                    ))}
                   </View>
+
+                  {/* ── Section 2: Filter by status ── */}
+                  <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
+                    Status
+                  </Text>
+                  <View style={styles.filterChipsContainer}>
+                    {ALL_REQUEST_STATUSES.map((status) => (
+                      <FilterChip
+                        key={status}
+                        active={draftFilter.statuses.includes(status)}
+                        label={getStatusLabel(status)}
+                        onPress={() => toggleDraftStatus(status)}
+                      />
+                    ))}
+                  </View>
+
+                  {/* ── Section 3: Filter by turn — only shown when Pending/Negotiating could be in results ── */}
+                  {draftHasOpenStatus ? (
+                    <>
+                      <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
+                        Turn
+                      </Text>
+                      <View style={styles.filterChipsContainer}>
+                        <FilterChip
+                          active={draftFilter.turn === "MY_TURN"}
+                          label="My turn"
+                          onPress={() => setDraftTurn("MY_TURN")}
+                        />
+                        <FilterChip
+                          active={draftFilter.turn === "THEIR_TURN"}
+                          label="Their turn"
+                          onPress={() => setDraftTurn("THEIR_TURN")}
+                        />
+                      </View>
+                    </>
+                  ) : null}
                 </ScrollView>
               </View>
 
+              {/* Action buttons */}
               <View style={styles.filterActionRow}>
                 <Pressable
                   style={[
                     styles.filterActionBtn,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surfaceMuted,
-                    },
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
                   ]}
-                  onPress={() => setDraftProductFilter(ALL_PRODUCTS_FILTER)}
+                  onPress={onClearAllFilters}
                 >
-                  <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
+                  <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear all</Text>
                 </Pressable>
                 <Pressable
                   style={[
                     styles.filterActionBtn,
-                    {
-                      borderColor: theme.colors.primary,
-                      backgroundColor: theme.colors.primary,
-                    },
+                    { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
                   ]}
                   onPress={onApplyProductFilter}
                 >
@@ -445,6 +574,8 @@ export default function RequestsScreen() {
     </SafeAreaView>
   );
 }
+
+// ── RequestSection ─────────────────────────────────────────────────────────────
 
 function RequestSection({
   title,
@@ -505,7 +636,7 @@ function RequestSection({
   }, [flattenedRows]);
 
   return (
-    <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+    <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <View style={styles.sectionHeaderRow}>
         <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{title}</Text>
         <ListControlsRow
@@ -531,8 +662,10 @@ function RequestSection({
       ) : null}
 
       {!isPending && !isError && groups.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}> 
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No {title.toLowerCase()} requests for {selectedProductLabel.toLowerCase()}.</Text>
+        <View style={[styles.emptyCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
+            No {title.toLowerCase()} requests match the selected filters.
+          </Text>
         </View>
       ) : null}
 
@@ -589,14 +722,8 @@ function RequestSection({
   );
 }
 
-/**
- * OPTIMIZATION: RequestItem is memoized to prevent unnecessary re-renders
- * when parent (RequestSection) updates but this item's props are unchanged.
- *
- * IMPORTANT: All callback props (acceptMutation, rejectMutation, etc.)
- * are passed from parent and remain stable across renders, so shallow
- * equality works perfectly here.
- */
+// ── RequestItem ────────────────────────────────────────────────────────────────
+
 const RequestItem = memo(function RequestItem({
   item,
   router,
@@ -625,7 +752,7 @@ const RequestItem = memo(function RequestItem({
       style={styles.itemCardPressable}
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
-      <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}> 
+      <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
         <View style={styles.detailsBlock}>
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, styles.statusLabel, { color: theme.colors.textMuted }]}>Status</Text>
@@ -638,7 +765,7 @@ const RequestItem = memo(function RequestItem({
                   borderColor: displayStatus === "CANCELLED" ? "#111827" : "transparent",
                 },
               ]}
-            > 
+            >
               <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
                 {displayStatus}
               </Text>
@@ -679,6 +806,8 @@ const RequestItem = memo(function RequestItem({
     </Pressable>
   );
 });
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -922,17 +1051,27 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     gap: 10,
     flexDirection: "column",
-    // No maxHeight here — the sheet sizes itself to content.
-    // The scroll cap is enforced by filterScrollWrapper's maxHeight instead.
   },
   filterScrollWrapper: {
-    // maxHeight is applied inline using the FILTER_SCROLL_MAX_HEIGHT constant
-    // so the sheet never exceeds 50% of screen height regardless of filter count.
     width: "100%",
   },
   filterScrollContentContainer: {
-    paddingVertical: 12,
+    paddingVertical: 4,
     paddingHorizontal: 0,
+  },
+  filterSectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  filterSectionHint: {
+    fontSize: 11,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    marginTop: -4,
   },
   filterModalHeaderRow: {
     flexDirection: "row",
@@ -979,6 +1118,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
+    marginBottom: 4,
   },
 });

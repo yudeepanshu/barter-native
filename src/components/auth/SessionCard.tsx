@@ -130,35 +130,36 @@ export function SessionCard({
 }
 
 function formatActiveSince(createdAt?: string) {
+  const prefix = "Active since: ";
   if (!createdAt) {
-    return "Member";
+    return `${prefix}Today`;
   }
 
   const createdTime = new Date(createdAt).getTime();
   if (Number.isNaN(createdTime)) {
-    return "Member";
+    return `${prefix}Today`;
   }
 
   const elapsedMs = Date.now() - createdTime;
   if (elapsedMs <= 0) {
-    return "Member";
+    return `${prefix}Today`;
   }
 
   const days = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
   if (days < 1) {
-    return "Active since today";
+    return `${prefix}Today`;
   }
   if (days < 30) {
-    return `Active since ${days} day${days === 1 ? "" : "s"}`;
+    return `${prefix}${days} day${days === 1 ? "" : "s"}`;
   }
 
   const months = Math.floor(days / 30);
   if (months < 12) {
-    return `Active since ${months} month${months === 1 ? "" : "s"}`;
+    return `${prefix}${months} month${months === 1 ? "" : "s"}`;
   }
 
   const years = Math.floor(days / 365);
-  return `Active since ${years} year${years === 1 ? "" : "s"}`;
+  return `${prefix}${years} year${years === 1 ? "" : "s"}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

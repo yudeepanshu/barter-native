@@ -848,7 +848,7 @@ export default function ProfileScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoCorrect={false}
-                  placeholder="Optional"
+                  placeholder="Enter your email address"
                   editable={!hasExistingValue(user?.email)}
                   disabled={hasExistingValue(user?.email)}
                 />
@@ -862,7 +862,7 @@ export default function ProfileScreen() {
                   }}
                   error={fieldErrors.mobileNumber ?? null}
                   keyboardType="phone-pad"
-                  placeholder="Optional"
+                  placeholder="Enter your phone number"
                   editable={!hasExistingValue(user?.mobileNumber)}
                   disabled={hasExistingValue(user?.mobileNumber)}
                 />

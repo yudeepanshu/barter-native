@@ -681,12 +681,12 @@ export default function MyListingsScreen() {
               <EmptyView
                 title={
                   selectedFilter === 'ALL' 
-                    ? "You haven't listed anything yet."
+                    ? "You haven't listed yet."
                     : `No ${selectedFilterLabel.toLowerCase()} listings found.`
                 }
                 message={
                   selectedFilter === 'ALL'
-                    ? "Create your first listing and it will show up here."
+                    ? "Create listing and it will show up here."
                     : "Try adjusting your filters to see more results."
                 }
                 buttons={

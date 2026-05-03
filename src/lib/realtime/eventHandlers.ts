@@ -212,56 +212,63 @@ function patchProductInInfiniteCollections(
 ) {
   let matched = false;
 
-  queryClient.setQueriesData<ProductsInfiniteData>(
-    { queryKey: ["products", "infinite"] },
-    (existing) => {
-      if (!existing) {
-        return existing;
-      }
+  const queries = queryClient.getQueryCache().findAll({ queryKey: ["products", "infinite"] });
 
-      let didChange = false;
-      const nextPages = existing.pages.map((page) => {
-        let pageChanged = false;
-        const nextItems: ProductSummary[] = [];
-        
-        for(const item of page.items) {
-          if (item.id !== patch.productId) {
-            nextItems.push(item);
-            continue;
-          }
+  for(const query of queries) {
+    const filters = query.queryKey[2] as {ownerId?: string | null} | undefined;
+    const isOwnerQuery = Boolean(filters?.ownerId);
 
-          matched = true;
-          pageChanged = true;
-
-          if(!patch.isListed) {
-            // If the product is no longer listed, remove it from the infinite collection
-            continue;
-          }
-
-          nextItems.push(patchProductSummary(item, patch));
+    queryClient.setQueryData<ProductsInfiniteData>(
+      query.queryKey,
+      (existing) => {
+        if (!existing) {
+          return existing;
         }
 
-        if (!pageChanged) {
-          return page;
+        let didChange = false;
+        const nextPages = existing.pages.map((page) => {
+          let pageChanged = false;
+          const nextItems: ProductSummary[] = [];
+          
+          for(const item of page.items) {
+            if (item.id !== patch.productId) {
+              nextItems.push(item);
+              continue;
+            }
+
+            matched = true;
+            pageChanged = true;
+
+            if(!patch.isListed && !isOwnerQuery) {
+              // If the product is no longer listed, remove it from the infinite collection
+              continue;
+            }
+
+            nextItems.push(patchProductSummary(item, patch));
+          }
+
+          if (!pageChanged) {
+            return page;
+          }
+
+          didChange = true;
+          return {
+            ...page,
+            items: nextItems,
+          };
+        });
+
+        if (!didChange) {
+          return existing;
         }
 
-        didChange = true;
         return {
-          ...page,
-          items: nextItems,
+          ...existing,
+          pages: nextPages,
         };
-      });
-
-      if (!didChange) {
-        return existing;
-      }
-
-      return {
-        ...existing,
-        pages: nextPages,
-      };
-    },
-  );
+      },
+    );
+  }
 
   return matched;
 }

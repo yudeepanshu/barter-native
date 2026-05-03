@@ -793,7 +793,7 @@ function RequestComposer({
           }
           message={message}
           onChangeMessage={setMessage}
-          messagePlaceholder="Add details for the seller"
+          messagePlaceholder="Add details for the seller (Optional)"
           feedback={feedback}
           feedbackColor={theme.colors.danger}
           submitLabel="Send request"

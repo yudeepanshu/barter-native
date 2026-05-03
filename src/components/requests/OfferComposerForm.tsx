@@ -114,7 +114,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
   comparisonSnapshot,
   message,
   onChangeMessage,
-  messageLabel = "Message (optional)",
+  messageLabel = "Message",
   messagePlaceholder,
   feedback,
   feedbackColor,

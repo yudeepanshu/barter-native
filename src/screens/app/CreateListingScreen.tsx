@@ -167,7 +167,7 @@ export default function CreateListingScreen() {
               />
             </View>
             <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Enable money offers</Text>
+              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Cash offers</Text>
               <Switch
                 value={form.state.requestByMoney}
                 onValueChange={form.actions.setRequestByMoney}

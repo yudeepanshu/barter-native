@@ -114,8 +114,12 @@ export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
     return { label: "Free", tone: "mint" };
   }
 
-  if (product.requestByMoney) {
+  if(product.requestByMoney && product.allowTradeRequest) {
     return { label: "Cash or Trade", tone: "amber" };
+  }
+
+  if (product.requestByMoney) {
+    return { label: "Cash Only", tone: "amber" };
   }
 
   return { label: "Trade Only", tone: "violet" };

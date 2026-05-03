@@ -29,6 +29,7 @@ import { FormCategoryChip } from "@/components/filters/FormCategoryChip";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { ErrorView } from "@/components/ui/ErrorView";
+import { OfferSegmentedControl } from "./OfferSegmentedControl";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -304,7 +305,7 @@ function EditListingFormSection({
                 ios_backgroundColor={switchTrackOffColor}
               />
             </View>
-            <View style={styles.switchRow}>
+            {/* <View style={styles.switchRow}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Cash offers</Text>
               <Switch
                 value={form.state.requestByMoney}
@@ -323,7 +324,26 @@ function EditListingFormSection({
                 placeholder="Enter minimum accepted amount (₹)"
                 error={form.state.fieldErrors.minMoneyAmount ?? null}
               />
-            ) : null}
+            ) : null} */}
+
+            {!form.state.isFree ? <OfferSegmentedControl
+              value={
+                form.state.isFree
+                  ? "both"
+                  : form.state.requestByMoney && form.state.allowTradeRequest
+                  ? "both"
+                  : form.state.requestByMoney
+                  ? "cash"
+                  : "trade"
+              }
+              onChange={(val) => {
+                form.actions.setRequestByMoney(val === "cash" || val === "both");
+                form.actions.setAllowTradeRequest(val === "both" || val === "trade");
+              }}
+              minMoneyAmount={form.state.minMoneyAmount}
+              onMinMoneyAmountChange={form.actions.setMinMoneyAmount}
+              minMoneyAmountError={form.state.fieldErrors.minMoneyAmount ?? null}
+            /> : null}
           </View>
         </View>
 

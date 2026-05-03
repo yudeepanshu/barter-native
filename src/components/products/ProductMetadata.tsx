@@ -78,7 +78,9 @@ export function getDistanceBadgeLabel(
 
 export function getProductTypeLabel(product: ProductSummary) {
   if (product.isFree) return "Free";
-  if (product.requestByMoney) return "Cash or Trade";
+  
+  if (product.requestByMoney && product.allowTradeRequest) return "Cash or Trade";
+  if (product.requestByMoney) return "Cash Only";
   return "Trade Only";
 }
 

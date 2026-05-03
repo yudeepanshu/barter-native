@@ -51,6 +51,7 @@ export function useEditListingForm(
   const [minMoneyAmount, setMinMoneyAmount] = useState(() =>
     product.minMoneyAmount != null ? String(product.minMoneyAmount) : "",
   );
+  const [allowTradeRequest, setAllowTradeRequest] = useState(() => Boolean(product.allowTradeRequest));
   const [existingImages, setExistingImages] = useState<ProductImage[]>(() => product.productImages ?? []);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -100,6 +101,7 @@ export function useEditListingForm(
       minMoneyAmount: requestByMoney
         ? (minMoneyAmount.trim().length > 0 ? Number(minMoneyAmount) : null)
         : null,
+      allowTradeRequest,
       imageFileNames: [
         ...Array.from({ length: existingImages.length }, (_, index) => `existing-image-${index + 1}.jpg`),
         ...newImages.map((asset, index) => asset.fileName ?? `mobile-image-${index + 1}.jpg`),
@@ -244,6 +246,7 @@ export function useEditListingForm(
       isFree,
       requestByMoney,
       minMoneyAmount,
+      allowTradeRequest,
       existingImages,
       newImages,
       fieldErrors,
@@ -263,6 +266,7 @@ export function useEditListingForm(
       setIsFree,
       setRequestByMoney,
       setMinMoneyAmount: setSanitizedMinMoneyAmount,
+      setAllowTradeRequest,
       setFormError,
       pickImages,
       removeExistingImage,
@@ -281,6 +285,7 @@ function buildUpdatePayload(
     categoryId?: string;
     requestByMoney?: boolean;
     minMoneyAmount?: number | null;
+    allowTradeRequest?: boolean;
     isFree?: boolean;
     locationName?: string;
   },

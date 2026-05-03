@@ -62,6 +62,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
   const [categoryId, setCategoryId] = useState("");
   const [isFree, setIsFree] = useState(false);
   const [requestByMoney, setRequestByMoney] = useState(true);
+  const [allowTradeRequest, setAllowTradeRequest] = useState(false);
   const [minMoneyAmount, setMinMoneyAmount] = useState("");
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [fieldErrors, setFieldErrors] = useState<CreateListingValidationResult["fieldErrors"]>({});
@@ -93,6 +94,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     setCategoryId("");
     setIsFree(false);
     setRequestByMoney(true);
+    setAllowTradeRequest(false);
     setMinMoneyAmount("");
     setImages([]);
     setFieldErrors({});
@@ -130,6 +132,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       categoryId,
       isFree,
       requestByMoney,
+      allowTradeRequest,
       minMoneyAmount: requestByMoney
         ? (minMoneyAmount.trim().length > 0 ? Number(minMoneyAmount) : null)
         : null,
@@ -305,6 +308,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       categoryId,
       isFree,
       requestByMoney,
+      allowTradeRequest,
       minMoneyAmount,
       images,
       fieldErrors,
@@ -328,6 +332,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       setCategoryId,
       setIsFree,
       setRequestByMoney,
+      setAllowTradeRequest,
       setLocationName: setSanitizedLocationName,
       setMinMoneyAmount: setSanitizedMinMoneyAmount,
       submit,

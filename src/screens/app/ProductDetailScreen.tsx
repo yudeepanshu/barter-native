@@ -22,10 +22,8 @@ import { useProductRoom } from "@/lib/realtime/rooms";
 import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import {
   ProductMetadata,
-  hasExchangeHistory,
   getInactiveExpiryWarning,
   formatLocationBadgeLabel,
 } from "@/components/products/ProductMetadata";
@@ -44,6 +42,7 @@ import { ErrorView } from "@/components/ui/ErrorView";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useReportProductMutation } from "@/hooks/mutations/useReportProductMutation";
 import { ReportProductModal } from "@/components/products/ReportProductModal";
+import { resolveImageBadge } from "@/components/products/ProductCard";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -226,6 +225,16 @@ export default function ProductDetailScreen() {
         isSubmitting={isPending}
       />
       <MenuHeader
+        centerNode={
+          product.title ? (
+            <View style={styles.headerRow}>
+              <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+                {product.title}
+              </Text>
+              <ProductTag tag={typeTag} variant="top-text" style={{ alignSelf: "center" }} />
+            </View>
+          ) : null
+        }
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
         contextMenuItems={
@@ -249,15 +258,7 @@ export default function ProductDetailScreen() {
           <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} />
         }
       >
-
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-              {product.title}
-            </Text>
-            <ProductTag tag={typeTag} variant="top-text" />
-          </View>
-
           {product.owner ? (
             <View style={styles.ownerRow}>
               {product.owner.profilePicture ? (
@@ -299,9 +300,11 @@ export default function ProductDetailScreen() {
             </View>
           ) : null}
 
-          <Text style={[styles.description, { color: theme.colors.textMuted }]}>
-            {product.description || "No description provided."}
-          </Text>
+          {product.description ? (
+            <Text style={[styles.description, { color: theme.colors.textMuted }]}>
+              {product.description}
+            </Text>
+          ) : null}
 
           {isOwner && getInactiveExpiryWarning(product) ? (
             <View
@@ -370,7 +373,7 @@ export default function ProductDetailScreen() {
                       uri={image.url}
                       style={styles.productImage}
                     />
-                    {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
+                    {resolveImageBadge(product, contextTag)}
                     {isOwner && image.isPrimary ? <Text style={styles.imagePrimaryBadge}>Primary</Text> : null}
                   </Pressable>
                 ))}
@@ -378,9 +381,6 @@ export default function ProductDetailScreen() {
 
               {product.productImages.length > 1 ? (
                 <View style={styles.imagePagerWrap}>
-                  {/* <Text style={[styles.imagePagerText, { color: theme.colors.textMuted }]}>
-                    {activeImageIndex + 1} of {product.productImages.length}
-                  </Text> */}
                   <View style={styles.imageDotsRow}>
                     {product.productImages.map((image, index) => (
                       <View
@@ -400,10 +400,24 @@ export default function ProductDetailScreen() {
             </View>
           ) : null}
 
+          <View
+            style={[
+              styles.listedOnCard,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <View style={styles.listedOnRow}>
+              <Text style={[styles.listedOnLabel, { color: theme.colors.textMuted }]}>Listed on</Text>
+              <Text style={[styles.listedOnValue, { color: theme.colors.textPrimary }]}>{listedOnDate}</Text>
+            </View>
+          </View>
+
           <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
           <View style={styles.metaSection}>
-            {contextTag ? <ProductTag tag={contextTag} variant="bottom-chip" /> : null}
             <ProductMetadata
               product={product}
               variant="detail"
@@ -414,21 +428,6 @@ export default function ProductDetailScreen() {
               fallbackDistanceLabel={previewLocationLabel}
               distanceOverrideKm={routeDistanceOverrideKm}
             />
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.listedOnCard,
-            {
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
-            },
-          ]}
-        >
-          <View style={styles.listedOnRow}>
-            <Text style={[styles.listedOnLabel, { color: theme.colors.textMuted }]}>Listed on</Text>
-            <Text style={[styles.listedOnValue, { color: theme.colors.textPrimary }]}>{listedOnDate}</Text>
           </View>
         </View>
 
@@ -820,6 +819,15 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
+  headerRow: {
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   backRow: { marginBottom: 2 },
   backButton: {
     alignSelf: "flex-start",
@@ -830,18 +838,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     padding: 18,
+    paddingTop: 10,
+    paddingBottom: 10,
     gap: 12,
   },
   eyebrow: {
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "center",
   },
   title: { flex: 1, minWidth: 0, fontSize: 28, fontWeight: "800", lineHeight: 32 },
   description: { fontSize: 15, lineHeight: 22 },
@@ -897,7 +901,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imageSection: {
-    marginVertical: 8,
+    marginVertical: 2,
     alignItems: "center",
   },
   imageCarousel: {
@@ -969,26 +973,22 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     opacity: 0.9,
   },
-  listedOnCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
+  listedOnCard: {},
   listedOnRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 8,         
+    opacity: 0.9,  
   },
   listedOnLabel: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
   listedOnValue: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "700",
     textAlign: "right",
   },

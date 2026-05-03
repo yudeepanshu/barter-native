@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -8,12 +8,13 @@ type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
 export type ProductTagTone = "mint" | "amber" | "violet" | "blue" | "teal" | "slate" | "rose" | "orange";
 
 export interface ProductTagSpec {
+  key?: string;
   label: string;
   tone: ProductTagTone;
   icon?: FeatherIconName;
 }
 
-const TAG_TONES: Record<
+export const TAG_TONES: Record<
   ProductTagTone,
   {
     top: {
@@ -123,29 +124,37 @@ export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
 export function getContextTag(product: ProductSummary, isRequested: boolean): ProductTagSpec | null {
   if (product.status === "RESERVED") {
     if (product.reservationContext === "FOR_VIEWER") {
-      return { label: "Reserved for you", tone: "blue", icon: "lock" };
+      return { key: "reserved-for-you", label: "Reserved for you", tone: "blue", icon: "lock" };
     }
 
-    return { label: "Popular now", tone: "orange", icon: "trending-up" };
+    return { key: "popular-now", label: "Popular now", tone: "orange", icon: "trending-up" };
   }
 
   if (isRequested) {
-    return { label: "Requested", tone: "amber", icon: "clock" };
+    return { key: "requested", label: "Requested", tone: "amber", icon: "clock" };
   }
 
   switch (product.status) {
     case "EXCHANGED":
-      return { label: "Exchanged", tone: "teal", icon: "refresh-cw" };
+      return { key: "traded", label: "Traded", tone: "teal", icon: "refresh-cw" };
     case "INACTIVE":
-      return { label: "Paused", tone: "slate", icon: "pause-circle" };
+      return { key: "paused", label: "Paused", tone: "slate", icon: "pause-circle" };
     case "REMOVED":
-      return { label: "Unavailable", tone: "rose", icon: "slash" };
+      return { key: "unavailable", label: "Unavailable", tone: "rose", icon: "slash" };
     default:
       return null;
   }
 }
 
-export function ProductTag({ tag, variant }: { tag: ProductTagSpec; variant: "top-text" | "bottom-chip" }) {
+export function ProductTag({
+  tag,
+  variant,
+  style,
+}: {
+  tag: ProductTagSpec;
+  variant: "top-text" | "bottom-chip";
+  style?: StyleProp<ViewStyle>;
+}) {
   const { theme } = useAppTheme();
   const mode = theme.mode === "dark" ? "dark" : "light";
   const palette = variant === "top-text" ? TAG_TONES[tag.tone].top[mode] : TAG_TONES[tag.tone].bottom[mode];
@@ -155,10 +164,8 @@ export function ProductTag({ tag, variant }: { tag: ProductTagSpec; variant: "to
       <View
         style={[
           styles.topTypeBadge,
-          {
-            borderColor: palette.border,
-            backgroundColor: palette.bg,
-          },
+          { borderColor: palette.border, backgroundColor: palette.bg },
+          style,
         ]}
       >
         <Text style={[styles.topTypeText, { color: palette.text }]} numberOfLines={1}>
@@ -172,10 +179,8 @@ export function ProductTag({ tag, variant }: { tag: ProductTagSpec; variant: "to
     <View
       style={[
         styles.bottomTag,
-        {
-          backgroundColor: palette.bg,
-          borderColor: palette.border,
-        },
+        { backgroundColor: palette.bg, borderColor: palette.border },
+        style,
       ]}
     >
       {tag.icon ? <Feather name={tag.icon} size={12} color={palette.text} /> : null}

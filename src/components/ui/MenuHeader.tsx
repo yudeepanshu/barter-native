@@ -11,6 +11,7 @@ interface BackMenuHeaderProps {
   onMenuPress?: () => void;
   textColor?: string;
   titleNode?: ReactNode;
+  centerNode?: ReactNode;
   contextMenuItems?: AnchoredContextMenuItem[];
 }
 
@@ -19,6 +20,7 @@ export function MenuHeader({
   onBack,
   onMenuPress,
   textColor = "#111827",
+  centerNode,
   contextMenuItems,
 }: BackMenuHeaderProps) {
   const { theme } = useAppTheme();
@@ -53,28 +55,39 @@ export function MenuHeader({
 
   return (
     <View style={styles.container}>
-      <Pressable
-        onPress={onBack}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1, borderColor: theme.colors.border }]}
-      >
-        <Feather name="chevron-left" size={20} color={textColor} />
-        {title ? <Text style={[styles.title, { color: textColor }]}>{title}</Text> : null}
-      </Pressable>
-
-      {hasMenuButton ? (
+      {/* Left: back button */}
+      <View style={styles.side}>
         <Pressable
-          onPress={handleMenuPress}
+          onPress={onBack}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Open menu"
+          accessibilityLabel="Go back"
           style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1, borderColor: theme.colors.border }]}
         >
-          <Feather name="more-vertical" size={20} color={textColor} />
+          <Feather name="chevron-left" size={20} color={textColor} />
+          {title ? <Text style={[styles.title, { color: textColor }]}>{title}</Text> : null}
         </Pressable>
-      ) : null}
+      </View>
+
+      {/* Center: grows to fill, height driven by content */}
+      {centerNode ? <View style={styles.center}>
+        {centerNode}
+      </View> : null}
+
+      {/* Right: menu button or empty spacer to keep center truly centered */}
+      <View style={styles.side}>
+        {hasMenuButton ? (
+          <Pressable
+            onPress={handleMenuPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1, borderColor: theme.colors.border }]}
+          >
+            <Feather name="more-vertical" size={20} color={textColor} />
+          </Pressable>
+        ) : null}
+      </View>
 
       {hasContextMenuItems ? (
         <AnchoredContextMenu
@@ -92,10 +105,19 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     width: "100%",
     paddingVertical: 8,
     paddingHorizontal: 12,
+    gap: 8,
+  },
+  side: {
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
   },
   button: {
     flexDirection: "row",

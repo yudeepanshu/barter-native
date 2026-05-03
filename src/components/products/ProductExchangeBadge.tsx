@@ -1,13 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
 
 export function ProductExchangeBadge({
-  position = "right",
+  position = "left",
 }: {
   position?: "left" | "right";
 }) {
   return (
     <View style={[styles.badgeWrap, position === "left" ? styles.badgeLeft : styles.badgeRight]}>
-      <Text style={styles.badgeText} numberOfLines={1}>Previously exchanged</Text>
+      <Text style={styles.badgeText} numberOfLines={1}>Previously traded</Text>
     </View>
   );
 }
@@ -16,12 +16,13 @@ const styles = StyleSheet.create({
   badgeWrap: {
     position: "absolute",
     top: 8,
-    borderWidth: 1,
-    borderColor: "#fdba74",
-    backgroundColor: "rgba(255, 237, 213, 0.96)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderWidth: 0,
+    borderLeftWidth: 3,
+    borderLeftColor: "#60a5fa",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     maxWidth: "80%",
   },
   badgeRight: {
@@ -31,7 +32,7 @@ const styles = StyleSheet.create({
     left: 8,
   },
   badgeText: {
-    color: "#9a3412",
+    color: "#fff",
     fontSize: 11,
     fontWeight: "700",
   },

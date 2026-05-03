@@ -4,8 +4,9 @@ import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ProductExchangeBadge } from "@/components/products/ProductExchangeBadge";
 import { ProductMetadata, formatLocationBadgeLabel, hasExchangeHistory } from "@/components/products/ProductMetadata";
-import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
+import { getContextTag, getTopTypeTag, ProductTag, ProductTagSpec } from "@/components/products/ProductTags";
 import { AppImage } from "@/components/ui/AppImage";
+import { ProductContextBadge } from "./ProductContextBadge";
 
 interface ProductCardProps {
   product: ProductSummary;
@@ -16,6 +17,18 @@ interface ProductCardProps {
   viewerLocation?: { latitude: number; longitude: number } | null;
   canShowRelativeDistance?: boolean;
   fallbackDistanceLabel?: string | null;
+}
+
+export function resolveImageBadge(
+  product: ProductSummary,
+  contextTag: ProductTagSpec | null,
+): React.ReactNode {
+  const isPriority = contextTag?.key === "reserved-for-you" || contextTag?.key === "requested";
+
+  if (isPriority) return <ProductContextBadge tag={contextTag!} />;
+  if (hasExchangeHistory(product)) return <ProductExchangeBadge />;
+  if (contextTag) return <ProductContextBadge tag={contextTag} />;
+  return null;
 }
 
 /**
@@ -79,7 +92,7 @@ export const ProductCard = memo(function ProductCard({
             uri={primaryImage.url}
             style={styles.thumbnail}
           />
-          {hasExchangeHistory(product) ? <ProductExchangeBadge /> : null}
+          {resolveImageBadge(product, contextTag)}
         </View>
       ) : null}
       <View style={styles.cardHeader}>
@@ -90,7 +103,6 @@ export const ProductCard = memo(function ProductCard({
       </View>
       {showMeta ? (
         <View style={styles.metaWrap}>
-          {contextTag ? <ProductTag tag={contextTag} variant="bottom-chip" /> : null}
           <ProductMetadata
             product={product}
             variant="compact"
@@ -133,6 +145,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  cardTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "800" },
+  cardTitle: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: "800" },
   metaWrap: { gap: 6, flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" },
 });

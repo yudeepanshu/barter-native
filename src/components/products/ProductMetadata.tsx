@@ -170,9 +170,13 @@ export function ProductMetadata({
   const effectiveDistanceKm = computedDistanceKm ?? distanceOverrideKm;
   const distanceLabel = getDistanceBadgeLabel(canShowRelativeDistance, effectiveDistanceKm, fallbackDistanceLabel);
 
+  // Distance takes priority over location — only one is shown at a time
+  const locationOrDistance = distanceLabel ?? (includeLocation && location ? location : null);
+  const isShowingDistance = !!distanceLabel;
+
   const chips: Array<{
     key: string;
-    icon: "tag" | "package" | "map-pin" | "navigation";
+    icon: "tag" | "package" | "map-pin";
     value: string;
     chipStyle: object;
     textStyle: object;
@@ -194,66 +198,101 @@ export function ProductMetadata({
     });
   }
 
-  if (includeCategory) {
-    chips.push({
-      key: "category",
-      icon: "tag",
-      value: getCategoryLabel(product),
-      chipStyle: styles.metaChipCategory,
-      textStyle: styles.metaChipTextCategory,
-    });
-  }
+  const hasChips = chips.length > 0;
+  const hasInlineItems = !!locationOrDistance || includeCategory;
 
-  if (includeLocation && location) {
-    chips.push({
-      key: "location",
-      icon: "map-pin",
-      value: location,
-      chipStyle: styles.metaChipLocation,
-      textStyle: styles.metaChipTextLocation,
-      lines: locationLines,
-    });
-  }
-
-  if (distanceLabel) {
-    chips.push({
-      key: "distance",
-      icon: "navigation",
-      value: distanceLabel,
-      chipStyle: styles.metaChipDistance,
-      textStyle: styles.metaChipTextDistance,
-    });
-  }
-
-  if (chips.length === 0) {
+  if (!hasChips && !hasInlineItems) {
     return null;
   }
 
   return (
     <View style={[styles.container, variant === "compact" && styles.containerCompact]}>
-      {chips.map((chip) => (
-        <View key={chip.key} style={[styles.metaChip, variant === "compact" && styles.metaChipCompact, chip.chipStyle]}>
-          <Feather name={chip.icon} size={12} color={theme.colors.textMuted} style={styles.metaChipIcon} />
-          <Text
-            numberOfLines={chip.lines ?? 1}
-            style={[styles.metaChipText, variant === "compact" && styles.metaChipTextCompact, chip.textStyle]}
-          >
-            {chip.value}
-          </Text>
+      {/* Chips row: type only */}
+      {hasChips && (
+        <View style={styles.chipsRow}>
+          {chips.map((chip) => (
+            <View
+              key={chip.key}
+              style={[styles.metaChip, variant === "compact" && styles.metaChipCompact, chip.chipStyle]}
+            >
+              <Feather name={chip.icon} size={12} color={theme.colors.textMuted} style={styles.metaChipIcon} />
+              <Text
+                numberOfLines={chip.lines ?? 1}
+                style={[styles.metaChipText, variant === "compact" && styles.metaChipTextCompact, chip.textStyle]}
+              >
+                {chip.value}
+              </Text>
+            </View>
+          ))}
         </View>
-      ))}
+      )}
+
+      {/* Inline text row: category · (distance OR location) */}
+      {hasInlineItems && (
+        <View style={styles.inlineRow}>
+          {locationOrDistance && (
+            <Feather
+              name="map-pin"
+              size={variant === "compact" ? 11 : 12}
+              color={theme.colors.textMuted}
+              style={styles.inlineIcon}
+            />
+          )}
+          {locationOrDistance && (
+            <Text
+              numberOfLines={isShowingDistance ? 1 : locationLines}
+              style={[
+                styles.inlineText,
+                variant === "compact" && styles.inlineTextCompact,
+                { color: theme.colors.textMuted },
+              ]}
+            >
+              {locationOrDistance}
+            </Text>
+          )}
+
+          {includeCategory && locationOrDistance && (
+            <Text style={[styles.inlineSeparator, { color: theme.colors.textMuted }]}>·</Text>
+          )}
+
+          {includeCategory && (
+            <Feather
+              name="tag"
+              size={variant === "compact" ? 11 : 12}
+              color={theme.colors.textMuted}
+              style={styles.inlineIcon}
+            />
+          )}
+          {includeCategory && (
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.inlineText,
+                variant === "compact" && styles.inlineTextCompact,
+                { color: theme.colors.textMuted },
+              ]}
+            >
+              {getCategoryLabel(product)}
+            </Text>
+          )}
+
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 6,
   },
   containerCompact: {
     marginTop: 0,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   metaChip: {
     flexDirection: "row",
@@ -278,10 +317,33 @@ const styles = StyleSheet.create({
   metaChipTextCompact: {
     fontSize: 11,
   },
-  metaChipCategory: { backgroundColor: "#f1f5f9", borderColor: "#cbd5e1" },
-  metaChipTextCategory: { color: "#475569" },
-  metaChipLocation: { backgroundColor: "#e0f2fe", borderColor: "#7dd3fc" },
-  metaChipTextLocation: { color: "#0c4a6e" },
-  metaChipDistance: { backgroundColor: "#fef3c7", borderColor: "#fcd34d" },
-  metaChipTextDistance: { color: "#92400e" },
+  // Inline text styles for category, location + distance
+  inlineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 4,
+  },
+  inlineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+  },
+  inlineIcon: {
+    marginTop: 0.5,
+  },
+  inlineText: {
+    fontSize: 12,
+    fontWeight: "500",
+    flexShrink: 1,
+  },
+  inlineTextCompact: {
+    fontSize: 11,
+  },
+  inlineSeparator: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginHorizontal: 4,
+  },
 });

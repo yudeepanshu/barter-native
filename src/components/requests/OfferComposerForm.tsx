@@ -78,8 +78,8 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
   supportsMixedOffers,
   includeMoney,
   includeProduct,
-  moneyModeLabel = "Offer money",
-  productModeLabel = "Offer product",
+  moneyModeLabel = "Cash Offer",
+  productModeLabel = "Trade Offfer",
   includeProductFirst = false,
   disableIncludeProductToggle = false,
   onDisableProductPress,
@@ -210,7 +210,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
             ) 
             :
              (
-              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts product offers only.</Text>
+              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts trade offers only.</Text>
             )
             }
           </View>

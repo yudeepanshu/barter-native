@@ -21,7 +21,7 @@ import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { useProductRoom } from "@/lib/realtime/rooms";
 import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
 import { useAppDataStore } from "@/lib/store/appDataStore";
-import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { formatCurrency } from "@/lib/currency";
 import {
   ProductMetadata,
   getInactiveExpiryWarning,
@@ -45,6 +45,7 @@ import { useReportProductMutation } from "@/hooks/mutations/useReportProductMuta
 import { ReportProductModal } from "@/components/products/ReportProductModal";
 import { resolveImageBadge } from "@/components/products/ProductCard";
 import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
+import { ProductImageCarousel } from "@/components/products/ProductImageCarousel";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -75,7 +76,6 @@ export default function ProductDetailScreen() {
 
 
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -383,64 +383,18 @@ export default function ProductDetailScreen() {
               </View>
             </View>
           ) : null}
-
-          {product.productImages && product.productImages.length > 0 ? (
-            <View style={styles.imageSection}>
-              <ScrollView
-                horizontal
-                snapToInterval={imageFrameSize}
-                snapToAlignment="center"
-                decelerationRate="fast"
-                scrollEnabled={true}
-                scrollEventThrottle={16}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.imageScrollContent}
-                onMomentumScrollEnd={(event) => {
-                  const nextIndex = Math.round(event.nativeEvent.contentOffset.x / imageFrameSize);
-                  setActiveImageIndex(Math.max(0, Math.min(nextIndex, product.productImages.length - 1)));
-                }}
-                style={[styles.imageCarousel, { width: imageFrameSize, backgroundColor: theme.colors.surfaceMuted }]}
-              >
-                {product.productImages.map((image, index) => (
-                  <Pressable
-                    key={image.id}
-                    onPress={() => {
-                      setPreviewIndex(index);
-                      setPreviewVisible(true);
-                    }}
-                    style={[styles.imageContainer, { width: imageFrameSize, height: imageFrameSize, backgroundColor: theme.colors.surfaceMuted, flexShrink: 0 }]}
-                  >
-                    <AppImage
-                      uri={image.url}
-                      style={styles.productImage}
-                    />
-                    {resolveImageBadge(product, contextTag)}
-                    {isOwner && image.isPrimary ? <Text style={styles.imagePrimaryBadge}>Primary</Text> : null}
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              {product.productImages.length > 1 ? (
-                <View style={styles.imagePagerWrap}>
-                  <View style={styles.imageDotsRow}>
-                    {product.productImages.map((image, index) => (
-                      <View
-                        key={image.id}
-                        style={[
-                          styles.imageDot,
-                          { backgroundColor: theme.colors.border },
-                          index === activeImageIndex
-                            ? [styles.imageDotActive, { backgroundColor: theme.colors.primary }]
-                            : undefined,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
+          <ProductImageCarousel
+            product={product}
+            contextTag={contextTag}
+            isOwner={isOwner}
+            imageFrameSize={imageFrameSize}
+            theme={theme}
+            resolveImageBadge={resolveImageBadge}
+            onImagePress={(index) => {
+              setPreviewIndex(index);
+              setPreviewVisible(true);
+            }}
+          />
           <View
             style={[
               styles.listedOnCard,

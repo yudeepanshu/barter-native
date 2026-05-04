@@ -339,7 +339,10 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
       pickImages,
       removeImageAt,
       resetDraft,
-      cancel: () => router.back(),
+      cancel: () => {
+        resetDraft();
+        router.back();
+      },
     },
   };
 }

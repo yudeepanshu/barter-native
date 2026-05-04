@@ -39,6 +39,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useListingImagePreparationStore } from "@/lib/forms/listingImagePreparationStore";
 import { uploadImages as uploadProductImages } from "@/lib/forms/listingFormUtils";
+import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 import { mobileApiClient } from "@/lib/api/client";
 import { syncProductEntity } from "@/lib/query/mutationSync";
 import { toUploadErrorMessage } from "@/lib/uploads/presignedImageUpload";
@@ -573,30 +574,34 @@ export default function MyListingsScreen() {
           });
         },
       },
-      {
+    );
+
+    if (contextMenuProduct && !isProductReportedAboveThreshold(contextMenuProduct)) {
+      items.push({
         key: "toggle-listing",
-        label: contextMenuProduct?.status === "ACTIVE" ? "Unlist" : "Relist",
-        icon: contextMenuProduct?.status === "ACTIVE" ? "eye-off" : "eye",
+        label: contextMenuProduct.status === "ACTIVE" ? "Unlist" : "Relist",
+        icon: contextMenuProduct.status === "ACTIVE" ? "eye-off" : "eye",
         onPress: () => {
-          if (contextMenuProduct?.status === "ACTIVE") {
+          if (contextMenuProduct.status === "ACTIVE") {
             onUnlist(contextMenuProductId);
             return;
           }
 
           onRelist(contextMenuProductId);
         },
+      });
+    }
+
+    items.push({
+      key: "delete",
+      label: "Delete",
+      icon: "trash-2",
+      destructive: true,
+      dividerTop: true,
+      onPress: () => {
+        onDelete(contextMenuProductId);
       },
-      {
-        key: "delete",
-        label: "Delete",
-        icon: "trash-2",
-        destructive: true,
-        dividerTop: true,
-        onPress: () => {
-          onDelete(contextMenuProductId);
-        },
-      },
-    );
+    });
 
     return items;
   }, [

@@ -43,6 +43,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useReportProductMutation } from "@/hooks/mutations/useReportProductMutation";
 import { ReportProductModal } from "@/components/products/ReportProductModal";
 import { resolveImageBadge } from "@/components/products/ProductCard";
+import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -215,6 +216,8 @@ export default function ProductDetailScreen() {
     });
   })();
 
+  const reported = isProductReportedAboveThreshold(product);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
       <StatusBar style={statusBarStyle} />
@@ -306,7 +309,7 @@ export default function ProductDetailScreen() {
             </Text>
           ) : null}
 
-          {isOwner && getInactiveExpiryWarning(product) ? (
+          {isOwner && !reported && getInactiveExpiryWarning(product) ? (
             <View
               style={[
                 styles.inactiveWarningBanner,
@@ -338,6 +341,43 @@ export default function ProductDetailScreen() {
                   ]}
                 >
                   Once removed, this listing cannot be relisted.
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {isOwner && reported ? (
+            <View
+              style={[
+                styles.inactiveWarningBanner,
+                {
+                  backgroundColor: theme.colors.dangerSoft,
+                  borderColor: theme.mode === "dark" ? "#991b1b" : "#fca5a5",
+                },
+              ]}
+            >
+              <Feather
+                name="flag"
+                size={14}
+                color={theme.mode === "dark" ? "#f87171" : "#b91c1c"}
+                style={{ marginTop: 1 }}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text
+                  style={[
+                    styles.inactiveWarningText,
+                    { color: theme.mode === "dark" ? "#f87171" : "#b91c1c" },
+                  ]}
+                >
+                  This listing has been reported and is under review.
+                </Text>
+                <Text
+                  style={[
+                    styles.inactiveWarningSubtext,
+                    { color: theme.mode === "dark" ? "#ef4444" : "#991b1b" },
+                  ]}
+                >
+                  Reported listings cannot be relisted or made active.
                 </Text>
               </View>
             </View>

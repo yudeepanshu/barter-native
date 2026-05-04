@@ -15,6 +15,7 @@ interface OfferComposerFormProps {
   disabled?: boolean;
   turnStatus?: "WAITING" | "ERROR";
   supportsMixedOffers: boolean;
+  supportOnlyMoneyOffers?: boolean;
   includeMoney: boolean;
   includeProduct: boolean;
   moneyModeLabel?: string;
@@ -76,10 +77,11 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
   disabled = false,
   turnStatus,
   supportsMixedOffers,
+  supportOnlyMoneyOffers = false,
   includeMoney,
   includeProduct,
   moneyModeLabel = "Cash Offer",
-  productModeLabel = "Trade Offfer",
+  productModeLabel = "Trade Offer",
   includeProductFirst = false,
   disableIncludeProductToggle = false,
   onDisableProductPress,
@@ -147,72 +149,71 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
       ) : (
         showModeSelector ? (
           <View style={styles.modeRow}>
-            {supportsMixedOffers ? (
-              <>
-                {includeProductFirst ? (
-                  <>
-                    {disableIncludeProductToggle && onDisableProductPress ? (
-                      <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
-                        <ToggleChip
-                          label={productModeLabel}
-                          selected={productModeLabel ? false :includeProduct}
-                          style={{flex: 1}}
-                          disabled={true}
-                          onPress={onToggleIncludeProduct}
-                        />
-                      </Pressable>
-                    ) : (
+          {supportOnlyMoneyOffers ? (
+            <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts cash offers only.</Text>
+          ) : supportsMixedOffers ? (
+            <>
+              {includeProductFirst ? (
+                <>
+                  {disableIncludeProductToggle && onDisableProductPress ? (
+                    <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
+                      <ToggleChip
+                        label={productModeLabel}
+                        selected={productModeLabel ? false : includeProduct}
+                        style={{ flex: 1 }}
+                        disabled={true}
+                        onPress={onToggleIncludeProduct}
+                      />
+                    </Pressable>
+                  ) : (
+                    <ToggleChip
+                      label={productModeLabel}
+                      selected={includeProduct}
+                      style={styles.modeChip}
+                      onPress={onToggleIncludeProduct}
+                      disabled={disableIncludeProductToggle}
+                    />
+                  )}
+                  <ToggleChip
+                    label={moneyModeLabel}
+                    selected={includeMoney}
+                    style={styles.modeChip}
+                    onPress={onToggleIncludeMoney}
+                  />
+                </>
+              ) : (
+                <>
+                  <ToggleChip
+                    label={moneyModeLabel}
+                    selected={includeMoney}
+                    style={styles.modeChip}
+                    onPress={onToggleIncludeMoney}
+                  />
+                  {disableIncludeProductToggle && onDisableProductPress ? (
+                    <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
                       <ToggleChip
                         label={productModeLabel}
                         selected={includeProduct}
-                        style={styles.modeChip}
+                        style={{ flex: 1 }}
+                        disabled={true}
                         onPress={onToggleIncludeProduct}
-                        disabled={disableIncludeProductToggle}
                       />
-                    )}
+                    </Pressable>
+                  ) : (
                     <ToggleChip
-                      label={moneyModeLabel}
-                      selected={includeMoney}
+                      label={productModeLabel}
+                      selected={includeProduct}
                       style={styles.modeChip}
-                      onPress={onToggleIncludeMoney}
+                      onPress={onToggleIncludeProduct}
+                      disabled={disableIncludeProductToggle}
                     />
-                  </>
-                ) : (
-                  <>
-                    <ToggleChip
-                      label={moneyModeLabel}
-                      selected={includeMoney}
-                      style={styles.modeChip}
-                      onPress={onToggleIncludeMoney}
-                    />
-                    {disableIncludeProductToggle && onDisableProductPress ? (
-                      <Pressable onPress={onDisableProductPress} style={styles.modeChip}>
-                        <ToggleChip
-                          label={productModeLabel}
-                          selected={includeProduct}
-                          style={{flex: 1}}
-                          disabled={true}
-                          onPress={onToggleIncludeProduct}
-                        />
-                      </Pressable>
-                    ) : (
-                      <ToggleChip
-                        label={productModeLabel}
-                        selected={includeProduct}
-                        style={styles.modeChip}
-                        onPress={onToggleIncludeProduct}
-                        disabled={disableIncludeProductToggle}
-                      />
-                    )}
-                  </>
-                )}
-              </>
-            ) 
-            :
-             (
-              <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts trade offers only.</Text>
-            )
-            }
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <Text style={[styles.modeInfo, { color: theme.colors.textMuted }]}>This listing accepts trade offers only.</Text>
+          )}
           </View>
         ) : null
       )}
@@ -262,7 +263,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      {showVisibleProductSelector && !disableIncludeProductToggle ? (
+      {showVisibleProductSelector && !disableIncludeProductToggle && visibleProducts.length > 0 ? (
         <View style={styles.offerWrap}>
           <Text style={[styles.offerLabel, { color: theme.colors.textSecondary }]}>{visibleProductSelectorLabel ?? "Show for consideration (optional)"}</Text>
           <SelectableProductGrid
@@ -313,7 +314,14 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         label={submitLabel}
         loading={submitLoading}
         onPress={onSubmit}
-        disabled={disabled || (offerableProducts.length === 0 &&  includeProduct) || (includeMoney && amount.trim() === "") || (includeProduct && selectedProductIds.length === 0)}
+        disabled={
+          disabled ||
+          (supportOnlyMoneyOffers
+            ? amount.trim() === ""
+            : (offerableProducts.length === 0 && includeProduct) ||
+              (includeMoney && amount.trim() === "") ||
+              (includeProduct && selectedProductIds.length === 0))
+        }
       />
 
       {onCancel ? <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={disabled} /> : null}

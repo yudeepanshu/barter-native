@@ -325,6 +325,9 @@ function buildUpdatePayload(
   if (Boolean(normalized.requestByMoney) !== Boolean(product.requestByMoney)) {
     payload.requestByMoney = Boolean(normalized.requestByMoney);
   }
+  if (Boolean(normalized.allowTradeRequest) !== Boolean(product.allowTradeRequest)) {
+    payload.allowTradeRequest = Boolean(normalized.allowTradeRequest);
+  }
   if (Boolean(normalized.requestByMoney)) {
     const nextMinAmount = normalized.minMoneyAmount ?? 0;
     if (Number(product.minMoneyAmount ?? 0) !== Number(nextMinAmount)) {

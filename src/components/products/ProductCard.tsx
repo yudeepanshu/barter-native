@@ -7,6 +7,7 @@ import { ProductMetadata, formatLocationBadgeLabel, hasExchangeHistory } from "@
 import { getContextTag, getTopTypeTag, ProductTag, ProductTagSpec } from "@/components/products/ProductTags";
 import { AppImage } from "@/components/ui/AppImage";
 import { ProductContextBadge } from "./ProductContextBadge";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProductCardProps {
   product: ProductSummary;
@@ -99,7 +100,7 @@ export const ProductCard = memo(function ProductCard({
         <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
           {product.title}
         </Text>
-        <ProductTag tag={typeTag} variant="top-text" />
+        <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" />
       </View>
       {showMeta ? (
         <View style={styles.metaWrap}>

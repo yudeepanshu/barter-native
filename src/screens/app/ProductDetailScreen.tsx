@@ -231,7 +231,7 @@ export default function ProductDetailScreen() {
               <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
                 {product.title}
               </Text>
-              <ProductTag tag={typeTag} variant="top-text" style={{ alignSelf: "center" }} />
+              <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" style={{ alignSelf: "center" }} />
             </View>
           ) : null
         }
@@ -520,10 +520,11 @@ function RequestComposer({
   const isOwner = product.currentOwnerId === sessionUserId;
   const requestable =
     (product.status === "ACTIVE" || product.status === "RESERVED") && product.isListed;
-  const supportsMixedOffers = product.requestByMoney || product.isFree;
+  const supportsMixedOffers = (product.requestByMoney && product.allowTradeRequest) || product.isFree;
+  const supportOnlyMoneyOffers = product.requestByMoney && !product.allowTradeRequest && !product.isFree;
   const lockProductSelectionUntilMoney = Boolean(product.requestByMoney) && !product.isFree;
-  const wantsMoney = supportsMixedOffers ? includeMoney : false;
-  const wantsProduct = supportsMixedOffers ? includeProduct : true;
+  const wantsMoney = supportOnlyMoneyOffers ? true : supportsMixedOffers ? includeMoney : false;
+  const wantsProduct = supportOnlyMoneyOffers ? false : supportsMixedOffers ? includeProduct : true;
   const normalizedMinMoneyAmount =
     product.minMoneyAmount != null && Number.isFinite(Number(product.minMoneyAmount))
       ? Number(product.minMoneyAmount)
@@ -598,7 +599,7 @@ function RequestComposer({
         }
       }
 
-      if (wantsProduct && offeredProductIds.length === 0) {
+      if (!supportOnlyMoneyOffers && wantsProduct && offeredProductIds.length === 0) {
         setFeedback("Select one or more of your listings to offer.");
         return;
       }
@@ -662,11 +663,13 @@ function RequestComposer({
       <View style={styles.requestTitleRow}>
         <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
         <InfoTooltip text={
-          product.isFree 
+          product.isFree
             ? "This listing is marked as free. You can only send a request without offering money or a product for trade. Deselect both if you'd like."
-            : supportsMixedOffers
-              ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
-              : "This listing accepts a trade offer. You must include at least one of your listings in the request."
+            : supportOnlyMoneyOffers
+              ? "This listing only accepts cash offers. Enter the amount you'd like to offer"
+              : supportsMixedOffers
+                ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
+                : "This listing accepts a trade offer. You must include at least one of your listings in the request."
         } />
       </View>
 
@@ -680,6 +683,7 @@ function RequestComposer({
           subtitle="Start a negotiation for this listing."
           showHeader={false}
           supportsMixedOffers={supportsMixedOffers}
+          supportOnlyMoneyOffers={supportOnlyMoneyOffers}
           includeMoney={includeMoney}
           includeProduct={includeProduct}
           includeProductFirst

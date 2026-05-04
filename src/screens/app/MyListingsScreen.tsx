@@ -46,7 +46,7 @@ import { ErrorView } from "@/components/ui/ErrorView";
 import { EmptyView } from "@/components/ui/EmptyView";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
-type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
+type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
 
 const LISTING_FILTERS: Array<{ key: ListingFilter; label: string }> = [
   { key: "ALL", label: "All" },
@@ -278,15 +278,19 @@ export default function MyListingsScreen() {
     const normalizedQuery = debouncedSearch.trim().toLowerCase();
 
     return visibleItems.filter((item) => {
-      if (freeOnly && !item.isFree) {
+      if (freeOnly  && !item.isFree) {
         return false;
       }
 
-      if (selectedTradeType === "OPEN_FOR_MONEY" && !item.requestByMoney) {
+      if (selectedTradeType === "MONEY_ONLY" && !(item.requestByMoney && !item.allowTradeRequest && !item.isFree)) {
         return false;
       }
 
-      if (selectedTradeType === "BARTER_ONLY" && (item.requestByMoney || item.isFree)) {
+      if (selectedTradeType === "OPEN_FOR_MONEY" && !(item.allowTradeRequest && item.requestByMoney && !item.isFree)) {
+        return false;
+      }
+
+      if (selectedTradeType === "BARTER_ONLY" && !(item.allowTradeRequest && !item.requestByMoney && !item.isFree)) {
         return false;
       }
 
@@ -360,9 +364,11 @@ export default function MyListingsScreen() {
   const selectedTradeTypeLabel =
     selectedTradeType === "BARTER_ONLY"
       ? "Trade only"
-      : selectedTradeType === "OPEN_FOR_MONEY"
-        ? "Cash or Trade"
-        : "All";
+      : selectedTradeType === "MONEY_ONLY"
+        ? "Cash only"
+        : selectedTradeType === "OPEN_FOR_MONEY"
+          ? "Cash or Trade"
+          : "All";
   const activeFilterCount =
     (selectedCategoryIds.length > 0 ? 1 : 0) +
     (selectedFilter !== "ALL" ? 1 : 0) +
@@ -392,6 +398,7 @@ export default function MyListingsScreen() {
     setSelectedFilter(draftFilter);
     setSelectedCategoryIds(draftCategoryIds);
     setSelectedTradeType(draftTradeType);
+    if (draftTradeType !== "ALL") setFreeOnly(false);
     setShowFilterModal(false);
   };
 
@@ -662,7 +669,12 @@ export default function MyListingsScreen() {
                 sortActive={sortBy !== "newest"}
                 onOpenFilters={onOpenFilterPicker}
                 onOpenSort={() => setShowSortModal(true)}
-                onToggleFree={() => setFreeOnly((current) => !current)}
+                onToggleFree={() => {
+                  setFreeOnly((current) => {
+                    if (!current) setSelectedTradeType("ALL");
+                    return !current;
+                  });
+                }}
                 onSortAnchor={onOpenSortAnchor}
               />
             </CollapsibleHeaderCard>
@@ -816,12 +828,17 @@ export default function MyListingsScreen() {
                 />
                 <FilterChip
                   active={draftTradeType === "BARTER_ONLY"}
-                  label="Barter only"
+                  label="Trade only"
                   onPress={() => setDraftTradeType("BARTER_ONLY")}
                 />
                 <FilterChip
+                  active={draftTradeType === "MONEY_ONLY"}
+                  label="Cash only"
+                  onPress={() => setDraftTradeType("MONEY_ONLY")}
+                />
+                <FilterChip
                   active={draftTradeType === "OPEN_FOR_MONEY"}
-                  label="Open for money"
+                  label="Cash or Trade"
                   onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
                 />
               </View>

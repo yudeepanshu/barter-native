@@ -199,7 +199,7 @@ interface ProductFeedProps {
   userName: string;
 }
 
-type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY";
+type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
 
 export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const router = useRouter();
@@ -288,15 +288,19 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         return false;
       }
 
-      if (freeOnly && !item.isFree) {
+      if (freeOnly  && !item.isFree) {
         return false;
       }
 
-      if (selectedTradeType === "OPEN_FOR_MONEY" && !item.requestByMoney) {
+      if (selectedTradeType === "MONEY_ONLY" && !(item.requestByMoney && !item.allowTradeRequest && !item.isFree)) {
         return false;
       }
 
-      if (selectedTradeType === "BARTER_ONLY" && (item.requestByMoney || item.isFree)) {
+      if (selectedTradeType === "OPEN_FOR_MONEY" && !(item.allowTradeRequest && item.requestByMoney && !item.isFree)) {
+        return false;
+      }
+
+      if (selectedTradeType === "BARTER_ONLY" && !(item.allowTradeRequest && !item.requestByMoney && !item.isFree)) {
         return false;
       }
 
@@ -497,7 +501,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     }
   };
 
-  const onToggleFree = useCallback(() => setFreeOnly((c) => !c), []);
+  const onToggleFree = useCallback(() =>   setFreeOnly((current) => {
+    if (!current) setSelectedTradeType("ALL");
+    return !current;
+  }), []);
 
   const onOpenNotificationsPanel = useCallback(() => {
     setShowNotifications(true);
@@ -565,6 +572,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     filterState.setCategoryId("");
     setSelectedTradeType(draftTradeType);
     setShowFilterModal(false);
+    if (draftTradeType !== "ALL") setFreeOnly(false);
   };
 
   const onOpenSortPicker = useCallback(() => {
@@ -819,6 +827,11 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
                   active={draftTradeType === "OPEN_FOR_MONEY"}
                   label="Cash or Trade"
                   onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
+                />
+                <FilterChip
+                  active={draftTradeType === "MONEY_ONLY"}
+                  label="Cash only"
+                  onPress={() => setDraftTradeType("MONEY_ONLY")}
                 />
               </View>
             </View>

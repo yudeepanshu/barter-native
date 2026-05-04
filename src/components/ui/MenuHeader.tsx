@@ -104,7 +104,7 @@ export function MenuHeader({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     width: "100%",
     paddingVertical: 8,
     paddingHorizontal: 12,

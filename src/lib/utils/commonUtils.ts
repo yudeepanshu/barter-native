@@ -40,3 +40,4 @@ export function getOfferTypeLabel(type: string) {
       return type;
   }
 }
+

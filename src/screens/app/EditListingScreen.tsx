@@ -14,7 +14,6 @@ import { StatusBar } from "expo-status-bar";
 import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";

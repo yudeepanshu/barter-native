@@ -521,7 +521,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
         });
       }}
       showAmountField={showsAmountField}
-      amountLabel="Offer amount (₹)"
+      amountLabel="Offer amount"
       amount={counterAmount}
       onChangeAmount={(value) => {
         setAmountTouched(true);

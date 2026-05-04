@@ -15,12 +15,14 @@ interface InputProps extends Omit<ComponentProps<typeof TextInput>, "style"> {
   style?: ComponentProps<typeof TextInput>["style"];
   showCharacterCount?: boolean;
   disabled?: boolean;
+  leftAdornment?: React.ReactNode;
 }
 
 export function Input({
   label,
   error,
   style,
+  leftAdornment,
   showCharacterCount = false,
   disabled = false,
   editable,
@@ -57,6 +59,25 @@ export function Input({
           </Text>
         )}
 
+        <View 
+        style={[
+          styles.inputRow,
+          {
+            backgroundColor: disabled ? theme.colors.surfaceMuted : theme.colors.surface,
+            borderColor: disabled ? theme.colors.border : focused ? theme.colors.primary : theme.colors.border,
+            borderRadius: theme.roundness - 4,
+            borderWidth: 1.4,
+            opacity: disabled ? 0.7 : 1,
+          },
+          error && !disabled && { borderColor: theme.colors.danger },
+        ]}>
+
+        {leftAdornment && (
+          <View style={styles.adornment}>
+            {leftAdornment}
+          </View>
+        )}
+
         <TextInput
           ref={inputRef}
           placeholderTextColor={theme.colors.textMuted}
@@ -64,16 +85,7 @@ export function Input({
             styles.input,
             {
               color: disabled ? theme.colors.textMuted : theme.colors.textPrimary,
-              backgroundColor: disabled ? theme.colors.surfaceMuted : theme.colors.surface,
-              borderColor: disabled
-                ? theme.colors.border
-                : focused
-                ? theme.colors.primary
-                : theme.colors.border,
-              borderRadius: theme.roundness - 4,
-              opacity: disabled ? 0.7 : 1,
             },
-            error && !disabled && { borderColor: theme.colors.danger },
             style,
           ]}
           editable={!disabled}
@@ -92,6 +104,8 @@ export function Input({
           }}
           {...rest}
         />
+
+        </View>
 
         {showCharacterCount && maxLength != null && (
           <Text
@@ -130,9 +144,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 2,
   },
-  input: {
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     minHeight: 50,
-    borderWidth: 1.4,
+  },
+  adornment: {
+    paddingLeft: 14,
+    justifyContent: "center",
+  },
+  input: {
+    flex: 1,
     paddingHorizontal: 14,
     fontSize: 15.5,
     fontWeight: "500",

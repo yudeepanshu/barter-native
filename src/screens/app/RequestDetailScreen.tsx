@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/Input";
 import { MenuHeader } from "@/components/ui/MenuHeader";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
+import { StatusBadge } from "@/components/requests/StatusBadge";
 import { AppImage } from "@/components/ui/AppImage";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
@@ -46,18 +47,6 @@ import { getFirstName, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { ErrorView } from "@/components/ui/ErrorView";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
-
-function getStatusBadgeStyle(status: string): { bg: string; text: string } {
-  switch (status) {
-    case "PENDING": return { bg: "#fef3c7", text: "#b45309" };
-    case "NEGOTIATING": return { bg: "#dbeafe", text: "#1d4ed8" };
-    case "ACCEPTED": return { bg: "#dcfce7", text: "#15803d" };
-    case "REJECTED": return { bg: "#fee2e2", text: "#b91c1c" };
-    case "CANCELLED": return { bg: "#f1f5f9", text: "#111827" };
-    case "COMPLETED": return { bg: "#ccfbf1", text: "#0f766e" };
-    default: return { bg: "#e2e8f0", text: "#334155" };
-  }
-}
 
 function getOfferStatusBadgeStyle(status: string): { bg: string; text: string } {
   switch (status) {
@@ -898,20 +887,7 @@ export default function RequestDetailScreen() {
         <View style={[styles.headerCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={3}>{request.product.title}</Text>
-            <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: getStatusBadgeStyle(displayStatus).bg,
-                  borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
-                  borderColor: displayStatus === "CANCELLED" ? "#111827" : "transparent",
-                },
-              ]}
-            > 
-              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]}> 
-                {displayStatus}
-              </Text>
-            </View>
+            <StatusBadge status={displayStatus} />
           </View>
         </View>
 
@@ -1538,18 +1514,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    overflow: "hidden",
-    flexShrink: 0,
-    marginTop: 2,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
   detailRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   contactRow: {
     flexDirection: "row",

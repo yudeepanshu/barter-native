@@ -85,3 +85,24 @@ export function formatCurrency(
 export function getCurrencyDisplay(country: SupportedCountry = DEFAULT_COUNTRY): string {
   return getCurrencySymbol(country);
 }
+
+/**
+ * Strip all formatting to get a raw numeric string for editing.
+ * "₹1,00,000.50" → "100000.50"
+ */
+export function stripCurrencyFormatting(value: string): string {
+  return value
+    .replace(/[^0-9.]/g, '')      // remove symbol, commas, spaces
+    .replace(/(\..*)\./g, '$1');  // allow only one decimal point
+}
+
+/**
+ * Parse a raw input string to a number safely.
+ * Returns null if empty or invalid.
+ */
+export function parseRawCurrencyInput(raw: string): number | null {
+  const stripped = raw.replace(/[^0-9.]/g, '');
+  if (!stripped) return null;
+  const parsed = parseFloat(stripped);
+  return Number.isNaN(parsed) ? null : parsed;
+}

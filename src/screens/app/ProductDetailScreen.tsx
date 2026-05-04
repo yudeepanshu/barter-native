@@ -31,6 +31,7 @@ import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
+import { StatusBadge } from "@/components/requests/StatusBadge";
 import { AppImage } from "@/components/ui/AppImage";
 import { MenuHeader } from "@/components/ui/MenuHeader";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -476,19 +477,19 @@ export default function ProductDetailScreen() {
             style={[
               styles.activeRequestCard,
               {
-                backgroundColor: theme.colors.primary,
-                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
               },
             ]}
           >
-            <Text style={[styles.activeRequestTitle, { color: theme.colors.onPrimary }]}>Your active request</Text>
-            <Text style={[styles.activeRequestStatus, { color: theme.colors.onPrimary }]}> 
-              Status: {activeRequest.status}
-              {product.status === "INACTIVE" ? " • Product is now inactive" : ""}
-            </Text>
+            <Text style={[styles.activeRequestTitle, { color: theme.colors.textPrimary }]}>Your active request</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <StatusBadge status={activeRequest.status} text="Status: " />
+              {product.status === "INACTIVE" ? <Text style={[styles.activeRequestStatus, { color: theme.colors.textSecondary }]}>• Product is now inactive</Text> : null}
+            </View>
             <Button
               label="View request"
-              variant="ghost"
+              variant="primary"
               onPress={() => router.push(`/(app)/requests/${activeRequest.id}`)}
             />
           </View>
@@ -743,7 +744,7 @@ function RequestComposer({
             setIncludeProduct((prev) => !prev);
           }}
           showAmountField={wantsMoney}
-          amountLabel={`Offer amount (${getCurrencySymbol()})`}
+          amountLabel={`Offer amount`}
           amount={amount}
           onChangeAmount={setAmount}
           amountPlaceholder="Enter amount"

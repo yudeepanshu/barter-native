@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable ,StyleSheet, Text, View } from "react-native";
 import type { ProductSummary } from "@barter/types";
 import { Input } from "@/components/ui/Input";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Button } from "@/components/ui/Button";
 import { ToggleChip } from "@/components/ui/ToggleChip";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -222,18 +223,15 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
 
       {showAmountField ? (
         <View style={styles.moneyOfferWrap}>
-          <Input
+          <CurrencyInput
             label={amountLabel}
             value={amount}
-            onChangeText={onChangeAmount}
-            keyboardType="numeric"
-            placeholder={amountPlaceholder}
+            onChange={onChangeAmount}
           />
 
           {amountHelperText ? (
             <View style={styles.minAmountHint}>
-              <Text style={[styles.minAmountLabel, { color: theme.colors.textMuted }]}>{amountHelperText}</Text>
-              {amountWarningText ? <Text style={[styles.minAmountWarning, { color: "#dc2626" }]}>{amountWarningText}</Text> : null}
+              {amountWarningText ? <Text style={[styles.minAmountWarning, { color: "#dc2626" }]}>{amountWarningText}</Text> : <Text style={[styles.minAmountLabel, { color: theme.colors.textMuted }]}>{amountHelperText}</Text>}
             </View>
           ) : null}
         </View>
@@ -342,7 +340,7 @@ const styles = StyleSheet.create({
   moneyOfferWrap: { gap: 8 },
   minAmountHint: { gap: 4 },
   minAmountLabel: { fontSize: 12, fontWeight: "500" },
-  minAmountWarning: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  minAmountWarning: { fontSize: 12, fontWeight: "600" },
   offerWrap: { gap: 8 },
   offerLabel: { fontSize: 13, fontWeight: "600" },
   offerList: {

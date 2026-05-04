@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
 
 export type OffersValue = "cash" | "both" | "trade";
 
@@ -45,12 +46,11 @@ export function OfferSegmentedControl({
         onChange={onChange}
       />
       {showMoneyInput ? (
-        <Input
+        <CurrencyInput
+          label="Amount"
           value={minMoneyAmount}
-          onChangeText={onMinMoneyAmountChange}
-          keyboardType="numeric"
-          placeholder="Enter minimum accepted amount (₹)"
-          error={minMoneyAmountError ?? null}
+          onChange={onMinMoneyAmountChange}
+          error={minMoneyAmountError}
         />
       ) : null}
     </View>

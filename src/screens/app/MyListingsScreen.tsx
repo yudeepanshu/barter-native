@@ -639,7 +639,7 @@ export default function MyListingsScreen() {
           <View style={styles.fixedTopContent}>
             <CollapsibleHeaderCard
               title="My Listings"
-              subtitle="Manage your active and past listings."
+              subtitle="Manage your listings."
               collapseMaxHeight={320}
               footerSlot={
                 <View style={styles.headerMetaRow}>

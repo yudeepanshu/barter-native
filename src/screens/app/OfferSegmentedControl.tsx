@@ -13,8 +13,8 @@ const CASH_OFFERS_OPTIONS: [
   { label: string; value: OffersValue }
 ] = [
   { label: "Cash", value: "cash" },
-  { label: "Any", value: "both" },
   { label: "Trade", value: "trade" },
+  { label: "Both ", value: "both" },
 ];
 
 type Props = {
@@ -38,7 +38,7 @@ export function OfferSegmentedControl({
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Allowed Offers</Text>
+        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Open to</Text>
       </View>
       <SegmentedControl
         options={CASH_OFFERS_OPTIONS}

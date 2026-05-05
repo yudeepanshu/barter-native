@@ -1,9 +1,9 @@
-import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { ReactNode } from "react";
 import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface FloatingModalProps {
   visible: boolean;
@@ -12,15 +12,20 @@ interface FloatingModalProps {
   children: ReactNode;
   headerRight?: ReactNode;
   anchor?: ContextMenuAnchor | null;
+  preferCenter?: boolean;
 }
 
-export function FloatingModal({ visible, title, onClose, children, headerRight, anchor }: FloatingModalProps) {
+export function FloatingModal({ visible, title, onClose, children, headerRight, anchor, preferCenter }: FloatingModalProps) {
   const { theme } = useAppTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [panelLayout, setPanelLayout] = useState<{ width: number; height: number } | null>(null);
 
+  useEffect(() => {
+    if (!visible) setPanelLayout(null);
+  }, [visible]);
+
   const position = useMemo(() => {
-    if (!anchor) {
+    if (!anchor || preferCenter) {
       return null;
     }
 
@@ -41,9 +46,16 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
       left,
       width: panelWidth,
     };
-  }, [anchor, panelLayout, screenHeight, screenWidth]);
+  }, [anchor, panelLayout, screenHeight, screenWidth, preferCenter]);
 
   const centeredPanelWidth = Math.min(368, screenWidth - 32);
+
+  // Reserve space for vertical padding + header so scroll area never overflows screen.
+  const VERTICAL_SCREEN_PADDING = 96;
+  const HEADER_HEIGHT = title || headerRight ? 52 : 0;
+  const maxScrollHeight = screenHeight - VERTICAL_SCREEN_PADDING - HEADER_HEIGHT;
+
+  const isAnchored = !preferCenter && !!anchor;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -51,7 +63,7 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
         style={[
           styles.backdrop,
           { backgroundColor: theme.colors.overlay },
-          anchor ? styles.backdropAnchor : styles.backdropCenter,
+          isAnchored ? styles.backdropAnchor : styles.backdropCenter,
         ]}
         onPress={onClose}
       >
@@ -65,6 +77,7 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
             // Keep modal open when tapping inside.
           }}
           onLayout={(event) => {
+            if (panelLayout) return;
             const { width, height } = event.nativeEvent.layout;
             setPanelLayout({ width, height });
           }}
@@ -78,7 +91,15 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
               </Pressable>
             </View>
           ) : null}
-          <View style={styles.content}>{children}</View>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: maxScrollHeight }}
+            contentContainerStyle={styles.content}
+          >
+            {children}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -106,7 +127,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     padding: 16,
-    maxHeight: "90%",
   },
   headerRow: {
     flexDirection: "row",

@@ -154,8 +154,9 @@ export default function CreateListingScreen() {
               ))}
             </ScrollView>
           </View>
+        </View>
 
-          <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+          <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
             <View style={styles.switchRow}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Mark as free</Text>
               <Switch
@@ -166,26 +167,6 @@ export default function CreateListingScreen() {
                 ios_backgroundColor={switchTrackOffColor}
               />
             </View>
-            {/* <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Cash offers</Text>
-              <Switch
-                value={form.state.requestByMoney}
-                onValueChange={form.actions.setRequestByMoney}
-                trackColor={switchTrackColor}
-                thumbColor={getSwitchThumbColor(form.state.requestByMoney)}
-                ios_backgroundColor={switchTrackOffColor}
-              />
-            </View>
-            {form.state.requestByMoney ? (
-              <Input
-                // label="Minimum amount (₹)"
-                value={form.state.minMoneyAmount}
-                onChangeText={form.actions.setMinMoneyAmount}
-                keyboardType="numeric"
-                placeholder="Enter minimum accepted amount (₹)"
-                error={form.state.fieldErrors.minMoneyAmount ?? null}
-              />
-            ) : null} */}
             {!form.state.isFree ? <OfferSegmentedControl
               value={
                 form.state.isFree
@@ -205,7 +186,6 @@ export default function CreateListingScreen() {
               minMoneyAmountError={form.state.fieldErrors.minMoneyAmount ?? null}
             /> : null}
           </View>
-        </View>
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.imageBlock}>

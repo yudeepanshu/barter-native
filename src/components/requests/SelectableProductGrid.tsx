@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { ProductSummary } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { AppImage } from "@/components/ui/AppImage";
 import { ProductMetadata } from "@/components/products/ProductMetadata";
 import { getTopTypeTag, ProductTag } from "@/components/products/ProductTags";
+import { ProductImageCarousel } from "@/components/products/ProductImageCarousel";
 
 interface SelectableProductGridProps {
   products: ProductSummary[];
@@ -26,7 +27,6 @@ export function SelectableProductGrid({
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
   const [previewProduct, setPreviewProduct] = React.useState<ProductSummary | null>(null);
-  const [previewImageIndex, setPreviewImageIndex] = React.useState(0);
   const previewImageSize = Math.max(220, Math.round(width - 72));
 
   if (products.length === 0) {
@@ -65,7 +65,6 @@ export function SelectableProductGrid({
                   onPress={(event) => {
                     event.stopPropagation();
                     setPreviewProduct(item);
-                    setPreviewImageIndex(0);
                   }}
                   hitSlop={8}
                   style={[styles.previewEyeButton, { backgroundColor: "rgba(15,23,42,0.7)" }]}
@@ -142,36 +141,12 @@ export function SelectableProductGrid({
                   ) : null}
 
                   {previewProduct.productImages.length > 0 ? (
-                    <>
-                      <ScrollView
-                        horizontal
-                        snapToInterval={previewImageSize}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
-                        scrollEventThrottle={16}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.previewImageScrollContent}
-                        onScroll={(event) => {
-                          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / previewImageSize);
-                          setPreviewImageIndex(Math.max(0, Math.min(nextIndex, previewProduct.productImages.length - 1)));
-                        }}
-                        style={[styles.previewImageCarousel, { width: previewImageSize, height: previewImageSize, backgroundColor: theme.colors.surfaceMuted }]}
-                      >
-                        {previewProduct.productImages.map((image) => (
-                          <View
-                            key={image.id}
-                            style={{ width: previewImageSize, height: previewImageSize, backgroundColor: theme.colors.surfaceMuted }}
-                          >
-                            <AppImage uri={image.url} style={styles.previewImage} />
-                          </View>
-                        ))}
-                      </ScrollView>
-                      {previewProduct.productImages.length > 1 ? (
-                        <Text style={[styles.previewPagerText, { color: theme.colors.textMuted }]}>
-                          Image {previewImageIndex + 1} of {previewProduct.productImages.length}
-                        </Text>
-                      ) : null}
-                    </>
+                    <ProductImageCarousel
+                      product={previewProduct}
+                      imageFrameSize={previewImageSize}
+                      theme={theme}
+                      resolveImageBadge={() => null}
+                    />
                   ) : null}
 
                   <Text style={[styles.previewDescription, { color: theme.colors.textMuted }]}>
@@ -296,23 +271,6 @@ const styles = StyleSheet.create({
   previewOwnerName: {
     fontSize: 14,
     fontWeight: "700",
-  },
-  previewImageCarousel: {
-    borderRadius: 12,
-    overflow: "hidden",
-    alignSelf: "center",
-  },
-  previewImageScrollContent: {
-    alignItems: "flex-start",
-  },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-  },
-  previewPagerText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
   },
   previewDescription: {
     fontSize: 14,

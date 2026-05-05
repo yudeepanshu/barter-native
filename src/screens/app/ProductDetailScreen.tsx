@@ -38,7 +38,6 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
-import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useReportProductMutation } from "@/hooks/mutations/useReportProductMutation";
@@ -74,11 +73,7 @@ export default function ProductDetailScreen() {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const { mutate: reportProduct, isPending } = useReportProductMutation(productId);
 
-
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState(0);
 
   const productData = query.data ?? null;
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
@@ -390,10 +385,6 @@ export default function ProductDetailScreen() {
             imageFrameSize={imageFrameSize}
             theme={theme}
             resolveImageBadge={resolveImageBadge}
-            onImagePress={(index) => {
-              setPreviewIndex(index);
-              setPreviewVisible(true);
-            }}
           />
           <View
             style={[
@@ -456,13 +447,6 @@ export default function ProductDetailScreen() {
               initialOfferedProductId={offeredProductId}
             />
           ) : null}
-
-          <ImagePreviewModal
-            images={product.productImages}
-            initialIndex={previewIndex}
-            visible={previewVisible}
-            onClose={() => setPreviewVisible(false)}
-          />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );

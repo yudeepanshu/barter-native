@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, ScrollView, Pressable, Text, StyleSheet } from "react-native";
 import { AppImage } from "@/components/ui/AppImage";
+import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { ProductTagSpec } from "./ProductTags";
 import { ProductSummary } from "@barter/types";
 
@@ -17,7 +18,7 @@ interface ProductImageCarouselProps {
     };
   };
   resolveImageBadge: (product: ProductSummary, contextTag: ProductTagSpec | null) => React.ReactNode;
-  onImagePress: (index: number) => void;
+  onImagePress?: (index: number) => void;
 }
 
 export function ProductImageCarousel({
@@ -30,85 +31,100 @@ export function ProductImageCarousel({
   onImagePress,
 }: ProductImageCarouselProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
  
   if (!product.productImages || product.productImages.length === 0) {
     return null;
   }
  
   return (
-    <View style={styles.imageSection}>
-      <View style={[styles.carouselWrapper, { width: imageFrameSize }]}>
-        <ScrollView
-          horizontal
-          snapToInterval={imageFrameSize}
-          snapToAlignment="center"
-          decelerationRate="fast"
-          scrollEnabled={true}
-          scrollEventThrottle={16}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.imageScrollContent}
-          onMomentumScrollEnd={(event) => {
-            const nextIndex = Math.round(
-              event.nativeEvent.contentOffset.x / imageFrameSize
-            );
-            setActiveImageIndex(
-              Math.max(
-                0,
-                Math.min(nextIndex, product.productImages.length - 1)
-              )
-            );
-          }}
-          style={[
-            styles.imageCarousel,
-            {
-              width: imageFrameSize,
-              backgroundColor: theme.colors.surfaceMuted,
-            },
-          ]}
-        >
-          {product.productImages.map((image, index) => (
-            <Pressable
-              key={image.id}
-              onPress={() => onImagePress(index)}
-              style={[
-                styles.imageContainer,
-                {
-                  width: imageFrameSize,
-                  height: imageFrameSize,
-                  backgroundColor: theme.colors.surfaceMuted,
-                  flexShrink: 0,
-                },
-              ]}
-            >
-              <AppImage uri={image.url} style={styles.productImage} />
-              {resolveImageBadge(product, contextTag ?? null)}
-              {isOwner && image.isPrimary ? (
-                <Text style={styles.imagePrimaryBadge}>Primary</Text>
-              ) : null}
-            </Pressable>
-          ))}
-        </ScrollView>
- 
-        {product.productImages.length > 1 && (
-          <View style={styles.imagePagerOverlay} pointerEvents="none">
-            <View style={styles.imageDotsRowOverlay}>
-              {product.productImages.map((image, index) => (
-                <View
-                  key={image.id}
-                  style={[
-                    styles.imageDot,
-                    { backgroundColor: "rgba(255,255,255,0.45)" },
-                    index === activeImageIndex
-                      ? [styles.imageDotActive, { backgroundColor: "#fff" }]
-                      : undefined,
-                  ]}
-                />
-              ))}
+    <>
+      <View style={styles.imageSection}>
+        <View style={[styles.carouselWrapper, { width: imageFrameSize }]}>
+          <ScrollView
+            horizontal
+            snapToInterval={imageFrameSize}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            scrollEnabled={true}
+            scrollEventThrottle={16}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.imageScrollContent}
+            onMomentumScrollEnd={(event) => {
+              const nextIndex = Math.round(
+                event.nativeEvent.contentOffset.x / imageFrameSize
+              );
+              setActiveImageIndex(
+                Math.max(
+                  0,
+                  Math.min(nextIndex, product.productImages.length - 1)
+                )
+              );
+            }}
+            style={[
+              styles.imageCarousel,
+              {
+                width: imageFrameSize,
+                backgroundColor: theme.colors.surfaceMuted,
+              },
+            ]}
+          >
+            {product.productImages.map((image, index) => (
+              <Pressable
+                key={image.id}
+                onPress={() => {
+                  setPreviewIndex(index);
+                  setPreviewVisible(true);
+                  onImagePress?.(index);
+                }}
+                style={[
+                  styles.imageContainer,
+                  {
+                    width: imageFrameSize,
+                    height: imageFrameSize,
+                    backgroundColor: theme.colors.surfaceMuted,
+                    flexShrink: 0,
+                  },
+                ]}
+              >
+                <AppImage uri={image.url} style={styles.productImage} />
+                {resolveImageBadge(product, contextTag ?? null)}
+                {isOwner && image.isPrimary ? (
+                  <Text style={styles.imagePrimaryBadge}>Primary</Text>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+   
+          {product.productImages.length > 1 && (
+            <View style={styles.imagePagerOverlay} pointerEvents="none">
+              <View style={styles.imageDotsRowOverlay}>
+                {product.productImages.map((image, index) => (
+                  <View
+                    key={image.id}
+                    style={[
+                      styles.imageDot,
+                      { backgroundColor: "rgba(255,255,255,0.45)" },
+                      index === activeImageIndex
+                        ? [styles.imageDotActive, { backgroundColor: "#fff" }]
+                        : undefined,
+                    ]}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
+        </View>
       </View>
-    </View>
+
+      <ImagePreviewModal
+        images={product.productImages}
+        initialIndex={previewIndex}
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+      />
+    </>
   );
 }
  

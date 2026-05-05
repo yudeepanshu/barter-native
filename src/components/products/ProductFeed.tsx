@@ -741,6 +741,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         title="Filters"
         onClose={closeFilterModal}
         anchor={filterAnchor}
+        preferCenter
       >
             <View style={styles.filterSection}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>

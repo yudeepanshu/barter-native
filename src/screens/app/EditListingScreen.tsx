@@ -245,7 +245,6 @@ function EditListingFormSection({
                     </Pressable>
                   ) : null}
                 </ScrollView>
-                <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>Changes apply only after you save.</Text>
               </>
             ) : (
               <Pressable
@@ -292,8 +291,9 @@ function EditListingFormSection({
               ))}
             </ScrollView>
           </View>
+        </View>
 
-          <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+          <View style={[styles.switchBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
             <View style={styles.switchRow}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Mark as free</Text>
               <Switch
@@ -304,27 +304,6 @@ function EditListingFormSection({
                 ios_backgroundColor={switchTrackOffColor}
               />
             </View>
-            {/* <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>Cash offers</Text>
-              <Switch
-                value={form.state.requestByMoney}
-                onValueChange={form.actions.setRequestByMoney}
-                trackColor={switchTrackColor}
-                thumbColor={getSwitchThumbColor(form.state.requestByMoney)}
-                ios_backgroundColor={switchTrackOffColor}
-              />
-            </View>
-            {form.state.requestByMoney ? (
-              <Input
-                // label="Minimum amount (₹)"
-                value={form.state.minMoneyAmount}
-                onChangeText={form.actions.setMinMoneyAmount}
-                keyboardType="numeric"
-                placeholder="Enter minimum accepted amount (₹)"
-                error={form.state.fieldErrors.minMoneyAmount ?? null}
-              />
-            ) : null} */}
-
             {!form.state.isFree ? <OfferSegmentedControl
               value={
                 form.state.isFree
@@ -344,7 +323,6 @@ function EditListingFormSection({
               minMoneyAmountError={form.state.fieldErrors.minMoneyAmount ?? null}
             /> : null}
           </View>
-        </View>
 
         {form.state.formError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.formError}</Text> : null}
 

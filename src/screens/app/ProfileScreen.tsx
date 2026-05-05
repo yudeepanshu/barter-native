@@ -59,7 +59,7 @@ const RATING_STEPS: { value: number; emoji: string; label: string }[] = [
   { value: 5, emoji: "😍", label: "Excellent" },
 ];
 
-const MAX_FEEDBACK_TEXT = 2000;
+const MAX_FEEDBACK_TEXT = 500;
 
 // ---------------------------------------------------------------------------
 // Types

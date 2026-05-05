@@ -300,7 +300,7 @@ export default function ProductDetailScreen() {
           ) : null}
 
           {product.description ? (
-            <Text style={[styles.description, { color: theme.colors.textMuted }]}>
+            <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={3}>
               {product.description}
             </Text>
           ) : null}

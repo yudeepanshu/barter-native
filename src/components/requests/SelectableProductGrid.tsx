@@ -149,7 +149,7 @@ export function SelectableProductGrid({
                     />
                   ) : null}
 
-                  <Text style={[styles.previewDescription, { color: theme.colors.textMuted }]}>
+                  <Text style={[styles.previewDescription, { color: theme.colors.textMuted }]} numberOfLines={1}>
                     {previewProduct.description || "No description provided."}
                   </Text>
 

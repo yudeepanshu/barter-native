@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
     gap: 10,
-    maxHeight: "90%",
+    maxHeight: "100%",
   },
   previewHeaderRow: {
     flexDirection: "row",

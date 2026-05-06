@@ -4,6 +4,7 @@ import { FloatingModal } from "@/components/ui/FloatingModal";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Input } from "@/components/ui/Input";
 import { OptionPillMenu, OptionPillMenuItem } from "@/components/filters/OptionPillMenu";
+import { Button } from "../ui/Button";
 
 const REPORT_TYPE_OPTIONS: OptionPillMenuItem[] = [
   { key: "ABUSIVE_CONTENT", value: "ABUSIVE_CONTENT", label: "Abusive Content" },
@@ -91,25 +92,7 @@ export function ReportProductModal({
           style={styles.textArea}
         />
 
-        <Pressable
-          style={[
-            styles.submitButton,
-            {
-              backgroundColor: canSubmit ? theme.colors.primary : theme.colors.border,
-            },
-          ]}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
-        >
-          <Text
-            style={[
-              styles.submitLabel,
-              { color: canSubmit ? theme.colors.textPrimary : theme.colors.textMuted },
-            ]}
-          >
-            {isSubmitting ? "Submitting..." : "Submit Report"}
-          </Text>
-        </Pressable>
+        <Button label={"Submit Report"} loading={isSubmitting} onPress={handleSubmit} disabled={!canSubmit} />
       </ScrollView>
     </FloatingModal>
   );

@@ -12,6 +12,7 @@ import { useProductsListController } from "@/hooks/queries/useProductsListContro
 import {
   useAcceptRequestMutation,
   useCancelRequestMutation,
+  useCancelAllRequestsForProductMutation,
   useCreateCounterOfferMutation,
   useRejectRequestMutation,
   useRequestContactRevealMutation,
@@ -37,6 +38,7 @@ import { CounterOfferForm } from "@/components/requests/CounterOfferForm";
 import { StatusBadge } from "@/components/requests/StatusBadge";
 import { AppImage } from "@/components/ui/AppImage";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { FloatingModal } from "@/components/ui/FloatingModal";
 import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
 import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
 import {
@@ -455,6 +457,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const acceptMutation = useAcceptRequestMutation();
   const rejectMutation = useRejectRequestMutation();
   const cancelMutation = useCancelRequestMutation();
+  const cancelAllRequestsForProductMutation = useCancelAllRequestsForProductMutation();
   const requestContactRevealMutation = useRequestContactRevealMutation();
   const respondContactRevealMutation = useRespondContactRevealMutation();
   const updateProfileMutation = useUpdateProfileMutation();
@@ -489,6 +492,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   }>({});
   const [contactUpdateMessage, setContactUpdateMessage] = useState<string | null>(null);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [showContactDetailsModal, setShowContactDetailsModal] = useState(false);
 
   const [, rerender] = useState(0);
 
@@ -541,6 +545,45 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
     }
   }, [sellerOtpActive]);
 
+  const onRequestContactReveal = async () => {
+    if (viewerMissingContactInfo) {
+      await dialog.alert(
+        "Contact Details Missing",
+        `Add your ${contactRequirementsLabel} so the other party can reach you after approval.`,
+      );
+      return;
+    }
+
+    try {
+      await requestContactRevealMutation.mutateAsync({
+        requestId: request.id,
+        payload: {},
+      });
+      await dialog.alert(
+        "Request Sent",
+        "The other party will be notified. Contact details will be visible to both once approved.",
+      );
+    } catch (error) {
+      await dialog.alert("Request failed", toRequestErrorMessage(error));
+    }
+  };
+
+  const onPressRequestContactReveal = useCallback(() => {
+    void (async () => {
+      const shouldRequest = await dialog.confirm(
+        "Request Contact Reveal",
+        "Both parties will see each other's contact details once approved. Do you want to proceed?",
+        {
+          confirmLabel: "Send Request",
+          cancelLabel: "Cancel",
+        },
+      );
+      if (shouldRequest) {
+        void onRequestContactReveal();
+      }
+    })();
+  }, [dialog, onRequestContactReveal]);
+
   if (!session) {
     return null;
   }
@@ -584,7 +627,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const revealState = request.contactReveal;
   const actorTurn = isBuyer ? "BUYER" : "SELLER";
   const isExchangeFinalized = request.product.status === "EXCHANGED";
-  const showContactRevealSection = request.status === "ACCEPTED" && request.product.status === "RESERVED";
+  const isReservedProductUsedInOtherOffers = Boolean((request as any).isReservedProductUsedInOtherOffers);
+  const showContactRevealSection = request.status === "ACCEPTED" && request.product.status === "RESERVED" && !isReservedProductUsedInOtherOffers;
 
   const ownOfferableProducts = ownProducts.items;
   const canActByTurn = OPEN_STATUSES.includes(request.status) && request.currentTurn === actorTurn;
@@ -659,8 +703,9 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const showAcceptedTurnDetails = Boolean(acceptedTurnLabel);
   const showRequestDetailsSection =
     showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
+  
   const showTransactionSection =
-    request.status === "ACCEPTED" && !isRequestCompleted && (transactionQuery.isPending || Boolean(tx));
+    request.status === "ACCEPTED" && !isRequestCompleted && !isReservedProductUsedInOtherOffers && (transactionQuery.isPending || Boolean(tx));
   const canViewCounterpartyContact = Boolean(revealState?.contactVisible);
   const showPhone =
     canViewCounterpartyContact &&
@@ -709,7 +754,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
     setContactUpdateMessage(null);
 
     if (Object.keys(nextErrors).length > 0) {
-      return;
+      return false;
     }
 
     try {
@@ -718,34 +763,12 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
         ...(viewerNeedsPhone ? { mobileNumber: trimmedPhone } : {}),
       });
       setContactUpdateMessage("Contact details updated.");
+      return true;
     } catch (error) {
       setContactUpdateMessage(toProfileErrorMessage(error));
+      return false;
     }
   };
-
-  const onRequestContactReveal = async () => {
-    if (viewerMissingContactInfo) {
-      await dialog.alert(
-        "Add Contact Details",
-        `Add your ${contactRequirementsLabel} before requesting contact reveal so the other party can reach you once it is approved.`,
-      );
-      return;
-    }
-
-    try {
-      await requestContactRevealMutation.mutateAsync({
-        requestId: request.id,
-        payload: {},
-      });
-      await dialog.alert(
-        "Contact Reveal Request Sent",
-        "Your request has been sent to the other party. Once approved, both of you will be able to view each other's contact details.",
-      );
-    } catch (error) {
-      await dialog.alert("Request failed", toRequestErrorMessage(error));
-    }
-  };
-
 
   const onRespondContactReveal = async (approve: boolean) => {
     const revealRequestId = revealState?.incomingRequestId;
@@ -913,6 +936,116 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             showMeta={false}
             onPress={() => router.push(`/(app)/products/${request.product.id}`)}
           />
+
+        {/* Listing Used in Other Outgoing Requests — shown only to the seller */}
+        {isReservedProductUsedInOtherOffers && isSeller ? (
+          <View
+            style={[
+              styles.card,
+              {
+                // backgroundColor: theme.mode === "dark" ? "#1c1a10" : "#fffbeb",
+                borderColor: theme.mode === "dark" ? "#4d3d00" : "#fde68a",
+              },
+            ]}
+          >
+            {/* Header row with warning icon */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+              <Feather name="alert-triangle" size={16} color={theme.mode === "dark" ? "#fbbf24" : "#d97706"} />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  {
+                    color: theme.mode === "dark" ? "#fbbf24" : "#92400e",
+                    marginBottom: 0,
+                  },
+                ]}
+              >
+                Listing Used in Another Request
+              </Text>
+            </View>
+
+            <Text
+              style={[
+                styles.feedbackText,
+                {
+                  color: theme.mode === "dark" ? "#d4aa50" : "#92400e",
+                  marginTop: 4,
+                },
+              ]}
+            >
+              <Text style={{ fontWeight: "700" }}>{request.product.title}</Text>
+              {" "}is offered in another request. Cancel conflicts to finalise this one.
+            </Text>
+
+            <View style={[styles.offerActionButtonsRow, { marginTop: 8 }]}>
+              {/* View outgoing requests that use this listing */}
+              <View style={styles.offerActionButtonCell}>
+                <Button
+                  label="View Requests"
+                  disabled={cancelAllRequestsForProductMutation.isPending}
+                  variant="ghost"
+                  style={{
+                    minHeight: 36,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: theme.mode === "dark" ? "#4d3d00" : "#fbbf24",
+                    backgroundColor: theme.mode === "dark" ? "#2a2000" : "#fef9ee",
+                  }}
+                  textColor={theme.mode === "dark" ? "#fbbf24" : "#b45309"}
+                  labelStyle={{ fontWeight: "700", fontSize: 13 }}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/(tabs)/requests",
+                      params: { tab: "sent", _t: Date.now().toString() },
+                    })
+                  }
+                />
+              </View>
+
+              {/* Cancel all outgoing requests that use this listing */}
+              <View style={styles.offerActionButtonCell}>
+                <Button
+                  label="Cancel All"
+                  variant="ghost"
+                  disabled={cancelAllRequestsForProductMutation.isPending}
+                  style={{
+                    minHeight: 36,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: theme.colors.danger,
+                    backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff",
+                  }}
+                  textColor={theme.colors.danger}
+                  labelStyle={{ fontWeight: "700", fontSize: 13 }}
+                  onPress={() => {
+                    void (async () => {
+                      const confirmed = await dialog.confirm(
+                        "Cancel All Conflicting Requests",
+                        `Cancel all outgoing requests offering "${request.product.title}"? This cannot be undone.`,
+                        {
+                          confirmLabel: "Cancel All",
+                          cancelLabel: "Go Back",
+                        },
+                      );
+
+                      if (!confirmed) return;
+
+                      try {
+                        await cancelAllRequestsForProductMutation.mutateAsync({
+                          requestId: request.id,
+                          reason: "Cancelled conflicting outgoing requests",
+                        });
+                      } catch (error) {
+                        void dialog.alert("Error", toRequestErrorMessage(error));
+                      }
+                    })();
+                  }}
+                  loading={cancelAllRequestsForProductMutation.isPending}
+                />
+              </View>
+            </View>
+          </View>
+        ) : null}
         </View>
 
         {/* Request Details */}
@@ -1103,7 +1236,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           </View>
         ) : null}
 
-        {hasConsiderationProducts ? (() => {
+        {hasConsiderationProducts && !OPEN_STATUSES.includes(request.status) ? null : hasConsiderationProducts ? (() => {
           const showTabs = yourConsiderationProducts.length > 0 && theirConsiderationProducts.length > 0;
           const activeProducts = showTabs
             ? (considerationTab === "yours" ? yourConsiderationProducts : theirConsiderationProducts)
@@ -1212,76 +1345,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
               </View>
             ) : null}
 
-            {viewerMissingContactInfo ? (
-              <View
-                style={[
-                  styles.contactMissingCard,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceMuted,
-                  },
-                ]}
-              >
-                <Text style={[styles.contactMissingTitle, { color: theme.colors.textPrimary }]}>Add your contact details</Text>
-                <Text style={[styles.contactMissingText, { color: theme.colors.textMuted }]}>Your {contactRequirementsLabel} is missing. Add it here before continuing with the contact reveal flow.</Text>
-
-                {viewerNeedsEmail ? (
-                  <Input
-                    label="Email"
-                    value={contactEmailInput}
-                    onChangeText={(value) => {
-                      setContactEmailInput(value);
-                      setContactFieldErrors((current) => ({ ...current, email: undefined }));
-                      setContactUpdateMessage(null);
-                    }}
-                    placeholder="you@example.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    error={contactFieldErrors.email ?? null}
-                  />
-                ) : null}
-
-                {viewerNeedsPhone ? (
-                  <Input
-                    label="Phone"
-                    value={contactPhoneInput}
-                    onChangeText={(value) => {
-                      setContactPhoneInput(value);
-                      setContactFieldErrors((current) => ({ ...current, mobileNumber: undefined }));
-                      setContactUpdateMessage(null);
-                    }}
-                    placeholder="Enter phone number"
-                    keyboardType="phone-pad"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    error={contactFieldErrors.mobileNumber ?? null}
-                  />
-                ) : null}
-
-                <Button
-                  label="Save Contact Details"
-                  onPress={() => void onSaveMissingContactInfo()}
-                  loading={updateProfileMutation.isPending}
-                />
-
-                {contactUpdateMessage ? (
-                  <Text
-                    style={[
-                      styles.contactMissingText,
-                      {
-                        color: contactUpdateMessage === "Contact details updated."
-                          ? theme.colors.textSecondary
-                          : theme.colors.danger,
-                      },
-                    ]}
-                  >
-                    {contactUpdateMessage}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-
             <View style={styles.contactRow}>
               <Text style={[styles.label, { color: theme.colors.textMuted }]}>Name</Text>
               <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{counterparty.userName}</Text>
@@ -1303,27 +1366,96 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
 
             <View style={styles.contactActionsRow}>
               {revealState?.canRequestReveal ? (
-                <Button
-                  label="Request Contact Details Reveal"
-                  disabled={viewerMissingContactInfo}
-                  onPress={() => {
-                    void (async () => {
-                      const shouldRequest = await dialog.confirm(
-                        "Request Contact Reveal",
-                        "Send a contact reveal request to the other party? Once they approve, both of you will be able to see each other's contact details.",
-                        {
-                          confirmLabel: "Send Request",
-                          cancelLabel: "Cancel",
-                        },
-                      );
-
-                      if (shouldRequest) {
-                        void onRequestContactReveal();
+                <>
+                  <Button
+                    label="Request Contact Details Reveal"
+                    onPress={() => {
+                      if (viewerMissingContactInfo) {
+                        setShowContactDetailsModal(true);
+                        return;
                       }
-                    })();
-                  }}
-                  loading={requestContactRevealMutation.isPending}
-                />
+                      onPressRequestContactReveal();
+                    }}
+                    loading={requestContactRevealMutation.isPending}
+                  />
+
+                  {/* Floating modal for missing contact details */}
+                  <FloatingModal
+                    visible={showContactDetailsModal}
+                    title="Add Contact Details"
+                    onClose={() => {
+                      setShowContactDetailsModal(false);
+                      setContactFieldErrors({});
+                      setContactUpdateMessage(null);
+                    }}
+                    preferCenter
+                  >
+                    <Text style={[styles.contactMissingText, { color: theme.colors.textMuted }]}>
+                      Your {contactRequirementsLabel} is missing. Add it here before requesting contact reveal.
+                    </Text>
+
+                    {viewerNeedsEmail ? (
+                      <Input
+                        label="Email"
+                        value={contactEmailInput}
+                        onChangeText={(value) => {
+                          setContactEmailInput(value);
+                          setContactFieldErrors((current) => ({ ...current, email: undefined }));
+                          setContactUpdateMessage(null);
+                        }}
+                        placeholder="you@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        error={contactFieldErrors.email ?? null}
+                      />
+                    ) : null}
+
+                    {viewerNeedsPhone ? (
+                      <Input
+                        label="Phone"
+                        value={contactPhoneInput}
+                        onChangeText={(value) => {
+                          setContactPhoneInput(value);
+                          setContactFieldErrors((current) => ({ ...current, mobileNumber: undefined }));
+                          setContactUpdateMessage(null);
+                        }}
+                        placeholder="Enter phone number"
+                        keyboardType="phone-pad"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        error={contactFieldErrors.mobileNumber ?? null}
+                      />
+                    ) : null}
+
+                    <Button
+                      label="Save Contact Details"
+                      onPress={async () => {
+                        const saved = await onSaveMissingContactInfo();
+                        if (saved) {
+                          setShowContactDetailsModal(false);
+                          onPressRequestContactReveal();
+                        }
+                      }}
+                      loading={updateProfileMutation.isPending}
+                    />
+
+                    {contactUpdateMessage ? (
+                      <Text
+                        style={[
+                          styles.contactMissingText,
+                          {
+                            color: contactUpdateMessage === "Contact details updated."
+                              ? theme.colors.textSecondary
+                              : theme.colors.danger,
+                          },
+                        ]}
+                      >
+                        {contactUpdateMessage}
+                      </Text>
+                    ) : null}
+                  </FloatingModal>
+                </>
               ) : null}
 
               {revealState?.canApproveIncoming && revealState.incomingRequestId ? (

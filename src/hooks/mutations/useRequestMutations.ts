@@ -173,6 +173,36 @@ export function useCancelRequestMutation() {
   });
 }
 
+export function useCancelAllRequestsForProductMutation() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
+      try {
+        const payload: CancelRequestInput = { reason: sanitizeOptionalText(reason, 500) ?? "" };
+        const envelope = await mobileApiClient.cancelAllRequestsForProduct(requestId, payload);
+        return envelope.data ?? null;
+      } catch (error) {
+        if (isDuplicateIdempotencyError(error)) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(['requests', 'detail', variables.requestId], (existing: any) => {
+        return existing ? { ...existing, isReservedProductUsedInOtherOffers: false } : existing;
+      });
+      syncRequestMutationResult(queryClient, result);
+      void Promise.all([
+        invalidateRequestCollections(queryClient),
+        invalidateTransactionForRequest(queryClient, variables.requestId),
+        invalidateProductCollections(queryClient),
+      ]);
+    },
+  });
+}
+
 export function useCreateCounterOfferMutation() {
   const queryClient = useQueryClient();
 

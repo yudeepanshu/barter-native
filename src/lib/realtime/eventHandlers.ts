@@ -39,6 +39,15 @@ function shouldRefetchRequestOffers(action: DomainEvent<"request.updated">["payl
   );
 }
 
+function shouldInvalidateRelatedProducts(action: DomainEvent<"request.updated">["payload"]["action"]) {
+  return (
+    action === "ACCEPTED" ||
+    action === "REJECTED" ||
+    action === "CANCELLED" ||
+    action === "EXPIRED"
+  );
+}
+
 function shouldRefetchRequestDetail(action: DomainEvent<"request.updated">["payload"]["action"]) {
   return (
     action === "CONTACT_REVEAL_REQUESTED" ||
@@ -278,20 +287,20 @@ function patchTransactionActiveByRequestCache(
   requestId: string,
   status: TransactionSummary["status"],
   updatedAt: string,
+  otpExpiresAt: string,
 ) {
   let matched = false;
 
   queryClient.setQueryData<TransactionSummary | null>(
     queryKeys.transactions.activeByRequest(requestId),
     (existing) => {
-      if (!existing) {
-        return existing;
-      }
+      if (!existing) return existing;
 
       matched = true;
       return {
         ...existing,
         status,
+        otpExpiresAt,
         ...(status === "COMPLETED" ? { completedAt: updatedAt } : {}),
         ...(status === "CANCELLED" ? { cancelledAt: updatedAt } : {}),
       };
@@ -302,7 +311,7 @@ function patchTransactionActiveByRequestCache(
 }
 
 function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient: QueryClient) {
-  const { action, requestId, status, currentTurn, message } = event.payload;
+  const { action, requestId, productId, status, currentTurn, message } = event.payload;
 
   const patch: RequestRealtimePatch = {
     requestId,
@@ -347,6 +356,11 @@ function handleRequestUpdated(event: DomainEvent<"request.updated">, queryClient
   if (shouldRefetchRequestOffers(action) || hasMessageUpdate) {
     void queryClient.invalidateQueries({ queryKey: ["requests", requestId, "offers"] });
   }
+
+  if(shouldInvalidateRelatedProducts(action) && productId) {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) });
+    void queryClient.invalidateQueries({ queryKey: ["products", "infinite"] });
+  }
 }
 
 function handleProductUpdated(event: DomainEvent<"product.updated">, queryClient: QueryClient) {
@@ -387,11 +401,12 @@ function handleProductUpdated(event: DomainEvent<"product.updated">, queryClient
 }
 
 function handleTransactionUpdated(event: DomainEvent<"transaction.updated">, queryClient: QueryClient) {
-  const { transactionId, requestId, productId, status } = event.payload;
+  const { transactionId, requestId, productId, status, otpExpiresAt } = event.payload;
   const normalizedStatus = status as TransactionSummary["status"];
 
   useAppStore.getState().patchTransaction(transactionId, {
     status: normalizedStatus,
+    otpExpiresAt: otpExpiresAt ?? "",
   });
 
   const hasActiveTransactionCache = patchTransactionActiveByRequestCache(
@@ -399,6 +414,7 @@ function handleTransactionUpdated(event: DomainEvent<"transaction.updated">, que
     requestId,
     normalizedStatus,
     event.occurredAt,
+    otpExpiresAt ?? "",
   );
 
   if (!hasActiveTransactionCache) {

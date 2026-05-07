@@ -11,6 +11,7 @@ import type {
 import { mobileApiClient } from "@/lib/api/client";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import {
+  invalidateProductCollections,
   invalidateRequestCollectionByScope,
   invalidateRequestCollections,
   invalidateTransactionForRequest,
@@ -89,6 +90,7 @@ export function useAcceptRequestMutation() {
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, requestId),
+        invalidateProductCollections(queryClient),
       ]);
     },
   });
@@ -126,6 +128,7 @@ export function useRejectRequestMutation() {
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, requestId),
+        invalidateProductCollections(queryClient),
       ]);
     },
   });
@@ -164,6 +167,7 @@ export function useCancelRequestMutation() {
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
         invalidateTransactionForRequest(queryClient, variables.requestId),
+        invalidateProductCollections(queryClient),
       ]);
     },
   });

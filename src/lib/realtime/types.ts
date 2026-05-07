@@ -50,6 +50,7 @@ export type DomainEventPayloadMap = {
     action: ProductAction;
     relatedRequestId?: string;
     relatedTransactionId?: string;
+    isReservedProductUsedInOtherOffers?: boolean;
   };
   "transaction.updated": {
     transactionId: string;
@@ -60,6 +61,7 @@ export type DomainEventPayloadMap = {
     status: string;
     action: TransactionAction;
     actorId?: string;
+    otpExpiresAt?: string | null;
   };
   "notification.updated": {
     userId: string;

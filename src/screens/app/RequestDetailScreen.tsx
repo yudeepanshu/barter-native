@@ -45,6 +45,8 @@ import {
 } from "@/hooks/mutations/useUpdateProfileMutation";
 import { getFirstName, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { ErrorView } from "@/components/ui/ErrorView";
+import { queryKeys } from "@/lib/query/queryKeys";
+import { useQueryClient } from "@tanstack/react-query";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -432,12 +434,13 @@ export default function RequestDetailScreen() {
 
   const session = useSession();
   const requestQuery = useRequestDetailQuery(requestId);
+  const queryClient = useQueryClient();
+
   const shouldCheckActiveTransaction =
-    requestQuery.data?.status === "ACCEPTED" && requestQuery.data.product.status !== "EXCHANGED";
-  const transactionQuery = useActiveTransactionQuery(
-    requestId,
-    shouldCheckActiveTransaction,
-  );
+    (requestQuery.data?.status === "ACCEPTED" && requestQuery.data.product.status !== "EXCHANGED") ||
+    Boolean(queryClient.getQueryData(queryKeys.transactions.activeByRequest(requestId)));
+
+const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveTransaction);
   useTransactionRoom(transactionQuery.data?.id ?? null);
   useRealtimeToastScope(
     requestId
@@ -487,6 +490,8 @@ export default function RequestDetailScreen() {
   const [contactUpdateMessage, setContactUpdateMessage] = useState<string | null>(null);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
+  const [, rerender] = useState(0);
+
   const onRefreshPage = () => {
     if (isManualRefreshing) {
       return;
@@ -508,6 +513,34 @@ export default function RequestDetailScreen() {
     setContactFieldErrors({});
   }, [session?.user.email, session?.user.mobileNumber]);
 
+  const tx = transactionQuery.data;
+  const sellerOtpActive =
+  session?.user.id === transactionQuery.data?.sellerId &&
+  tx?.status === "IN_PROGRESS" &&
+  (
+    !tx.otpExpiresAt || // if server doesn't send it, show the field
+    new Date(tx.otpExpiresAt).getTime() > Date.now()
+  );
+
+  useEffect(() => {
+    if (!tx?.otpExpiresAt) return;
+
+    const msUntilExpiry = new Date(tx.otpExpiresAt).getTime() - Date.now();
+    if (msUntilExpiry <= 0) return;
+
+    const timer = setTimeout(() => {
+      rerender((n) => n + 1)
+    }, msUntilExpiry);
+    return () => clearTimeout(timer);
+  }, [tx?.otpExpiresAt]);
+
+  useEffect(() => {
+    if (!sellerOtpActive) {
+      setOtpInput("");
+      setTxFeedback(null);
+    }
+  }, [sellerOtpActive]);
+
   if (!session) {
     return null;
   }
@@ -525,26 +558,6 @@ export default function RequestDetailScreen() {
   if (requestQuery.error || !requestQuery.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
-        {/* <View style={[styles.center, styles.errorContent]}>
-          <View style={[styles.errorIconContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Feather name="alert-circle" size={48} color={theme.colors.danger} />
-          </View>
-          <Text style={[styles.errorTitle, { color: theme.colors.textPrimary }]}>Request not found</Text>
-          <Text style={[styles.errorDescription, { color: theme.colors.textMuted }]}>We couldn't load this request. It may have been deleted or you don't have access to it.</Text>
-          <View style={[styles.errorActions, { gap: 12 }]}>
-            <Button 
-              label="Retry" 
-              onPress={() => void requestQuery.refetch()}
-              style={{ flex: 1 }}
-            />
-            <Button 
-              label="Back" 
-              variant="ghost" 
-              onPress={() => router.back()}
-              style={{ flex: 1, backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff", borderColor: theme.colors.border, borderWidth: 1 }}
-            />
-          </View>
-        </View> */}
         <ErrorView
           title="Request not found"
           message="We couldn't load this request. It may have been deleted or you don't have access to it."
@@ -618,7 +631,7 @@ export default function RequestDetailScreen() {
       .filter((id): id is string => typeof id === "string")
   )).filter((id) => ownOfferableProducts.some((p) => p.id === id));
 
-  const tx = transactionQuery.data;
+  
   const generatedOtpExpiresAtMs = generatedOtpExpiresAt ? new Date(generatedOtpExpiresAt).getTime() : null;
   const hasGeneratedOtpExpiredByClock =
     generatedOtp != null && (generatedOtpExpiresAtMs == null || generatedOtpExpiresAtMs <= Date.now());
@@ -642,6 +655,7 @@ export default function RequestDetailScreen() {
             ? (canGenerateBuyerOtp ? "Your turn" : "Their turn")
             : "Your turn"
           : null;
+
   const showAcceptedTurnDetails = Boolean(acceptedTurnLabel);
   const showRequestDetailsSection =
     showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
@@ -801,12 +815,12 @@ export default function RequestDetailScreen() {
     }
   };
 
-  const onVerifyOtp = async () => {
+  const onVerifyOtp = async (otp?: string) => {
     if (!tx) return;
     setTxFeedback(null);
 
     try {
-      await verifyOtpMutation.mutateAsync({ transactionId: tx.id, otp: otpInput.trim() });
+      await verifyOtpMutation.mutateAsync({ transactionId: tx.id, otp: (otp ?? otpInput).trim() });
       setOtpInput("");
       setGeneratedOtp(null);
       setGeneratedOtpExpiresAt(null);
@@ -1350,11 +1364,17 @@ export default function RequestDetailScreen() {
         {showTransactionSection && tx && (
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
-            <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>Generate OTP only after both parties have agreed to the final terms and are ready to complete the exchange.</Text>
+            {isBuyer ? 
+              (!generatedOtp ? <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>Generate OTP only after both parties have agreed to the final terms and are ready to complete the exchange.</Text> : null)
+            : (
+              sellerOtpActive 
+              ? <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>The buyer has generated an OTP. Enter the code here once they share it.</Text> 
+              : <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>The buyer generates the OTP. Enter the code here once they share it, then verify it to complete the exchange.</Text>
+            )}
 
             {isBuyer ? (
               <>
-                {generatedOtp ? (
+                {generatedOtp && !buyerOtpExpired ? (
                   <View
                     style={[
                       styles.otpBox,
@@ -1364,7 +1384,7 @@ export default function RequestDetailScreen() {
                       },
                     ]}
                   >
-                    <OtpCodeField value={generatedOtp} editable={false} active={!buyerOtpExpired} />
+                    <OtpCodeField value={generatedOtp} editable={false} active />
                   </View>
                 ) : null}
 
@@ -1384,23 +1404,29 @@ export default function RequestDetailScreen() {
                   />
                 ) : null}
               </>
-            ) : isSeller && tx.status === "IN_PROGRESS" ? (
-              <>
-                <Input
-                  label="Verification OTP"
-                  placeholder="Enter OTP from the other party"
-                  value={otpInput}
-                  onChangeText={setOtpInput}
-                />
-
-                <Button
-                  label="Verify OTP & Complete"
-                  onPress={onVerifyOtp}
-                  loading={verifyOtpMutation.isPending}
-                />
-              </>
+            ) : sellerOtpActive ? (
+                <>
+                  <OtpCodeField
+                    value={otpInput}
+                    onChangeText={(next) => {
+                      setOtpInput(next);
+                      setTxFeedback(null);
+                      if (next.length === 6) {
+                        void onVerifyOtp(next);
+                      }
+                    }}
+                    editable={!verifyOtpMutation.isPending}
+                    autoFocus
+                    invalid={Boolean(txFeedback)}
+                  />
+                  {verifyOtpMutation.isPending ? (
+                    <View style={{ alignItems: "center", marginTop: 4 }}>
+                      <Spinner size={20} />
+                    </View>
+                  ) : null}
+                </>
             ) : (
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted }]}>Waiting for the buyer to generate the OTP.</Text>
+              null
             )}
 
             {txFeedback && (

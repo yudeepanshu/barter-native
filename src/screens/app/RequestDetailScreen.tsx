@@ -49,6 +49,7 @@ import { getFirstName, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/currency";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -202,7 +203,7 @@ const OfferCard = memo(
         {offer.offeredAmount && (
           <View style={passedStyles.detailRow}>
             <Text style={[passedStyles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-            <Text style={[passedStyles.value, { color: theme.colors.textPrimary }]}>₹{offer.offeredAmount}</Text>
+            <Text style={[passedStyles.value, { color: theme.colors.textPrimary }]}>{formatCurrency(offer.offeredAmount)}</Text>
           </View>
         )}
 
@@ -1117,7 +1118,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 {latestActiveOffer.offeredAmount && (
                   <View style={styles.detailRow}>
                     <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>₹{latestActiveOffer.offeredAmount}</Text>
+                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{formatCurrency(latestActiveOffer.offeredAmount)}</Text>
                   </View>
                 )}
 

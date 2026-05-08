@@ -30,6 +30,7 @@ import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
 import { getOfferTypeLabel } from "@/lib/utils/commonUtils";
+import { formatCurrency } from "@/lib/currency";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -797,7 +798,7 @@ const RequestItem = memo(function RequestItem({
             <View style={styles.detailRow}>
               <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Amount</Text>
               <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                ₹{activeOffer.offeredAmount}
+                {formatCurrency(activeOffer.offeredAmount)}
               </Text>
             </View>
           ) : null}

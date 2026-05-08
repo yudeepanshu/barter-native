@@ -5,6 +5,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { Input } from "@/components/ui/Input";
 import { OptionPillMenu, OptionPillMenuItem } from "@/components/filters/OptionPillMenu";
 import { Button } from "../ui/Button";
+import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 
 const REPORT_TYPE_OPTIONS: OptionPillMenuItem[] = [
   { key: "ABUSIVE_CONTENT", value: "ABUSIVE_CONTENT", label: "Abusive Content" },
@@ -46,8 +47,8 @@ export function ReportProductModal({
     if (!selectedType) return;
     onSubmit({
       reportType: selectedType,
-      reason: reason.trim() || undefined,
-      description: description.trim() || undefined,
+      reason: sanitizeOptionalText(reason, 120),
+      description: sanitizeOptionalText(description, 500),
     });
   };
 
@@ -76,7 +77,7 @@ export function ReportProductModal({
           placeholder="Brief reason..."
           value={reason}
           onChangeText={setReason}
-          maxLength={200}
+          maxLength={120}
           showCharacterCount
         />
 
@@ -85,7 +86,7 @@ export function ReportProductModal({
           placeholder="Additional details..."
           value={description}
           onChangeText={setDescription}
-          maxLength={2000}
+          maxLength={500}
           showCharacterCount
           multiline
           numberOfLines={4}

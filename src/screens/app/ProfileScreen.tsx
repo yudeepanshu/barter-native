@@ -39,6 +39,7 @@ import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScroll
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -226,11 +227,12 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
     if (Object.keys(nextErrors).length > 0) return;
 
     const payload: FeedbackPayload = {};
-    const trimPos = positiveFeedback.trim();
-    const trimNeg = negativeFeedback.trim();
 
-    if (trimPos.length > 0) payload.positiveFeedback = trimPos;
-    if (trimNeg.length > 0) payload.negativeFeedback = trimNeg;
+    const sanitizedPos = sanitizeOptionalText(positiveFeedback, MAX_FEEDBACK_TEXT);
+    const sanitizedNeg = sanitizeOptionalText(negativeFeedback, MAX_FEEDBACK_TEXT);
+
+    if (sanitizedPos) payload.positiveFeedback = sanitizedPos;
+    if (sanitizedNeg) payload.negativeFeedback = sanitizedNeg;
     if (uiRating !== null) payload.uiRating = uiRating;
     if (uxRating !== null) payload.uxRating = uxRating;
 

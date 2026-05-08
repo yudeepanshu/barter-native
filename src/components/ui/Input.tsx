@@ -89,10 +89,11 @@ export function Input({
             style,
           ]}
           editable={!disabled}
-            onChangeText={(value) => {
-              const next = isNumeric ? value.replace(/[^0-9]/g, "") : value;
-              onChangeText?.(next);
-            }}
+          onChangeText={(value) => {
+            let next = isNumeric ? value.replace(/[^0-9]/g, "") : value;
+            if (maxLength != null) next = next.slice(0, maxLength);
+            onChangeText?.(next);
+          }}
           onFocus={(event) => {
             setFocused(true);
             keyboardAware?.notifyInputFocused(inputRef.current);

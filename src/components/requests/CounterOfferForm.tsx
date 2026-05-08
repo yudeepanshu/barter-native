@@ -395,11 +395,11 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
   const handleSubmit = async () => {
     setFeedback(null);
 
-    const offerType: "PRODUCT" | "MONEY" | "MIXED" | "NONE" = wantsMoney && wantsProduct
+    const offerType: "PRODUCT" | "MONEY" | "MIXED" | "NONE" = includeMoney && includeProduct
       ? "MIXED"
-      : wantsMoney
+      : includeMoney
         ? "MONEY"
-        : wantsProduct
+        : includeProduct
           ? "PRODUCT"
           : "NONE";
 
@@ -413,11 +413,15 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
     } = {
       offerType,
       ...(counterMessage.trim() ? { message: counterMessage.trim() } : {}),
-      ...(counterVisibleProductIds.length > 0 ? { visibleProducts: counterVisibleProductIds } : {}),
-      ...(counterRequestedProductIds.length > 0 ? { requestedProducts: counterRequestedProductIds } : {}),
+      ...(includeProduct && counterVisibleProductIds.length > 0
+        ? { visibleProducts: counterVisibleProductIds }
+        : {}),
+      ...(includeProduct && counterRequestedProductIds.length > 0
+        ? { requestedProducts: counterRequestedProductIds }
+        : {}),
     };
 
-    if (wantsMoney) {
+    if (includeMoney) {
       const amountValue = Number(counterAmount);
       if (!Number.isFinite(amountValue) || amountValue <= 0) {
         setFeedback("Enter a valid positive amount.");
@@ -426,7 +430,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
       payload.amount = amountValue;
     }
 
-    if (wantsProduct) {
+    if (includeProduct) {
       if (canOfferOwnProducts) {
         if (counterOfferedProductIds.length === 0) {
           setFeedback("Select one or more listings for your counter offer.");

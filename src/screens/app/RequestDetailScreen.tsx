@@ -969,7 +969,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           {/* Buyer/Seller user card */}
           <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, borderTopWidth: 0.5, borderTopColor: theme.colors.border,
+            flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10,
           }}>
             {counterparty.profilePicture ? (
               <AppImage uri={counterparty.profilePicture} style={{ width: 38, height: 38, borderRadius: 19 }} />

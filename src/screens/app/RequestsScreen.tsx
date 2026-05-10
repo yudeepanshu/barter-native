@@ -812,17 +812,9 @@ const RequestItem = memo(function RequestItem({
             {showTurn ? (
               <View style={styles.itemTurnRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
-                <View style={[
-                  styles.itemTurnPill,
-                  {
-                    backgroundColor: isMyTurn ? "#dcfce7" : theme.colors.surfaceMuted,
-                    borderColor: isMyTurn ? "#86efac" : theme.colors.border,
-                  },
-                ]}>
-                  <Text style={[styles.itemTurnText, { color: isMyTurn ? "#15803d" : theme.colors.textSecondary }]}>
-                    {isMyTurn ? "Your turn" : "Their turn"}
-                  </Text>
-                </View>
+                <Text style={[styles.itemTurnText, { color: isMyTurn ? "#15803d" : theme.colors.textSecondary }]}>
+                  {isMyTurn ? "Your turn" : "Their turn"}
+                </Text>
               </View>
             ) : null}
 

@@ -10,11 +10,13 @@ const TRADE_TYPE_CHIP_COLORS = {
     free: { bg: "#dcfce7", border: "#86efac", text: "#166534" },
     money: { bg: "#fef3c7", border: "#fcd34d", text: "#92400e" },
     barter: { bg: "#ede9fe", border: "#c4b5fd", text: "#4c1d95" },
+    both: { bg: "#e0f2fe", border: "#7dd3fc", text: "#0c4a6e" },
   },
   dark: {
     free: { bg: "#052e1a", border: "#22c55e", text: "#4ade80" },
     money: { bg: "#3b2400", border: "#f59e0b", text: "#fbbf24" },
     barter: { bg: "#2e1065", border: "#8b5cf6", text: "#a78bfa" },
+    both: { bg: "#0c4a6e", border: "#7dd3fc", text: "#e0f2fe" },
   },
 } as const;
 
@@ -188,8 +190,10 @@ export function ProductMetadata({
   if (showProductType) {
     const typeColors = product.isFree
       ? tradeTypeColors.free
-      : product.requestByMoney
-        ? tradeTypeColors.money
+      : product.requestByMoney && product.allowTradeRequest
+        ? tradeTypeColors.both
+        : product.requestByMoney
+          ? tradeTypeColors.money
         : tradeTypeColors.barter;
     chips.push({
       key: "type",

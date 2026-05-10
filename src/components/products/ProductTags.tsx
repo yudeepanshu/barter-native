@@ -115,7 +115,7 @@ export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
   }
 
   if(product.requestByMoney && product.allowTradeRequest) {
-    return { label: "Cash or Trade", tone: "amber" };
+    return { label: "Cash or Trade", tone: "blue" };
   }
 
   if (product.requestByMoney) {

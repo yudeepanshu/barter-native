@@ -911,6 +911,49 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       <MenuHeader
         onBack={() => router.back()}
         textColor={theme.colors.textPrimary}
+        containerCenter={true}
+        centerNode={
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={3}>
+              {request.product.title}
+            </Text>
+            <View style={{ gap: 6, alignItems: 'flex-end' }}>
+              {!showRequestDetailsSection ? <StatusBadge status={displayStatus} /> : null}
+              {showRequestDetailsSection && (
+                <View style={{
+                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                  backgroundColor: request.currentTurn === actorTurn ? '#dcfce7' : '#f1f5f9',
+                }}>
+                  <Text style={{
+                    fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+                    color: request.currentTurn === actorTurn ? '#15803d' : '#64748b',
+                  }}>
+                    {request.currentTurn === actorTurn ? 'YOUR TURN' : 'THEIR TURN'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        }
+        contextMenuItems={
+          canCancel ? [{
+            label: "Cancel Request",
+            key: "cancel",
+            icon: 'x',
+            onPress: () =>
+              dialog
+                .confirm("Cancel Request", "Are you sure you want to cancel this request?")
+                .then((confirmed) => {
+                  if (confirmed) {
+                    void cancelMutation
+                      .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
+                      .catch((error) => {
+                        void dialog.alert("Error", toRequestErrorMessage(error));
+                      });
+                  }
+                }),
+          }] : []
+        }
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: 10 }]}
@@ -921,17 +964,37 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           />
         }
       >
-        {/* Request Header */}
-        <View style={[styles.headerCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={3}>{request.product.title}</Text>
-            <StatusBadge status={displayStatus} />
-          </View>
-        </View>
 
         {/* Product Card */}
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Requested product</Text>
+          {/* Buyer/Seller user card */}
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, borderTopWidth: 0.5, borderTopColor: theme.colors.border,
+          }}>
+            {counterparty.profilePicture ? (
+              <AppImage uri={counterparty.profilePicture} style={{ width: 38, height: 38, borderRadius: 19 }} />
+            ) : (
+              <View style={{
+                width: 38, height: 38, borderRadius: 19,
+                backgroundColor: '#1e40af',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                  {toInitials(counterparty.userName)}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {isBuyer ? 'SELLER' : 'BUYER'}
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>
+                {counterparty.userName}
+              </Text>
+            </View>
+          </View>
+
+          {/* <Text style={[{ color: theme.colors.textPrimary, fontSize: 12, fontWeight: '600' }]}>Request Details</Text> */}
           <ProductCard
             product={request.product}
             showMeta={false}
@@ -1047,174 +1110,134 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             </View>
           </View>
         ) : null}
-        </View>
 
         {/* Request Details */}
         {showRequestDetailsSection ? (
-          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Request Details</Text>
-              {canCancel ? (
-                <Pressable
-                  onPress={() =>
-                    cancelMutation
-                      .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
-                      .catch((error) => {
-                        void dialog.alert("Error", toRequestErrorMessage(error));
-                      })
-                  }
-                  style={({ pressed }) => [
-                    {
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: theme.colors.danger,
-                      backgroundColor: pressed ? (theme.mode === "dark" ? theme.colors.border : "#fee2e2") : (theme.mode === "dark" ? theme.colors.surface : "#fff"),
-                      opacity: cancelMutation.isPending ? 0.6 : 1,
-                    },
-                  ]}
-                  disabled={cancelMutation.isPending}
-                >
-                  <Text style={{ color: theme.colors.danger, fontWeight: "700", fontSize: 12 }}>
-                    {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            {showPendingTurnDetails ? (
-              <View style={styles.detailRow}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
-                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                  {request.currentTurn === actorTurn ? "Your turn" : "Their turn"}
-                </Text>
-              </View>
-            ) : showAcceptedTurnDetails ? (
-              <View style={styles.detailRow}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Turn</Text>
-                <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                  {acceptedTurnLabel}
-                </Text>
-              </View>
-            ) : null}
-
+          <View> 
             {showPendingTurnDetails && latestActiveOffer && latestActiveOffer.type !== "NONE" ? (
               <>
-                <View style={styles.detailRow}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Latest Offer</Text>
-                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                    {getOfferTypeLabel(latestActiveOffer.type)}
-                  </Text>
-                </View>
 
-                <View style={styles.detailRow}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>By</Text>
-                  <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                    {latestActiveOffer.offeredBy?.userName || "Unknown"}
-                  </Text>
-                </View>
+               {/* Latest Offer — fieldset style with floating label on border */}
+              <View style={[styles.latestOfferSection, { borderColor: theme.colors.border }]}>
+                <Text style={[styles.latestOfferLabel, { backgroundColor: theme.colors.surface, color: theme.colors.textMuted }]}>
+                  Latest offer
+                </Text>
 
-                {latestActiveOffer.offeredAmount && (
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>{formatCurrency(latestActiveOffer.offeredAmount)}</Text>
+                {/* Type inline with dot separator + Amount on right (only if cash/mixed) */}
+                <View style={styles.detailRow}>
+                  <View style={{ flexDirection: "column" }}>
+                    <Text style={[styles.label, { color: theme.colors.textMuted }]}>Type</Text>
+                    {/* <View style={styles.latestOfferDot} /> */}
+                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                      {getOfferTypeLabel(latestActiveOffer.type)}
+                    </Text>
                   </View>
-                )}
+                  {latestActiveOffer.offeredAmount ? (
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
+                      <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
+                        {formatCurrency(latestActiveOffer.offeredAmount)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
 
+                {/* Offered products — below the type/amount row */}
                 {latestActiveOffer.offeredProducts.length > 0 && (
-                  <View style={styles.offeredProducts}>
+                  <View style={{ gap: 8, marginTop: 10 }}>
                     <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Offered listings</Text>
                     {latestActiveOffer.offeredProducts.map((op) => (
-                      <View key={op.id} style={{ marginTop: 8 }}>
-                        <ProductCard
-                          product={op.product}
-                          showMeta={false}
-                          onPress={() => router.push(`/(app)/products/${op.product.id}`)}
-                        />
-                      </View>
+                      <ProductCard
+                        key={op.id}
+                        product={op.product}
+                        showMeta={false}
+                        onPress={() => router.push(`/(app)/products/${op.product.id}`)}
+                      />
                     ))}
                   </View>
                 )}
 
                 {latestActiveOffer.requestedProducts?.length > 0 && (
-                  <View style={styles.offeredProducts}>
+                  <View style={{ gap: 8, marginTop: 10 }}>
                     <Text style={[styles.offerBy, { color: theme.colors.textMuted }]}>Requested in return</Text>
                     {latestActiveOffer.requestedProducts.map((rp) => (
-                      <View key={rp.id} style={{ marginTop: 8 }}>
-                        <ProductCard
-                          product={rp.product}
-                          showMeta={false}
-                          onPress={() => router.push(`/(app)/products/${rp.product.id}`)}
-                        />
-                      </View>
+                      <ProductCard
+                        key={rp.id}
+                        product={rp.product}
+                        showMeta={false}
+                        onPress={() => router.push(`/(app)/products/${rp.product.id}`)}
+                      />
                     ))}
                   </View>
                 )}
 
                 {/* Action Buttons: Accept/Reject/Counter */}
                 {canActByTurn && (
-                  <View style={styles.offerActionButtonsRow}>
-                    <View style={styles.offerActionButtonCell}>
-                      <Button
-                        label="Accept"
-                        style={{
-                          minHeight: 32,
-                          borderRadius: 10,
-                          paddingHorizontal: 18,
-                          paddingVertical: 0,
-                        }}
-                        onPress={() =>
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    {/* Accept — full width green */}
+                    <Button
+                      label="Accept Offer"
+                      style={{
+                        minHeight: 48, borderRadius: 12,
+                        backgroundColor: '#16a34a', borderWidth: 0,
+                      }}
+                      textColor="#ffffff"
+                      labelStyle={{ fontWeight: '700', fontSize: 15 }}
+                      onPress={() =>
                           acceptMutation.mutateAsync(request.id).catch((error) => {
                             void dialog.alert("Error", toRequestErrorMessage(error));
                           })
                         }
-                        loading={acceptMutation.isPending}
-                      />
-                    </View>
-                    <View style={styles.offerActionButtonCell}>
+                      loading={acceptMutation.isPending}
+                      leftIcon={<Feather name="check" size={16} color="#ffffff" />}
+                    />
+
+                    {/* Counter Offer — full width outlined */}
+                    {canCounter && (
                       <Button
-                        label="Reject"
+                        label="Counter Offer"
                         variant="ghost"
                         style={{
-                          minHeight: 32,
-                          borderRadius: 10,
-                          paddingHorizontal: 18,
-                          paddingVertical: 0,
-                          backgroundColor: theme.mode === "dark" ? theme.colors.surface : "#fff",
-                          borderColor: theme.colors.danger,
-                          borderWidth: 1,
+                          minHeight: 44, borderRadius: 12,
+                          borderWidth: 1, borderColor: theme.colors.border,
+                          backgroundColor: theme.colors.surfaceMuted,
                         }}
-                        textColor={theme.colors.danger}
-                        labelStyle={{ fontWeight: "700" }}
-                        onPress={() =>
+                        textColor={theme.colors.textPrimary}
+                        labelStyle={{ fontWeight: '600', fontSize: 14 }}
+                        onPress={() => setShowCounterOfferForm(true)}
+                        leftIcon={<Feather name="repeat" size={16} color={theme.colors.textPrimary} />}
+                      />
+                    )}
+
+                    {/* OR divider */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 }}>
+                      <View style={{ flex: 1, height: 0.5, backgroundColor: theme.colors.border }} />
+                      <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>OR</Text>
+                      <View style={{ flex: 1, height: 0.5, backgroundColor: theme.colors.border }} />
+                    </View>
+
+                    {/* Reject — full width light red */}
+                    <Button
+                      label="Reject Offer"
+                      variant="ghost"
+                      style={{
+                        minHeight: 44, borderRadius: 12,
+                        borderWidth: 1, borderColor: '#fca5a5',
+                        backgroundColor: '#fff1f2',
+                      }}
+                      textColor="#dc2626"
+                      labelStyle={{ fontWeight: '600', fontSize: 14 }}
+                      onPress={() =>
                           rejectMutation.mutateAsync(request.id).catch((error) => {
                             void dialog.alert("Error", toRequestErrorMessage(error));
                           })
                         }
-                        loading={rejectMutation.isPending}
-                      />
-                    </View>
+                      loading={rejectMutation.isPending}
+                      leftIcon={<Feather name="x" size={16} color="#dc2626" />}
+                    />
                   </View>
                 )}
-
-                {canCounter && (
-                  <Button
-                    label="Counter Offer"
-                    variant="ghost"
-                    style={{
-                      minHeight: 36,
-                      borderRadius: 10,
-                      marginTop: 2,
-                      backgroundColor: theme.mode === "dark" ? theme.colors.surfaceMuted : "#fff",
-                      borderWidth: 1,
-                      borderColor: theme.mode === "dark" ? theme.colors.primary : theme.colors.border,
-                    }}
-                    textColor={theme.mode === "dark" ? theme.colors.textPrimary : theme.colors.textSecondary}
-                    labelStyle={{ fontWeight: "700" }}
-                    onPress={() => setShowCounterOfferForm(true)}
-                  />
-                )}
+              </View>
               </>
             ) : null}
 
@@ -1236,6 +1259,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             ) : null}
           </View>
         ) : null}
+
+        </View>
 
         {hasConsiderationProducts && !OPEN_STATUSES.includes(request.status) ? null : hasConsiderationProducts ? (() => {
           const showTabs = yourConsiderationProducts.length > 0 && theirConsiderationProducts.length > 0;
@@ -1672,7 +1697,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   detailRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   contactRow: {
     flexDirection: "row",
@@ -1811,5 +1836,30 @@ const styles = StyleSheet.create({
   bottomSheetContent: {
     paddingHorizontal: 16,
     paddingBottom: 12,
+  },
+  latestOfferSection: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    paddingTop: 16,
+    marginTop: 6,
+    gap: 2,
+    position: "relative",
+  },
+  latestOfferLabel: {
+    position: "absolute",
+    top: -9,
+    left: 12,
+    paddingHorizontal: 5,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  latestOfferDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "#94a3b8",
   },
 });

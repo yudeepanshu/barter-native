@@ -745,8 +745,16 @@ const RequestItem = memo(function RequestItem({
     (item.status === "ACCEPTED" && isExchangeFinalized);
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : item.status;
   const showTurn = OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
+  const isMyTurn = item.currentTurn === actorTurn;
   const isBuyer = sessionUserId === item.buyerId;
   const requestedByLabel = isBuyer ? "You" : (item.buyer.userName?.trim() || "Unknown");
+  const initials = requestedByLabel
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
 
   return (
     <Pressable
@@ -754,60 +762,77 @@ const RequestItem = memo(function RequestItem({
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
       <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
-        <View style={styles.detailsBlock}>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, styles.statusLabel, { color: theme.colors.textMuted }]}>Status</Text>
-            <View
-              style={[
-                styles.badgeWrap,
-                {
-                  backgroundColor: getStatusBadgeStyle(displayStatus).bg,
-                  borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
-                  borderColor: displayStatus === "CANCELLED" ? "#111827" : "transparent",
-                },
-              ]}
-            >
-              <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
-                {displayStatus}
-              </Text>
-            </View>
+
+        {/* Top row: avatar + name + status badge */}
+        <View style={styles.itemTopRow}>
+          <View style={[styles.itemAvatar, { backgroundColor: theme.colors.surface ?? "#e0e7ff" }]}>
+            <Text style={[styles.itemAvatarText, { color: theme.colors.primary }]}>{initials}</Text>
           </View>
-          {showTurn ? (
-            <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
-              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                {item.currentTurn === actorTurn ? "Your turn" : "Their turn"}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Requested by</Text>
-            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-              {requestedByLabel}
+          <Text style={[styles.itemUserName, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+            {requestedByLabel}
+          </Text>
+          <View style={[
+            styles.badgeWrap,
+            {
+              backgroundColor: getStatusBadgeStyle(displayStatus).bg,
+              borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
+              borderColor: displayStatus === "CANCELLED" ? theme.colors.border : "transparent",
+            },
+          ]}>
+            <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
+              {getStatusLabel(displayStatus)}
             </Text>
           </View>
-          {activeOffer?.type && activeOffer.type !== "NONE" ? (
-            <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest Offer</Text>
-              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                {getOfferTypeLabel(activeOffer.type)}
-              </Text>
-            </View>
-          ) : null}
-          {activeOffer?.offeredAmount != null ? (
-            <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Amount</Text>
-              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                {formatCurrency(activeOffer.offeredAmount)}
-              </Text>
-            </View>
-          ) : null}
         </View>
+
+        {/* Bottom row: offer info + turn pill */}
+        {/* Bottom rows: offer info and turn as separate rows */}
+        {(activeOffer?.type && activeOffer.type !== "NONE") || showTurn ? (
+          <View style={[styles.itemBottomBlock, { borderTopColor: theme.colors.border }]}>
+
+            {activeOffer?.type && activeOffer.type !== "NONE" ? (
+              <View style={styles.itemOfferInline}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest offer</Text>
+                <View style={styles.itemOfferValue}>
+                  <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                    {getOfferTypeLabel(activeOffer.type)}
+                  </Text>
+                  {activeOffer.offeredAmount != null ? (
+                    <>
+                      <View style={[styles.itemOfferDot, { backgroundColor: theme.colors.textMuted }]} />
+                      <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                        {formatCurrency(activeOffer.offeredAmount)}
+                      </Text>
+                    </>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {showTurn ? (
+              <View style={styles.itemTurnRow}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
+                <View style={[
+                  styles.itemTurnPill,
+                  {
+                    backgroundColor: isMyTurn ? "#dcfce7" : theme.colors.surfaceMuted,
+                    borderColor: isMyTurn ? "#86efac" : theme.colors.border,
+                  },
+                ]}>
+                  <Text style={[styles.itemTurnText, { color: isMyTurn ? "#15803d" : theme.colors.textSecondary }]}>
+                    {isMyTurn ? "Your turn" : "Their turn"}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+          </View>
+        ) : null}
+
       </View>
     </Pressable>
   );
 });
-
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -915,30 +940,30 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    width: 90,
-  },
+  // detailLabel: {
+  //   fontSize: 12,
+  //   fontWeight: "600",
+  //   width: 90,
+  // },
   statusLabel: {
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 16,
   },
-  detailValue: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-  badgeWrap: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  badgeText: { fontSize: 11, fontWeight: "700" },
+  // detailValue: {
+  //   flex: 1,
+  //   fontSize: 12,
+  //   fontWeight: "700",
+  //   textAlign: "right",
+  // },
+  // badgeWrap: {
+  //   paddingHorizontal: 8,
+  //   paddingVertical: 3,
+  //   borderRadius: 8,
+  //   overflow: "hidden",
+  //   flexShrink: 0,
+  // },
+  // badgeText: { fontSize: 11, fontWeight: "700" },
   metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
   metaPill: { fontSize: 12, fontWeight: "500" },
   metaDot: { fontSize: 11 },
@@ -1122,4 +1147,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginBottom: 4,
   },
+
+
+  itemTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  itemAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  itemAvatarText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  itemUserName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  itemBottomBlock: {
+    borderTopWidth: 0.5,
+    paddingTop: 8,
+    gap: 8,
+  },
+  itemTurnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  itemOfferInline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    minWidth: 0,
+  },
+  itemOfferValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  itemOfferDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    flexShrink: 0,
+  },
+  itemTurnPill: {
+    borderWidth: 1,
+    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexShrink: 0,
+    flexGrow: 0,
+  },
+  itemTurnText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    flexShrink: 0,
+  },
+  detailValue: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  badgeWrap: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  badgeText: { fontSize: 11, fontWeight: "700" },
 });

@@ -13,6 +13,7 @@ interface BackMenuHeaderProps {
   titleNode?: ReactNode;
   centerNode?: ReactNode;
   contextMenuItems?: AnchoredContextMenuItem[];
+  containerCenter?: boolean;
 }
 
 export function MenuHeader({
@@ -22,6 +23,7 @@ export function MenuHeader({
   textColor = "#111827",
   centerNode,
   contextMenuItems,
+  containerCenter = false,
 }: BackMenuHeaderProps) {
   const { theme } = useAppTheme();
   const [contextMenuAnchor, setContextMenuAnchor] = useState<ContextMenuAnchor | null>(null);
@@ -54,7 +56,7 @@ export function MenuHeader({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={containerCenter ? styles.containerCenter : styles.container}>
       {/* Left: back button */}
       <View style={styles.side}>
         <Pressable
@@ -75,8 +77,7 @@ export function MenuHeader({
       </View> : null}
 
       {/* Right: menu button or empty spacer to keep center truly centered */}
-      <View style={styles.side}>
-        {hasMenuButton ? (
+      {hasMenuButton ? (<View style={styles.side}>
           <Pressable
             onPress={handleMenuPress}
             hitSlop={8}
@@ -86,8 +87,7 @@ export function MenuHeader({
           >
             <Feather name="more-vertical" size={20} color={textColor} />
           </Pressable>
-        ) : null}
-      </View>
+      </View> ) : null}
 
       {hasContextMenuItems ? (
         <AnchoredContextMenu
@@ -105,6 +105,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "flex-start",
+    width: "100%",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  containerCenter: {
+    flexDirection: "row",
+    alignItems: "center",
     width: "100%",
     paddingVertical: 8,
     paddingHorizontal: 12,

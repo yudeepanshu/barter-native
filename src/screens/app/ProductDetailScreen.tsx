@@ -230,10 +230,13 @@ export default function ProductDetailScreen() {
               <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
                 {product.title}
               </Text>
-              <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" style={{ alignSelf: "center" }} />
+              <View style={{ gap: 6, alignItems: 'flex-end' }}>
+                <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" style={{ alignSelf: "center" }} />
+              </View>
             </View>
           ) : null
         }
+        containerCenter
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
         contextMenuItems={
@@ -802,14 +805,16 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  headerRow: {
-    alignItems: "center",
-    gap: 8,
-  },
   headerTitle: {
+    flex: 1,
     fontSize: 22,
     fontWeight: "700",
-    textAlign: "center",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
   },
   backRow: { marginBottom: 2 },
   backButton: {

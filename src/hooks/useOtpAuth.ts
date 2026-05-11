@@ -130,13 +130,13 @@ export function useOtpAuth(): UseOtpAuthReturn {
 
     try {
       // Clear Google SDK cached account so next login can re-prompt account chooser.
+      await GoogleSignin.revokeAccess();
       await GoogleSignin.signOut();
     } catch {
       // Ignore: user may have no active Google session in SDK cache.
     }
 
-    await queryClient.cancelQueries({queryKey: queryKeys.auth.me, exact: true});
-    queryClient.setQueryData(queryKeys.auth.me, null);
+    queryClient.clear();
 
     await clearSession();
     setStep("identifier");

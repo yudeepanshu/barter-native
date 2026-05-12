@@ -16,12 +16,12 @@ export async function askImageSource(
   dialog: AppDialog,
 ): Promise<"camera" | "library" | null> {
   const action = await dialog.show({
-    title: "Choose image source",
-    message: "Select how you want to add images.",
+    title: "Add image",
     showCloseButton: true,
+    iconLayout: true,
     actions: [
-      { key: "camera", label: "Camera" },
-      { key: "library", label: "Gallery" },
+      { key: "camera", label: "Camera", icon: "camera" },
+      { key: "library", label: "Gallery", icon: "image" },
     ],
   });
 

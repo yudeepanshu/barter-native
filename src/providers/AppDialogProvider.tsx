@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { Feather } from "@expo/vector-icons";
 
 type AppDialogActionRole = "default" | "cancel" | "destructive";
 
@@ -8,6 +9,7 @@ export interface AppDialogAction {
   key: string;
   label: string;
   role?: AppDialogActionRole;
+  icon?: string;
 }
 
 export interface AppDialogOptions {
@@ -17,6 +19,7 @@ export interface AppDialogOptions {
   showCloseButton?: boolean;
   disableDismiss?: boolean;
   dismissOnBackdrop?: boolean;
+  iconLayout?: boolean;
 }
 
 interface PendingDialog extends AppDialogOptions {
@@ -157,37 +160,63 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 {pendingDialog.message ? (
                   <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{pendingDialog.message}</Text>
                 ) : null}
-                <View style={styles.actionsRow}>
-                  {pendingDialog.actions.map((action) => {
-                    const isDestructive = action.role === "destructive";
-                    const isCancel = action.role === "cancel";
-                    return (
+                {pendingDialog.iconLayout ? (
+                  <View style={styles.iconActionsRow}>
+                    {pendingDialog.actions.map((action) => (
                       <Pressable
                         key={action.key}
                         onPress={() => onClose(action.key)}
                         style={({ pressed }) => [
-                          styles.actionBtn,
+                          styles.iconActionBtn,
                           {
                             borderColor: theme.colors.border,
-                            backgroundColor: isCancel ? theme.colors.surfaceMuted : theme.colors.surface,
+                            backgroundColor: theme.colors.surfaceMuted,
                             opacity: pressed ? 0.86 : 1,
                           },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.actionLabel,
-                            {
-                              color: isDestructive ? theme.colors.danger : theme.colors.textPrimary,
-                            },
-                          ]}
-                        >
+                        {action.icon ? (
+                          <Feather name={action.icon as any} size={28} color={theme.colors.textSecondary} />
+                        ) : null}
+                        <Text style={[styles.iconActionLabel, { color: theme.colors.textPrimary }]}>
                           {action.label}
                         </Text>
                       </Pressable>
-                    );
-                  })}
-                </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.actionsRow}>
+                    {pendingDialog.actions.map((action) => {
+                      const isDestructive = action.role === "destructive";
+                      const isCancel = action.role === "cancel";
+                      return (
+                        <Pressable
+                          key={action.key}
+                          onPress={() => onClose(action.key)}
+                          style={({ pressed }) => [
+                            styles.actionBtn,
+                            {
+                              borderColor: theme.colors.border,
+                              backgroundColor: isCancel ? theme.colors.surfaceMuted : theme.colors.surface,
+                              opacity: pressed ? 0.86 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.actionLabel,
+                              {
+                                color: isDestructive ? theme.colors.danger : theme.colors.textPrimary,
+                              },
+                            ]}
+                          >
+                            {action.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </>
             ) : null}
           </Pressable>
@@ -263,5 +292,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: "700",
+  },
+  iconActionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  iconActionBtn: {
+    flex: 1,
+    aspectRatio: 1.4,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  iconActionLabel: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

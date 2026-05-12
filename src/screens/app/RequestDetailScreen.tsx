@@ -702,8 +702,9 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           : null;
 
   const showAcceptedTurnDetails = Boolean(acceptedTurnLabel);
-  const showRequestDetailsSection =
-    showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
+  const showCondition = showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
+
+  const showRequestDetailsSection = showCondition && (!isSeller || !isReservedProductUsedInOtherOffers);
   
   const showTransactionSection =
     request.status === "ACCEPTED" && !isRequestCompleted && !isReservedProductUsedInOtherOffers && (transactionQuery.isPending || Boolean(tx));
@@ -1038,7 +1039,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
               ]}
             >
               <Text style={{ fontWeight: "700" }}>{request.product.title}</Text>
-              {" "}is offered in another request. Cancel conflicts to finalise this one.
+              {" "}is offered in another request. Cancel conflicts to proceed with this one.
             </Text>
 
             <View style={[styles.offerActionButtonsRow, { marginTop: 8 }]}>

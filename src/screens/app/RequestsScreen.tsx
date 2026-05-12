@@ -29,7 +29,7 @@ import {
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
-import { getOfferTypeLabel } from "@/lib/utils/commonUtils";
+import { formatTimeAgo, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { formatCurrency } from "@/lib/currency";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -37,7 +37,7 @@ const SCREEN_HEIGHT = Dimensions.get("window").height;
 const MODAL_CHROME_HEIGHT = 200;
 const FILTER_SCROLL_MAX_HEIGHT = SCREEN_HEIGHT * 0.65 - MODAL_CHROME_HEIGHT;
 
-const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
+const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", 'ACCEPTED'];
 const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
 
 const ALL_REQUEST_STATUSES: RequestStatus[] = [
@@ -725,6 +725,23 @@ function RequestSection({
 
 // ── RequestItem ────────────────────────────────────────────────────────────────
 
+// function getStatusBorderColor(
+//   status: RequestSummary["status"],
+//   isCompleted: boolean,
+//   colors: ReturnType<typeof useAppTheme>["theme"]["colors"]
+// ): string {
+//   if (isCompleted) return "#16a34a"; // green
+//   switch (status) {
+//     case "PENDING":
+//     case "ACCEPTED":
+//       return colors.primary;       // brand blue – active/open
+//     case "CANCELLED":
+//       return colors.border;        // neutral grey
+//     default:
+//       return colors.border;
+//   }
+// }
+
 const RequestItem = memo(function RequestItem({
   item,
   router,
@@ -743,11 +760,16 @@ const RequestItem = memo(function RequestItem({
   const isRequestCompleted =
     item.status === "COMPLETED" ||
     (item.status === "ACCEPTED" && isExchangeFinalized);
-  const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : item.status;
-  const showTurn = OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
+  const displayStatus: RequestSummary["status"] = isRequestCompleted
+    ? "COMPLETED"
+    : item.status;
+  const showTurn =
+    OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
   const isMyTurn = item.currentTurn === actorTurn;
   const isBuyer = sessionUserId === item.buyerId;
-  const requestedByLabel = isBuyer ? "You" : (item.buyer.userName?.trim() || "Unknown");
+  const requestedByLabel = isBuyer
+    ? "You"
+    : item.buyer.userName?.trim() || "Unknown";
   const initials = requestedByLabel
     .trim()
     .split(/\s+/)
@@ -756,21 +778,55 @@ const RequestItem = memo(function RequestItem({
     .map((w) => w[0].toUpperCase())
     .join("");
 
+  // Offer display
+  const hasOffer =
+    activeOffer?.type && activeOffer.type !== "NONE";
+  const isTrade = activeOffer?.type === "PRODUCT" || activeOffer?.type === "MIXED";
+  const offerLabel = hasOffer ? getOfferTypeLabel(activeOffer.type) : "N/A";
+  const offerAmount =
+    hasOffer && activeOffer.offeredAmount != null
+      ? formatCurrency(activeOffer.offeredAmount)
+      : null;
+
   return (
     <Pressable
       style={styles.itemCardPressable}
       onPress={() => router.push(`/(app)/requests/${item.id}`)}
     >
-      <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+      <View
+        style={[
+          styles.itemCard,
+              {
+                borderColor: theme.mode === "dark"
+                  ? "rgba(255,255,255,0.12)"   // soft luminous white glow in dark
+                  : "rgba(0,0,0,0.10)",        // subtle shadow-like border in light
+                backgroundColor: theme.colors.surfaceMuted,
+              },
+        ]}
+      >
+      {/* ── Top row: avatar · name/time · badge+turn column ── */}
+      <View style={styles.itemTopRow}>
+        <View style={[styles.itemAvatar, { backgroundColor: theme.colors.surface ?? "#e0e7ff" }]}>
+          <Text style={[styles.itemAvatarText, { color: theme.colors.primary }]}>{initials}</Text>
+        </View>
 
-        {/* Top row: avatar + name + status badge */}
-        <View style={styles.itemTopRow}>
-          <View style={[styles.itemAvatar, { backgroundColor: theme.colors.surface ?? "#e0e7ff" }]}>
-            <Text style={[styles.itemAvatarText, { color: theme.colors.primary }]}>{initials}</Text>
-          </View>
-          <Text style={[styles.itemUserName, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+        <View style={styles.itemNameTimeCol}>
+          <Text
+            style={[styles.itemUserName, { color: theme.colors.textPrimary }]}
+            numberOfLines={1}
+          >
             {requestedByLabel}
           </Text>
+          <Text
+            style={[styles.itemTimeText, { color: theme.colors.textMuted }]}
+            numberOfLines={1}
+          >
+            {formatTimeAgo(item.createdAt)}
+          </Text>
+        </View>
+
+        {/* Badge + turn stacked in a column on the right */}
+        <View style={styles.itemBadgeTurnCol}>
           <View style={[
             styles.badgeWrap,
             {
@@ -779,52 +835,70 @@ const RequestItem = memo(function RequestItem({
               borderColor: displayStatus === "CANCELLED" ? theme.colors.border : "transparent",
             },
           ]}>
-            <Text style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]} numberOfLines={1}>
+            <Text
+              style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]}
+              numberOfLines={1}
+            >
               {getStatusLabel(displayStatus)}
             </Text>
           </View>
+
+          {showTurn && (
+            <Text style={[
+              styles.itemTurnText,
+              { color: isMyTurn ? "#16a34a" : theme.colors.textSecondary },
+            ]}>
+              {isMyTurn ? "Your turn" : "Their turn"}
+            </Text>
+          )}
         </View>
+      </View>
 
-        {/* Bottom row: offer info + turn pill */}
-        {/* Bottom rows: offer info and turn as separate rows */}
-        {(activeOffer?.type && activeOffer.type !== "NONE") || showTurn ? (
-          <View style={[styles.itemBottomBlock, { borderTopColor: theme.colors.border }]}>
-
-            {activeOffer?.type && activeOffer.type !== "NONE" ? (
-              <View style={styles.itemOfferInline}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Latest offer</Text>
-                <View style={styles.itemOfferValue}>
-                  <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {getOfferTypeLabel(activeOffer.type)}
-                  </Text>
-                  {activeOffer.offeredAmount != null ? (
-                    <>
-                      <View style={[styles.itemOfferDot, { backgroundColor: theme.colors.textMuted }]} />
-                      <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                        {formatCurrency(activeOffer.offeredAmount)}
-                      </Text>
-                    </>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
-
-            {showTurn ? (
-              <View style={styles.itemTurnRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>Turn</Text>
-                <Text style={[styles.itemTurnText, { color: isMyTurn ? "#15803d" : theme.colors.textSecondary }]}>
-                  {isMyTurn ? "Your turn" : "Their turn"}
+      {/* ── Bottom block: offer row only ── */}
+      {hasOffer && (
+        <View style={[styles.itemBottomBlock, { borderTopColor: theme.colors.border }]}>
+          <View style={styles.itemOfferInline}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>
+              Latest offer:
+            </Text>
+            <View style={styles.itemOfferValue}>
+              {isTrade && (
+                <Feather
+                  name="repeat"
+                  size={12}
+                  color={theme.colors.textPrimary}
+                  style={{ marginRight: 3 }}
+                />
+              )}
+              {isTrade && (
+                <Text
+                  style={[styles.detailValue, { color: theme.colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {offerLabel === 'CASH + TRADE' ? 'TRADE' : offerLabel}
                 </Text>
-              </View>
-            ) : null}
-
+              )}
+              {isTrade && offerAmount != null && (
+                <Feather name="plus" size={11} color={theme.colors.textMuted} />
+              )}
+              {offerAmount != null && (
+                <Text
+                  style={[styles.detailValue, { color: theme.colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {offerAmount}
+                </Text>
+              )}
+            </View>
+            <Feather name="chevron-right" size={14} color={theme.colors.textMuted} />
           </View>
-        ) : null}
-
+        </View>
+      )}
       </View>
     </Pressable>
   );
 });
+
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -912,12 +986,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  itemCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
+  // itemCard: {
+  //   borderWidth: 1,
+  //   borderRadius: 12,
+  //   padding: 12,
+  //   gap: 8,
+  // },
   itemCardPressable: {
     opacity: 1,
   },
@@ -1141,11 +1215,11 @@ const styles = StyleSheet.create({
   },
 
 
-  itemTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  // itemTopRow: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   gap: 8,
+  // },
   itemAvatar: {
     width: 30,
     height: 30,
@@ -1158,42 +1232,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  itemUserName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  itemBottomBlock: {
-    borderTopWidth: 0.5,
-    paddingTop: 8,
-    gap: 8,
-  },
-  itemTurnRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  itemOfferInline: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 6,
-    minWidth: 0,
-  },
-  itemOfferValue: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  itemOfferDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    flexShrink: 0,
-  },
+  // itemUserName: {
+  //   flex: 1,
+  //   fontSize: 13,
+  //   fontWeight: "600",
+  // },
+  // itemBottomBlock: {
+  //   borderTopWidth: 0.5,
+  //   paddingTop: 8,
+  //   gap: 8,
+  // },
+  // itemTurnRow: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   justifyContent: "space-between",
+  // },
+  // itemOfferInline: {
+  //   flex: 1,
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   justifyContent: "space-between",
+  //   gap: 6,
+  //   minWidth: 0,
+  // },
+  // itemOfferValue: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   gap: 5,
+  //   flexShrink: 1,
+  //   minWidth: 0,
+  // },
+  // itemOfferDot: {
+  //   width: 3,
+  //   height: 3,
+  //   borderRadius: 2,
+  //   flexShrink: 0,
+  // },
   itemTurnPill: {
     borderWidth: 1,
     borderRadius: 99,
@@ -1202,10 +1276,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     flexGrow: 0,
   },
-  itemTurnText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
+  // itemTurnText: {
+  //   fontSize: 11,
+  //   fontWeight: "600",
+  // },
   detailLabel: {
     fontSize: 12,
     fontWeight: "600",
@@ -1225,4 +1299,68 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   badgeText: { fontSize: 11, fontWeight: "700" },
+  itemCard: {
+    borderWidth: 1.5,          // slightly thicker so the colour reads clearly
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  itemTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  itemNameTimeCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  itemUserName: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  itemTimeText: {
+    fontSize: 11,
+    fontWeight: "400",
+  },
+  itemBottomBlock: {
+    borderTopWidth: 0.5,
+    paddingTop: 8,
+    gap: 6,
+  },
+  itemOfferInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  itemOfferValue: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  itemOfferDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    flexShrink: 0,
+  },
+  itemTurnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  itemBadgeTurnCol: {
+  alignItems: "flex-end",
+  gap: 4,
+  flexShrink: 0,
+},
+  itemTurnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    alignSelf: "center",
+  },
 });

@@ -41,3 +41,30 @@ export function getOfferTypeLabel(type: string) {
   }
 }
 
+export function formatTimeAgo(createdAt?: string): string {
+  if (!createdAt) return "Just now";
+
+  const createdTime = new Date(createdAt).getTime();
+  if (Number.isNaN(createdTime)) return "Just now";
+
+  const elapsedMs = Date.now() - createdTime;
+  if (elapsedMs <= 0) return "Just now";
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  if (seconds < 60) return "Just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+
+  const years = Math.floor(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}

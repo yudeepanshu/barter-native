@@ -23,6 +23,7 @@ export interface AppTheme {
     chipText: string;
     chipActiveText: string;
     danger: string;
+      warning: string;
     dangerSoft: string;
     warningSoft: string;
     overlay: string;
@@ -67,6 +68,7 @@ export const lightTheme: AppTheme = {
     chipText: "#334155",
     chipActiveText: "#f9fafb",
     danger: "#b91c1c",
+    warning: "#b45309",
     dangerSoft: "#fee2e2",
     warningSoft: "#fef3c7",
     overlay: "rgba(15, 23, 42, 0.72)",
@@ -101,6 +103,7 @@ export const darkTheme: AppTheme = {
     chipText: "#cbd5e1",
     chipActiveText: "#111827",
     danger: "#f87171",
+    warning: "#b45309",
     dangerSoft: "#3f1d25",
     warningSoft: "#3f2d15",
     overlay: "rgba(2, 6, 23, 0.82)",

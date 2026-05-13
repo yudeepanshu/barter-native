@@ -41,10 +41,10 @@ export function getOfferTypeLabel(type: string) {
   }
 }
 
-export function formatTimeAgo(createdAt?: string): string {
-  if (!createdAt) return "Just now";
+export function formatTimeAgo(timestamp?: string): string {
+  if (!timestamp) return "Just now";
 
-  const createdTime = new Date(createdAt).getTime();
+  const createdTime = new Date(timestamp).getTime();
   if (Number.isNaN(createdTime)) return "Just now";
 
   const elapsedMs = Date.now() - createdTime;

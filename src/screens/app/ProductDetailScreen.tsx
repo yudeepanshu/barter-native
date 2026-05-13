@@ -406,7 +406,11 @@ export default function ProductDetailScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
-          <View style={styles.metaSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.metaSection}
+          >
             <ProductMetadata
               product={product}
               variant="detail"
@@ -417,7 +421,7 @@ export default function ProductDetailScreen() {
               fallbackDistanceLabel={previewLocationLabel}
               distanceOverrideKm={routeDistanceOverrideKm}
             />
-          </View>
+          </ScrollView>
         </View>
 
         {activeRequest && !isOwner ? (
@@ -944,6 +948,8 @@ const styles = StyleSheet.create({
     height: 1,
   },
   metaSection: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   activeRequestCard: {

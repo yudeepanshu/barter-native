@@ -241,11 +241,15 @@ const OfferCard = memo(
 
 function OtpExpiryInfo({
   expiresAt,
-  textColor,
+  themeColors,
   onExpire,
 }: {
   expiresAt: string | null;
-  textColor: string;
+  themeColors: {
+    textPrimary: string;
+    textMuted: string;
+    danger: string;
+  };
   onExpire: () => void;
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -277,13 +281,15 @@ function OtpExpiryInfo({
 
   return (
     <>
-      <Text style={[styles.feedbackText, { color: textColor, marginTop: 0 }]}>
+      <Text style={[styles.feedbackText, { color: themeColors.textMuted, marginTop: 0, textAlign: "center" }]}>
         {isExpired
-          ? "OTP expired. You can regenerate it now."
-          : `OTP generated. Time remaining ${formatRemainingDuration(remainingMs)}.`}
-      </Text>
-      <Text style={[styles.feedbackText, { color: textColor, marginTop: 0 }]}>
-        It can be regenerated after current OTP expires.
+          ? "OTP expired. Regenerate and share the new code with the seller."
+          : <>OTP expires in <Text style={{ fontWeight: '700' }}>{formatRemainingDuration(remainingMs)}</Text>. </>}
+        {!isExpired && (
+          <Text style={{ color: themeColors.danger, fontWeight: '600' }}>
+            Do not close the app or navigate away until the seller verifies.
+          </Text>
+        )}
       </Text>
     </>
   );
@@ -688,18 +694,33 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const canCancel = OPEN_STATUSES.includes(request.status) || (request.status === "ACCEPTED" && !isRequestCompleted);
   const displayStatus: RequestSummary["status"] = isRequestCompleted ? "COMPLETED" : request.status;
   const showPendingTurnDetails = OPEN_STATUSES.includes(request.status) && Boolean(request.currentTurn);
-  const acceptedTurnLabel =
-    request.status !== "ACCEPTED" || isRequestCompleted || !tx
-      ? null
-      : tx.status === "INITIATED"
-        ? isBuyer
-          ? "Your turn"
-          : "Their turn"
-        : tx.status === "IN_PROGRESS"
-          ? isBuyer
-            ? (canGenerateBuyerOtp ? "Your turn" : "Their turn")
-            : "Your turn"
-          : null;
+  const acceptedTurnLabel = (() => {
+    if (request.status !== "ACCEPTED" || isRequestCompleted) return null;
+
+    // Case 1: accepted but tx not yet created — buyer initiates
+    if (!tx) return isBuyer ? "Your turn" : "Their turn";
+
+    // Case 2: tx INITIATED — buyer goes first
+    if (tx.status === "INITIATED") return isBuyer ? "Your turn" : "Their turn";
+
+    // Case 3 & 4: tx IN_PROGRESS
+    if (tx.status === "IN_PROGRESS") {
+      // Case 4: OTP active takes priority — seller must enter it
+      const otpIsActive = !canGenerateBuyerOtp;
+      if (otpIsActive) return isBuyer ? "Their turn" : "Your turn";
+
+      // Case 3: contact reveal pending
+      if (showContactRevealSection && revealState) {
+        if (revealState.canApproveIncoming) return "Your turn";
+        if (revealState.viewerRequestStatus === "PENDING") return "Their turn";
+      }
+
+      // Default IN_PROGRESS: buyer generates OTP
+      return isBuyer ? "Your turn" : "Their turn";
+    }
+
+    return null;
+  })();
 
   const showAcceptedTurnDetails = Boolean(acceptedTurnLabel);
   const showCondition = showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
@@ -920,19 +941,25 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             </Text>
             <View style={{ gap: 6, alignItems: 'flex-end' }}>
               {!showRequestDetailsSection ? <StatusBadge status={displayStatus} /> : null}
-              {showRequestDetailsSection && (
-                <View style={{
-                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-                  backgroundColor: request.currentTurn === actorTurn ? '#dcfce7' : '#f1f5f9',
-                }}>
-                  <Text style={{
-                    fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
-                    color: request.currentTurn === actorTurn ? '#15803d' : '#64748b',
+              {showRequestDetailsSection && (() => {
+                const isYourTurn = request.status === "ACCEPTED" && acceptedTurnLabel
+                  ? acceptedTurnLabel === "Your turn"
+                  : request.currentTurn === actorTurn;
+
+                return (
+                  <View style={{
+                    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                    backgroundColor: isYourTurn ? '#dcfce7' : '#f1f5f9',
                   }}>
-                    {request.currentTurn === actorTurn ? 'YOUR TURN' : 'THEIR TURN'}
-                  </Text>
-                </View>
-              )}
+                    <Text style={{
+                      fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+                      color: isYourTurn ? '#15803d' : '#64748b',
+                    }}>
+                      {isYourTurn ? 'YOUR TURN' : 'THEIR TURN'}
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
         }
@@ -1366,9 +1393,9 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
         {showContactRevealSection ? (
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Contact Info</Text>
-            {!revealState?.contactVisible ? (
+            {!revealState?.contactVisible && revealState?.viewerRequestStatus !== "PENDING" ? (
               <View>
-                <Text style={[styles.contactInfoHint, { color: theme.colors.textMuted }]}>Contact details are not yet visible. Either party can initiate a reveal request. Once approved, both parties will be able to view each other's contact information.</Text>
+                <Text style={[styles.contactInfoHint, { color: theme.colors.textMuted }]}>Contact details hidden. Either party can request a reveal and both sides will see each other's info once approved.</Text>
               </View>
             ) : null}
 
@@ -1514,7 +1541,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             ) : null}
 
             {revealState?.viewerRequestStatus === "REJECTED" && revealState?.canRequestReveal ? (
-              <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginBottom: 4 }]}>Your previous contact reveal request was declined. You may send a new request.</Text>
+              <Text style={[styles.feedbackText, { color: theme.colors.warning, marginBottom: 4, textAlign: "center" }]}>Previous request declined. You may send a new one.</Text>
             ) : null}
           </View>
         ) : null}
@@ -1523,12 +1550,16 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
         {showTransactionSection && tx && (
           <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Finalize Exchange</Text>
-            {isBuyer ? 
-              (!generatedOtp ? <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>Generate OTP only after both parties have agreed to the final terms and are ready to complete the exchange.</Text> : null)
-            : (
-              sellerOtpActive 
-              ? <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>The buyer has generated an OTP. Enter the code here once they share it.</Text> 
-              : <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>The buyer generates the OTP. Enter the code here once they share it, then verify it to complete the exchange.</Text>
+            {isBuyer ? (
+              !generatedOtp ? (
+                <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>
+                  Generate an OTP when you're ready to exchange. Share it with the seller to complete.
+                </Text>
+              ) : null
+            ) : (
+              <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>
+                {sellerOtpActive ? "Enter the OTP shared by the buyer to complete the exchange." : "Waiting for the buyer to generate an OTP."}
+              </Text>
             )}
 
             {isBuyer ? (
@@ -1550,7 +1581,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 {generatedOtp ? (
                   <OtpExpiryInfo
                     expiresAt={generatedOtpExpiresAt}
-                    textColor={theme.colors.textMuted}
+                    themeColors={theme.colors}
                     onExpire={() => setIsGeneratedOtpExpired(true)}
                   />
                 ) : null}
@@ -1739,7 +1770,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 6,
-    marginTop: 2,
   },
   revealInfoText: {
     flex: 1,

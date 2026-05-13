@@ -37,7 +37,7 @@ const SCREEN_HEIGHT = Dimensions.get("window").height;
 const MODAL_CHROME_HEIGHT = 200;
 const FILTER_SCROLL_MAX_HEIGHT = SCREEN_HEIGHT * 0.65 - MODAL_CHROME_HEIGHT;
 
-const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", 'ACCEPTED'];
+const OPEN_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING"];
 const ALL_PRODUCTS_FILTER = "__ALL_PRODUCTS__";
 
 const ALL_REQUEST_STATUSES: RequestStatus[] = [
@@ -821,7 +821,7 @@ const RequestItem = memo(function RequestItem({
             style={[styles.itemTimeText, { color: theme.colors.textMuted }]}
             numberOfLines={1}
           >
-            {formatTimeAgo(item.createdAt)}
+            {formatTimeAgo(item.updatedAt ? item.updatedAt : item.createdAt)}
           </Text>
         </View>
 

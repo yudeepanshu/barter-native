@@ -23,16 +23,24 @@ export function ListingLocationSection({
 }: ListingLocationSectionProps) {
   const { theme } = useAppTheme();
 
+  // Hint text colour: error red when there's a field error, muted otherwise.
+  const hintColor = fieldError ? theme.colors.danger : theme.colors.textMuted;
+
   return (
-    <View style={[styles.locationModeBlock, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
+    <View style={[styles.locationModeBlock, { borderColor: fieldError ? theme.colors.danger : theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}>
       <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Location</Text>
 
       {locationName ? (
         <Text style={[styles.locationHintStrong, { color: theme.colors.textPrimary }]}>{locationName}</Text>
-      ) : <Text style={[styles.locationHint, { color: theme.colors.textMuted }]}>Attach your current device location to this listing.</Text>}
+      ) : (
+        <Text style={[styles.locationHint, { color: hintColor }]}>
+          {fieldError ?? "Attach your current device location to this listing."}
+        </Text>
+      )}
 
-      {locationWarning ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{locationWarning}</Text> : null}
-      {fieldError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{fieldError}</Text> : null}
+      {locationWarning ? (
+        <Text style={[styles.errorText, { color: theme.colors.danger }]}>{locationWarning}</Text>
+      ) : null}
 
       {hasAttachedLocation ? (
         <View style={styles.locationModeRow}>

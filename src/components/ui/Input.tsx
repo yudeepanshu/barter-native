@@ -89,6 +89,7 @@ export function Input({
             style,
           ]}
           editable={!disabled}
+          cursorColor={theme.colors.primary}
           onChangeText={(value) => {
             let next = isNumeric ? value.replace(/[^0-9]/g, "") : value;
             if (maxLength != null) next = next.slice(0, maxLength);

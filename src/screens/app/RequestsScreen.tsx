@@ -31,6 +31,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
 import { formatTimeAgo, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { formatCurrency } from "@/lib/currency";
+import { AppImage } from "@/components/ui/AppImage";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -683,7 +684,9 @@ function RequestSection({
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             renderItem={({ item: row }) =>
-              row.kind === "header" ? (
+              row.kind === "header" ? (() => {
+                const primaryImage = row.group.requests[0]?.product.productImages?.find((img) => img.isPrimary) || row.group.requests[0]?.product.productImages?.[0];
+                return (
                 <View
                   style={[
                     styles.productGroupHeader,
@@ -695,6 +698,9 @@ function RequestSection({
                     row.groupIndex > 0 ? styles.productGroupHeaderWithTopBorder : undefined,
                   ]}
                 >
+                  {primaryImage?.url && (
+                    <AppImage uri={primaryImage.url} style={styles.productGroupThumb} recyclingKey={primaryImage.url} />
+                  )}
                   <Text style={[styles.productGroupTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
                     {row.group.productTitle}
                   </Text>
@@ -702,7 +708,8 @@ function RequestSection({
                     {row.group.requests.length} request(s)
                   </Text>
                 </View>
-              ) : (
+                );
+              })() : (
                 <RequestItem
                   item={row.item}
                   router={router}
@@ -1354,13 +1361,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   itemBadgeTurnCol: {
-  alignItems: "flex-end",
-  gap: 4,
-  flexShrink: 0,
-},
+    alignItems: "flex-end",
+    gap: 4,
+    flexShrink: 0,
+  },
   itemTurnText: {
     fontSize: 11,
     fontWeight: "600",
     alignSelf: "center",
+  },
+  productGroupThumb: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    flexShrink: 0,
   },
 });

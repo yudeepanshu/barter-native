@@ -529,7 +529,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   session?.user.id === transactionQuery.data?.sellerId &&
   tx?.status === "IN_PROGRESS" &&
   (
-    !tx.otpExpiresAt || // if server doesn't send it, show the field
     new Date(tx.otpExpiresAt).getTime() > Date.now()
   );
 
@@ -1558,7 +1557,16 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
               ) : null
             ) : (
               <Text style={[styles.feedbackText, { color: theme.colors.textMuted, marginTop: 0 }]}>
-                {sellerOtpActive ? "Enter the OTP shared by the buyer to complete the exchange." : "Waiting for the buyer to generate an OTP."}
+              {sellerOtpActive ? (
+                <>
+                  <Text>{"Enter the OTP shared by the buyer to complete the exchange. "}</Text>
+                  <Text style={{ color: theme.colors.danger, fontWeight: '600' }}>
+                    Do not close the app or navigate away.
+                  </Text>
+                </>
+              ) : (
+                <Text>{"Waiting for the buyer to generate an OTP."}</Text>
+              )}
               </Text>
             )}
 

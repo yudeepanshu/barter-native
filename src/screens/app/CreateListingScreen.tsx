@@ -72,7 +72,13 @@ export default function CreateListingScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
+      // Scroll back to top.
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      // Reset step and all local error state whenever the screen comes into
+      // focus — covers re-visiting the tab after a submit or navigation event.
+      setStep(1);
+      setStep1Errors({});
+      setStep2Errors({});
     });
 
     return unsubscribe;
@@ -246,22 +252,21 @@ export default function CreateListingScreen() {
     void form.actions.submit();
   };
 
-  // Sync form-level errors that arrive after a failed submit attempt back into
-  // local step-2 error state so they are displayed and the guard stays active.
+  // Sync form-level errors into local step-2 state after a failed submit,
+  // and clear them when the form resets (fieldErrors goes back to undefined).
   useEffect(() => {
-    if (form.state.fieldErrors.minMoneyAmount) {
-      setStep2Errors((prev) => ({
-        ...prev,
-        minMoneyAmount: form.state.fieldErrors.minMoneyAmount,
-      }));
-    }
-    if (form.state.fieldErrors.images) {
-      setStep2Errors((prev) => ({
-        ...prev,
-        images: form.state.fieldErrors.images,
-      }));
-    }
-  }, [form.state.fieldErrors.minMoneyAmount, form.state.fieldErrors.images]);
+    setStep2Errors((prev) => ({
+      ...prev,
+      minMoneyAmount: form.state.fieldErrors.minMoneyAmount ?? undefined,
+    }));
+  }, [form.state.fieldErrors.minMoneyAmount]);
+
+  useEffect(() => {
+    setStep2Errors((prev) => ({
+      ...prev,
+      images: form.state.fieldErrors.images ?? undefined,
+    }));
+  }, [form.state.fieldErrors.images]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
@@ -488,12 +493,7 @@ export default function CreateListingScreen() {
                 loading={form.state.isSubmitting}
                 disabled={hasUnresolvedErrors}
               />
-              <Button label="Cancel" variant="ghost" onPress={()=> {
-                if (form.state.isSubmitting) return;
-                setStep(1);
-                setStep2Errors({});
-                form.actions.cancel();
-              }} />
+              <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
             </View>
           </>
         )}

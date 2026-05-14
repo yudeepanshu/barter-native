@@ -90,6 +90,15 @@ export function useEditListingForm(
     setLocationWarning(null);
     setFieldErrors({});
 
+    // Location is required — check before running the shared validator.
+    if (manualLatitude == null || manualLongitude == null) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        locationName: "Please select a location for your listing",
+      }));
+      return;
+    }
+
     const effectiveImageCount = existingImages.length + newImages.length;
     const validation = validateCreateListingDraft({
       title,
@@ -200,16 +209,17 @@ export function useEditListingForm(
       setManualLatitude(snapshot.latitude);
       setManualLongitude(snapshot.longitude);
 
+      // Attaching a location resolves the locationName error.
+      setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
+
       if (snapshot.locationName?.trim()) {
         setLocationName(snapshot.locationName);
-        setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
         return true;
       }
 
       const fallbackName = await reverseGeocodeCoords(snapshot.latitude, snapshot.longitude);
       if (fallbackName) {
         setLocationName(fallbackName);
-        setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
       }
 
       return true;
@@ -226,7 +236,9 @@ export function useEditListingForm(
     setManualLatitude(null);
     setManualLongitude(null);
     setLocationName("");
-    setFieldErrors((prev) => ({ ...prev, locationName: undefined }));
+    // Do NOT clear the locationName field error here — removing a location
+    // doesn't fix the "required" problem. The error stays until the user
+    // attaches a new location.
   };
 
   const setSanitizedTitle = (value: string) => setTitle(sanitizeTitleInput(value));

@@ -1,31 +1,31 @@
+import { useMemo } from "react";
 import { useColorScheme } from "react-native";
-import { useEffect, useMemo } from "react";
-import { getAppTheme, resolveThemeMode } from "@/theme/appTheme";
+import { getAppTheme } from "@/theme/appTheme";
 import { useThemeStore } from "@/lib/theme/themeStore";
- 
+
 export function useAppTheme() {
-  const systemScheme = useColorScheme();
+  const colorScheme = useColorScheme();
+
   const preference = useThemeStore((state) => state.preference);
   const setPreference = useThemeStore((state) => state.setPreference);
-  const initializeFromSystem = useThemeStore((state) => state.initializeFromSystem);
- 
-  const resolvedSystemScheme = systemScheme === "unspecified" ? null : systemScheme;
- 
-  useEffect(() => {
-    const stored = useThemeStore.getState().preference;
-    if (!stored) {
-      initializeFromSystem(resolvedSystemScheme);
-    }
-  }, [resolvedSystemScheme, initializeFromSystem]);
- 
-  const resolvedMode = resolveThemeMode(preference, resolvedSystemScheme);
+  const setToAuto = useThemeStore((state) => state.setToAuto);
+
+  const systemScheme: "light" | "dark" =
+    colorScheme === "dark" ? "dark" : "light";
+
+  const resolvedMode: "light" | "dark" =
+    preference === "auto" ? systemScheme : preference;
+
   const theme = useMemo(() => getAppTheme(resolvedMode), [resolvedMode]);
- 
+  const isAuto = preference === "auto";
+
   return {
     theme,
     preference,
     resolvedMode,
+    isAuto,
     setPreference,
+    setToAuto,
     statusBarStyle: resolvedMode === "dark" ? ("light" as const) : ("dark" as const),
   };
 }

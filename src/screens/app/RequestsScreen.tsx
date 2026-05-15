@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { StatusBar } from "expo-status-bar";
@@ -21,6 +21,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { ListControlsRow } from "@/components/filters/ListControlsRow";
 import { FilterChip } from "@/components/filters/FilterChip";
+import { AppImage } from "@/components/ui/AppImage";
 import {
   REQUESTS_SENT_MATCH_LIMIT,
   REQUESTS_SHARED_LIMIT,
@@ -29,9 +30,7 @@ import {
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
-import { formatTimeAgo, getOfferTypeLabel } from "@/lib/utils/commonUtils";
-import { formatCurrency } from "@/lib/currency";
-import { AppImage } from "@/components/ui/AppImage";
+import { RequestItem } from "./RequestItem";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -102,27 +101,15 @@ function buildProductRequestGroups(items: RequestSummary[]) {
     .sort((a, b) => b.latestUpdatedAtMs - a.latestUpdatedAtMs);
 }
 
-function getStatusBadgeStyle(status: string): { bg: string; text: string } {
-  switch (status) {
-    case "PENDING": return { bg: "#fef3c7", text: "#b45309" };
-    case "NEGOTIATING": return { bg: "#dbeafe", text: "#1d4ed8" };
-    case "ACCEPTED": return { bg: "#dcfce7", text: "#15803d" };
-    case "REJECTED": return { bg: "#fee2e2", text: "#b91c1c" };
-    case "CANCELLED": return { bg: "#f1f5f9", text: "#111827" };
-    case "COMPLETED": return { bg: "#ccfbf1", text: "#0f766e" };
-    default: return { bg: "#e2e8f0", text: "#334155" };
-  }
-}
-
 function getStatusLabel(status: RequestStatus): string {
   switch (status) {
-    case "PENDING": return "Pending";
+    case "PENDING":     return "Pending";
     case "NEGOTIATING": return "Negotiating";
-    case "ACCEPTED": return "Accepted";
-    case "REJECTED": return "Rejected";
-    case "CANCELLED": return "Cancelled";
-    case "COMPLETED": return "Completed";
-    default: return status;
+    case "ACCEPTED":    return "Accepted";
+    case "REJECTED":    return "Rejected";
+    case "CANCELLED":   return "Cancelled";
+    case "COMPLETED":   return "Completed";
+    default:            return status;
   }
 }
 
@@ -167,7 +154,7 @@ function applyRequestFilters(
 
 export default function RequestsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string; productId?: string, _t?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; productId?: string; _t?: string }>();
   const { theme, statusBarStyle } = useAppTheme();
   const session = useSession();
   const sentQuery = useRequestsQuery("sent", { limit: REQUESTS_SENT_MATCH_LIMIT });
@@ -182,13 +169,13 @@ export default function RequestsScreen() {
     params.tab === "sent" ? "sent" : "received",
   );
 
-  // ── Per-tab applied filter state ────────────────────────────────────────────
+  // ── Per-tab applied filter state ─────────────────────────────────────────────
   const [filterByTab, setFilterByTab] = useState<{ received: TabFilterState; sent: TabFilterState }>({
     received: { ...DEFAULT_TAB_FILTER },
     sent: { ...DEFAULT_TAB_FILTER },
   });
 
-  // ── Draft state (used inside the open modal before Apply is pressed) ────────
+  // ── Draft state (used inside the open modal before Apply is pressed) ─────────
   const [showProductFilterModal, setShowProductFilterModal] = useState(false);
   const [draftFilter, setDraftFilter] = useState<TabFilterState>({ ...DEFAULT_TAB_FILTER });
 
@@ -237,12 +224,7 @@ export default function RequestsScreen() {
     if (!hasCurrentTab) {
       setActiveTab(stableTabOptions[0].value);
     }
-  }, [
-    activeTab,
-    receivedQuery.isPending,
-    sentQuery.isPending,
-    stableTabOptions,
-  ]);
+  }, [activeTab, receivedQuery.isPending, sentQuery.isPending, stableTabOptions]);
 
   const isEverythingEmpty =
     !sentQuery.isPending &&
@@ -256,14 +238,12 @@ export default function RequestsScreen() {
   const currentFilter = filterByTab[activeTab];
   const actorTurn: RequestTurn = activeTab === "received" ? "SELLER" : "BUYER";
 
-  // ── Filtered groups: listing → status → turn ────────────────────────────────
+  // ── Filtered groups: listing → status → turn ─────────────────────────────────
   const filteredGroups = useMemo(() => {
-    // Step 1: listing filter
     let groups = currentFilter.productId === ALL_PRODUCTS_FILTER
       ? currentGroups
       : currentGroups.filter((g) => g.productId === currentFilter.productId);
 
-    // Step 2: status + turn filters
     groups = applyRequestFilters(groups, currentFilter.statuses, currentFilter.turn, actorTurn);
 
     return groups;
@@ -296,7 +276,7 @@ export default function RequestsScreen() {
   // Turn filter is only shown when Pending or Negotiating is explicitly selected in the draft.
   const draftHasOpenStatus = draftFilter.statuses.some((s) => OPEN_STATUSES.includes(s));
 
-  // ── Deep-link param handling ─────────────────────────────────────────────────
+  // ── Deep-link param handling ──────────────────────────────────────────────────
   useEffect(() => {
     const requestedProductId = typeof params.productId === "string" ? params.productId : null;
     if (!requestedProductId) return;
@@ -335,7 +315,7 @@ export default function RequestsScreen() {
     setDraftFilter({ ...DEFAULT_TAB_FILTER });
   };
 
-  // ── Draft helpers ────────────────────────────────────────────────────────────
+  // ── Draft helpers ─────────────────────────────────────────────────────────────
   const toggleDraftStatus = (status: RequestStatus) => {
     setDraftFilter((prev) => {
       const exists = prev.statuses.includes(status);
@@ -343,7 +323,6 @@ export default function RequestsScreen() {
         ? prev.statuses.filter((s) => s !== status)
         : [...prev.statuses, status];
 
-      // If no open statuses remain explicitly selected, clear the turn filter.
       const nextHasOpenStatus = nextStatuses.some((s) => OPEN_STATUSES.includes(s));
 
       return {
@@ -459,7 +438,7 @@ export default function RequestsScreen() {
           ) : null}
         </View>
 
-        {/* ── Filter Modal ──────────────────────────────────────────────────── */}
+        {/* ── Filter Modal ───────────────────────────────────────────────────── */}
         <Modal
           visible={showProductFilterModal}
           transparent
@@ -485,11 +464,6 @@ export default function RequestsScreen() {
                 </Pressable>
               </View>
 
-              {/*
-                Scrollable filter sections — capped at FILTER_SCROLL_MAX_HEIGHT.
-                When content is short, ScrollView shrinks naturally.
-                When content overflows, scroll kicks in without growing past 65% screen.
-              */}
               <View style={[styles.filterScrollWrapper, { maxHeight: FILTER_SCROLL_MAX_HEIGHT }]}>
                 <ScrollView
                   contentContainerStyle={styles.filterScrollContentContainer}
@@ -615,6 +589,7 @@ function RequestSection({
   sessionUserId: string;
 }) {
   const { theme } = useAppTheme();
+
   const flattenedRows = useMemo(() => {
     return groups.flatMap((group, groupIndex) => [
       {
@@ -685,29 +660,38 @@ function RequestSection({
             keyboardShouldPersistTaps="handled"
             renderItem={({ item: row }) =>
               row.kind === "header" ? (() => {
-                const primaryImage = row.group.requests[0]?.product.productImages?.find((img) => img.isPrimary) || row.group.requests[0]?.product.productImages?.[0];
+                const primaryImage =
+                  row.group.requests[0]?.product.productImages?.find((img) => img.isPrimary) ||
+                  row.group.requests[0]?.product.productImages?.[0];
                 return (
-                <View
-                  style={[
-                    styles.productGroupHeader,
-                    {
-                      borderBottomColor: theme.colors.border,
-                      borderTopColor: theme.colors.border,
-                      backgroundColor: theme.colors.surface,
-                    },
-                    row.groupIndex > 0 ? styles.productGroupHeaderWithTopBorder : undefined,
-                  ]}
-                >
-                  {primaryImage?.url && (
-                    <AppImage uri={primaryImage.url} style={styles.productGroupThumb} recyclingKey={primaryImage.url} />
-                  )}
-                  <Text style={[styles.productGroupTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {row.group.productTitle}
-                  </Text>
-                  <Text style={[styles.productGroupCount, { color: theme.colors.textMuted }]}>
-                    {row.group.requests.length} request(s)
-                  </Text>
-                </View>
+                  <View
+                    style={[
+                      styles.productGroupHeader,
+                      {
+                        borderBottomColor: theme.colors.border,
+                        borderTopColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                      row.groupIndex > 0 ? styles.productGroupHeaderWithTopBorder : undefined,
+                    ]}
+                  >
+                    {primaryImage?.url && (
+                      <AppImage
+                        uri={primaryImage.url}
+                        style={styles.productGroupThumb}
+                        recyclingKey={primaryImage.url}
+                      />
+                    )}
+                    <Text
+                      style={[styles.productGroupTitle, { color: theme.colors.textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {row.group.productTitle}
+                    </Text>
+                    <Text style={[styles.productGroupCount, { color: theme.colors.textMuted }]}>
+                      {row.group.requests.length} request(s)
+                    </Text>
+                  </View>
                 );
               })() : (
                 <RequestItem
@@ -729,182 +713,6 @@ function RequestSection({
     </View>
   );
 }
-
-// ── RequestItem ────────────────────────────────────────────────────────────────
-
-// function getStatusBorderColor(
-//   status: RequestSummary["status"],
-//   isCompleted: boolean,
-//   colors: ReturnType<typeof useAppTheme>["theme"]["colors"]
-// ): string {
-//   if (isCompleted) return "#16a34a"; // green
-//   switch (status) {
-//     case "PENDING":
-//     case "ACCEPTED":
-//       return colors.primary;       // brand blue – active/open
-//     case "CANCELLED":
-//       return colors.border;        // neutral grey
-//     default:
-//       return colors.border;
-//   }
-// }
-
-const RequestItem = memo(function RequestItem({
-  item,
-  router,
-  actorTurn,
-  sessionUserId,
-}: {
-  item: RequestSummary;
-  router: ReturnType<typeof useRouter>;
-  actorTurn: RequestTurn;
-  sessionUserId: string;
-}) {
-  const { theme } = useAppTheme();
-
-  const activeOffer = item.offers[item.offers.length - 1];
-  const isExchangeFinalized = item.product.status === "EXCHANGED";
-  const isRequestCompleted =
-    item.status === "COMPLETED" ||
-    (item.status === "ACCEPTED" && isExchangeFinalized);
-  const displayStatus: RequestSummary["status"] = isRequestCompleted
-    ? "COMPLETED"
-    : item.status;
-  const showTurn =
-    OPEN_STATUSES.includes(item.status) && Boolean(item.currentTurn);
-  const isMyTurn = item.currentTurn === actorTurn;
-  const isBuyer = sessionUserId === item.buyerId;
-  const requestedByLabel = isBuyer
-    ? "You"
-    : item.buyer.userName?.trim() || "Unknown";
-  const initials = requestedByLabel
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-
-  // Offer display
-  const hasOffer =
-    activeOffer?.type && activeOffer.type !== "NONE";
-  const isTrade = activeOffer?.type === "PRODUCT" || activeOffer?.type === "MIXED";
-  const offerLabel = hasOffer ? getOfferTypeLabel(activeOffer.type) : "N/A";
-  const offerAmount =
-    hasOffer && activeOffer.offeredAmount != null
-      ? formatCurrency(activeOffer.offeredAmount)
-      : null;
-
-  return (
-    <Pressable
-      style={styles.itemCardPressable}
-      onPress={() => router.push(`/(app)/requests/${item.id}`)}
-    >
-      <View
-        style={[
-          styles.itemCard,
-              {
-                borderColor: theme.mode === "dark"
-                  ? "rgba(255,255,255,0.12)"   // soft luminous white glow in dark
-                  : "rgba(0,0,0,0.10)",        // subtle shadow-like border in light
-                backgroundColor: theme.colors.surfaceMuted,
-              },
-        ]}
-      >
-      {/* ── Top row: avatar · name/time · badge+turn column ── */}
-      <View style={styles.itemTopRow}>
-        <View style={[styles.itemAvatar, { backgroundColor: theme.colors.surface ?? "#e0e7ff" }]}>
-          <Text style={[styles.itemAvatarText, { color: theme.colors.primary }]}>{initials}</Text>
-        </View>
-
-        <View style={styles.itemNameTimeCol}>
-          <Text
-            style={[styles.itemUserName, { color: theme.colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {requestedByLabel}
-          </Text>
-          <Text
-            style={[styles.itemTimeText, { color: theme.colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {formatTimeAgo(item.updatedAt ? item.updatedAt : item.createdAt)}
-          </Text>
-        </View>
-
-        {/* Badge + turn stacked in a column on the right */}
-        <View style={styles.itemBadgeTurnCol}>
-          <View style={[
-            styles.badgeWrap,
-            {
-              backgroundColor: getStatusBadgeStyle(displayStatus).bg,
-              borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
-              borderColor: displayStatus === "CANCELLED" ? theme.colors.border : "transparent",
-            },
-          ]}>
-            <Text
-              style={[styles.badgeText, { color: getStatusBadgeStyle(displayStatus).text }]}
-              numberOfLines={1}
-            >
-              {getStatusLabel(displayStatus)}
-            </Text>
-          </View>
-
-          {showTurn && (
-            <Text style={[
-              styles.itemTurnText,
-              { color: isMyTurn ? "#16a34a" : theme.colors.textSecondary },
-            ]}>
-              {isMyTurn ? "Your turn" : "Their turn"}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {/* ── Bottom block: offer row only ── */}
-      {hasOffer && (
-        <View style={[styles.itemBottomBlock, { borderTopColor: theme.colors.border }]}>
-          <View style={styles.itemOfferInline}>
-            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>
-              Latest offer:
-            </Text>
-            <View style={styles.itemOfferValue}>
-              {isTrade && (
-                <Feather
-                  name="repeat"
-                  size={12}
-                  color={theme.colors.textPrimary}
-                  style={{ marginRight: 3 }}
-                />
-              )}
-              {isTrade && (
-                <Text
-                  style={[styles.detailValue, { color: theme.colors.textPrimary }]}
-                  numberOfLines={1}
-                >
-                  {offerLabel === 'CASH + TRADE' ? 'TRADE' : offerLabel}
-                </Text>
-              )}
-              {isTrade && offerAmount != null && (
-                <Feather name="plus" size={11} color={theme.colors.textMuted} />
-              )}
-              {offerAmount != null && (
-                <Text
-                  style={[styles.detailValue, { color: theme.colors.textPrimary }]}
-                  numberOfLines={1}
-                >
-                  {offerAmount}
-                </Text>
-              )}
-            </View>
-            <Feather name="chevron-right" size={14} color={theme.colors.textMuted} />
-          </View>
-        </View>
-      )}
-      </View>
-    </Pressable>
-  );
-});
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -963,14 +771,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   emptyText: { fontSize: 13, textAlign: "center" },
-  listWrap: { gap: 8 },
   listWrapFlatlist: { flex: 1, minHeight: 0 },
-  groupList: {
-    gap: 8,
-  },
-  groupScrollContent: {
-    gap: 8,
-  },
   productGroupHeader: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -981,9 +782,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8,
   },
-  productGroupHeaderWithTopBorder: {
-    // Gap is handled by FlatList contentContainerStyle
-  },
+  productGroupHeaderWithTopBorder: {},
   productGroupTitle: {
     flex: 1,
     fontSize: 14,
@@ -993,149 +792,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  // itemCard: {
-  //   borderWidth: 1,
-  //   borderRadius: 12,
-  //   padding: 12,
-  //   gap: 8,
-  // },
-  itemCardPressable: {
-    opacity: 1,
+  productGroupThumb: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    flexShrink: 0,
   },
-  itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
-  itemTitle: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: "700" },
-  detailsBlock: {
-    gap: 7,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  // detailLabel: {
-  //   fontSize: 12,
-  //   fontWeight: "600",
-  //   width: 90,
-  // },
-  statusLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 16,
-  },
-  // detailValue: {
-  //   flex: 1,
-  //   fontSize: 12,
-  //   fontWeight: "700",
-  //   textAlign: "right",
-  // },
-  // badgeWrap: {
-  //   paddingHorizontal: 8,
-  //   paddingVertical: 3,
-  //   borderRadius: 8,
-  //   overflow: "hidden",
-  //   flexShrink: 0,
-  // },
-  // badgeText: { fontSize: 11, fontWeight: "700" },
-  metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
-  metaPill: { fontSize: 12, fontWeight: "500" },
-  metaDot: { fontSize: 11 },
-  metaText: { fontSize: 12 },
-  contactCardRow: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
-    gap: 3,
-    position: "relative",
-  },
-  eyeButton: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  messageText: { marginTop: 2, fontSize: 13, fontStyle: "italic" },
-  actions: { marginTop: 8, gap: 8 },
-  actionPillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  actionPill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    minHeight: 32,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  actionPillText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  actionPillDisabled: {
-    opacity: 0.6,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    alignItems: "center",
-    gap: 8,
-  },
-  actionCell: {
-    flex: 1,
-    minWidth: 0,
-  },
-  actionRowSecondary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  actionRowTertiary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  actionSecondaryCell: {
-    flex: 1,
-    minWidth: 0,
-  },
-  counterCard: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-  },
-  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  modeChip: { flex: 1, minWidth: 0 },
-  offerWrap: { gap: 6 },
-  offerList: { gap: 8, paddingRight: 8 },
-  offerChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  offerChipActive: {},
-  offerChipText: { fontSize: 12, fontWeight: "600" },
-  offerChipTextActive: {},
-  transactionCard: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-  },
-  transactionTitle: { fontSize: 13, fontWeight: "700" },
-  otpText: { fontSize: 15, fontWeight: "700" },
   filterModalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1166,12 +828,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 4,
   },
-  filterSectionHint: {
-    fontSize: 11,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-    marginTop: -4,
-  },
   filterModalHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1180,21 +836,6 @@ const styles = StyleSheet.create({
   filterModalTitle: {
     fontSize: 18,
     fontWeight: "800",
-  },
-  filterOption: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  filterOptionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
   },
   filterActionRow: {
     flexDirection: "row",
@@ -1219,161 +860,5 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 4,
     marginBottom: 4,
-  },
-
-
-  // itemTopRow: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   gap: 8,
-  // },
-  itemAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  itemAvatarText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  // itemUserName: {
-  //   flex: 1,
-  //   fontSize: 13,
-  //   fontWeight: "600",
-  // },
-  // itemBottomBlock: {
-  //   borderTopWidth: 0.5,
-  //   paddingTop: 8,
-  //   gap: 8,
-  // },
-  // itemTurnRow: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   justifyContent: "space-between",
-  // },
-  // itemOfferInline: {
-  //   flex: 1,
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   justifyContent: "space-between",
-  //   gap: 6,
-  //   minWidth: 0,
-  // },
-  // itemOfferValue: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   gap: 5,
-  //   flexShrink: 1,
-  //   minWidth: 0,
-  // },
-  // itemOfferDot: {
-  //   width: 3,
-  //   height: 3,
-  //   borderRadius: 2,
-  //   flexShrink: 0,
-  // },
-  itemTurnPill: {
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    flexShrink: 0,
-    flexGrow: 0,
-  },
-  // itemTurnText: {
-  //   fontSize: 11,
-  //   fontWeight: "600",
-  // },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    flexShrink: 0,
-  },
-  detailValue: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-  badgeWrap: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  badgeText: { fontSize: 11, fontWeight: "700" },
-  itemCard: {
-    borderWidth: 1.5,          // slightly thicker so the colour reads clearly
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  itemTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  itemNameTimeCol: {
-    flex: 1,
-    minWidth: 0,
-    gap: 1,
-  },
-  itemUserName: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  itemTimeText: {
-    fontSize: 11,
-    fontWeight: "400",
-  },
-  itemBottomBlock: {
-    borderTopWidth: 0.5,
-    paddingTop: 8,
-    gap: 6,
-  },
-  itemOfferInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 6,
-  },
-  itemOfferValue: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  itemOfferDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    flexShrink: 0,
-  },
-  itemTurnRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  itemBadgeTurnCol: {
-    alignItems: "flex-end",
-    gap: 4,
-    flexShrink: 0,
-  },
-  itemTurnText: {
-    fontSize: 11,
-    fontWeight: "600",
-    alignSelf: "center",
-  },
-  productGroupThumb: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    flexShrink: 0,
   },
 });

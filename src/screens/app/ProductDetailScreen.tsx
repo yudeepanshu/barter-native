@@ -31,7 +31,6 @@ import { getContextTag, getTopTypeTag, ProductTag } from "@/components/products/
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { OfferComposerForm } from "@/components/requests/OfferComposerForm";
-import { StatusBadge } from "@/components/requests/StatusBadge";
 import { AppImage } from "@/components/ui/AppImage";
 import { MenuHeader } from "@/components/ui/MenuHeader";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -45,6 +44,7 @@ import { ReportProductModal } from "@/components/products/ReportProductModal";
 import { resolveImageBadge } from "@/components/products/ProductCard";
 import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 import { ProductImageCarousel } from "@/components/products/ProductImageCarousel";
+import { RequestItem } from "./RequestItem";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -118,14 +118,12 @@ export default function ProductDetailScreen() {
     setReportModalVisible(false);
     dialog.alert("Report Submitted", "Thank you for your report. We will review this listing shortly.");
 
-    // Fire and forget — invalidation on success will update viewerHasReported
     reportProduct(payload, {
       onError: () => {
         dialog.alert("Failed", "Something went wrong. Please try again.");
       },
     });
   };
-
 
   const activeRequest = useMemo(() => {
     if (isOwner || !productData) {
@@ -230,8 +228,12 @@ export default function ProductDetailScreen() {
               <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
                 {product.title}
               </Text>
-              <View style={{ gap: 6, alignItems: 'flex-end' }}>
-                <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" style={{ alignSelf: "center" }} />
+              <View style={{ gap: 6, alignItems: "flex-end" }}>
+                <ProductTag
+                  tag={typeTag.label === "Cash Only" ? { ...typeTag, label: formatCurrency(product.minMoneyAmount ?? 0) } : typeTag}
+                  variant="top-text"
+                  style={{ alignSelf: "center" }}
+                />
               </View>
             </View>
           ) : null
@@ -381,6 +383,7 @@ export default function ProductDetailScreen() {
               </View>
             </View>
           ) : null}
+
           <ProductImageCarousel
             product={product}
             contextTag={contextTag}
@@ -389,6 +392,7 @@ export default function ProductDetailScreen() {
             theme={theme}
             resolveImageBadge={resolveImageBadge}
           />
+
           <View
             style={[
               styles.listedOnCard,
@@ -424,6 +428,7 @@ export default function ProductDetailScreen() {
           </ScrollView>
         </View>
 
+        {/* ── Active request card ─────────────────────────────────────────────── */}
         {activeRequest && !isOwner ? (
           <View
             style={[
@@ -434,30 +439,39 @@ export default function ProductDetailScreen() {
               },
             ]}
           >
-            <Text style={[styles.activeRequestTitle, { color: theme.colors.textPrimary }]}>Your active request</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <StatusBadge status={activeRequest.status} text="Status: " />
-              {product.status === "INACTIVE" ? <Text style={[styles.activeRequestStatus, { color: theme.colors.textSecondary }]}>• Product is now inactive</Text> : null}
-            </View>
-            <Button
-              label="View request"
-              variant="primary"
-              onPress={() => router.push(`/(app)/requests/${activeRequest.id}`)}
+            <Text style={[styles.activeRequestTitle, { color: theme.colors.textPrimary }]}>
+              Your active request
+            </Text>
+
+            {product.status === "INACTIVE" ? (
+              <Text style={[styles.activeRequestInactiveNote, { color: theme.colors.textSecondary }]}>
+                Product is now inactive
+              </Text>
+            ) : null}
+
+            {/* Reuse RequestItem — actorTurn is BUYER since this is the sender's view */}
+            <RequestItem
+              item={activeRequest}
+              router={router}
+              actorTurn="BUYER"
+              sessionUserId={session?.user.id ?? ""}
             />
           </View>
         ) : null}
 
-          {session && !activeRequest ? (
-            <RequestComposer
-              product={product}
-              sessionUserId={session.user.id}
-              initialOfferedProductId={offeredProductId}
-            />
-          ) : null}
+        {session && !activeRequest ? (
+          <RequestComposer
+            product={product}
+            sessionUserId={session.user.id}
+            initialOfferedProductId={offeredProductId}
+          />
+        ) : null}
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
+
+// ── RequestComposer ────────────────────────────────────────────────────────────
 
 function RequestComposer({
   product,
@@ -571,8 +585,7 @@ function RequestComposer({
           setFeedback("Amount cannot exceed 15 crore.");
           return;
         }
-        
-        // Validate against minimum only when listing accepts money offers
+
         if (
           product.requestByMoney &&
           effectiveMinMoneyAmount != null &&
@@ -590,13 +603,14 @@ function RequestComposer({
         return;
       }
 
-      const offerType = wantsMoney && wantsProduct
-        ? "MIXED"
-        : wantsMoney
-          ? "MONEY"
-          : wantsProduct
-            ? "PRODUCT"
-            : "NONE";
+      const offerType =
+        wantsMoney && wantsProduct
+          ? "MIXED"
+          : wantsMoney
+            ? "MONEY"
+            : wantsProduct
+              ? "PRODUCT"
+              : "NONE";
 
       const result = await createRequestMutation.mutateAsync({
         productId: product.id,
@@ -648,15 +662,17 @@ function RequestComposer({
     >
       <View style={styles.requestTitleRow}>
         <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
-        <InfoTooltip text={
-          product.isFree
-            ? "This listing is marked as free. You can only send a request without offering money or a product for trade. Deselect both if you'd like."
-            : supportOnlyMoneyOffers
-              ? "This listing only accepts cash offers. Enter the amount you'd like to offer"
-              : supportsMixedOffers
-                ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
-                : "This listing accepts a trade offer. You must include at least one of your listings in the request."
-        } />
+        <InfoTooltip
+          text={
+            product.isFree
+              ? "This listing is marked as free. You can only send a request without offering money or a product for trade. Deselect both if you'd like."
+              : supportOnlyMoneyOffers
+                ? "This listing only accepts cash offers. Enter the amount you'd like to offer"
+                : supportsMixedOffers
+                  ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
+                  : "This listing accepts a trade offer. You must include at least one of your listings in the request."
+          }
+        />
       </View>
 
       {!requestable ? (
@@ -689,7 +705,7 @@ function RequestComposer({
             setIncludeProduct((prev) => !prev);
           }}
           showAmountField={wantsMoney}
-          amountLabel={`Offer amount`}
+          amountLabel="Offer amount"
           amount={amount}
           onChangeAmount={setAmount}
           amountPlaceholder="Enter amount"
@@ -706,8 +722,8 @@ function RequestComposer({
                   : Number(amount) <= 0
                     ? "Amount must be greater than zero"
                     : product.requestByMoney &&
-                      effectiveMinMoneyAmount != null &&
-                      Number(amount) < effectiveMinMoneyAmount
+                        effectiveMinMoneyAmount != null &&
+                        Number(amount) < effectiveMinMoneyAmount
                       ? `Amount is below the minimum of ${formatCurrency(effectiveMinMoneyAmount)}`
                       : undefined
                 : "Please enter a valid amount"
@@ -718,7 +734,9 @@ function RequestComposer({
           offerableProducts={ownOfferableProducts}
           selectedProductIds={offeredProductIds}
           onToggleProduct={toggleOfferedProduct}
-          selectedProductsHint={offeredProductIds.length > 0 ? `${offeredProductIds.length} listing(s) selected.` : undefined}
+          selectedProductsHint={
+            offeredProductIds.length > 0 ? `${offeredProductIds.length} listing(s) selected.` : undefined
+          }
           showVisibleProductSelector={wantsProduct && ownOfferableProducts.length > 0}
           visibleProductSelectorLabel="Show for consideration"
           visibleProducts={visibleOwnProducts}
@@ -732,10 +750,12 @@ function RequestComposer({
                   { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
                 ]}
               >
-                <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>No listing to offer yet.</Text>
+                <Text style={[styles.emptyOfferTitle, { color: theme.colors.textPrimary }]}>
+                  No listing to offer yet.
+                </Text>
                 {hasOwnedProductsButNoneListed ? (
                   <>
-                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
+                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
                       You already have products, but none are currently listed.
                     </Text>
                     <View style={styles.emptyOfferActions}>
@@ -758,7 +778,7 @@ function RequestComposer({
                   </>
                 ) : (
                   <>
-                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}> 
+                    <Text style={[styles.emptyOfferText, { color: theme.colors.textMuted }]}>
                       Create one by clicking the "Create listing" button.
                     </Text>
                     <Button
@@ -777,9 +797,7 @@ function RequestComposer({
             )
           }
           loadingProductsText={
-            ownProductsQuery.query.isPending
-              ? "Loading your listings..."
-              : undefined
+            ownProductsQuery.query.isPending ? "Loading your listings..." : undefined
           }
           message={message}
           onChangeMessage={setMessage}
@@ -796,6 +814,8 @@ function RequestComposer({
     </View>
   );
 }
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -956,24 +976,23 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 14,
     padding: 16,
-    gap: 12,
+    gap: 10,
   },
   activeRequestTitle: {
     fontSize: 16,
     fontWeight: "700",
   },
-  activeRequestStatus: {
-    fontSize: 13,
+  activeRequestInactiveNote: {
+    fontSize: 12,
     fontWeight: "500",
-    opacity: 0.9,
   },
   listedOnCard: {},
   listedOnRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,         
-    opacity: 0.9,  
+    gap: 8,
+    opacity: 0.9,
   },
   listedOnLabel: {
     fontSize: 11,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
+import { Button } from "../ui/Button";
 
 interface SessionCardProps {
   user: AuthUser;
@@ -98,33 +99,17 @@ export function SessionCard({
         <Row label="Phone" value={user.mobileNumber ?? "—"} />
       </View>
 
-      <Pressable
-        key={`signout-${theme.mode}`}
-        onPress={() => {
+      <Button
+        label="Sign out"
+        onPress={()=> {
           if (!isSigningOut) {
             onSignOut();
           }
         }}
+        variant="ghost"
         disabled={isSigningOut}
-        accessibilityRole="button"
-        android_ripple={{ color: theme.mode === "dark" ? "rgba(148, 163, 184, 0.18)" : "rgba(15, 23, 42, 0.08)" }}
-        style={({ pressed }) => [
-          styles.signOutButton,
-          {
-            borderColor: theme.colors.border,
-            borderRadius: theme.roundness - 4,
-            backgroundColor: theme.colors.surfaceMuted,
-            opacity: isSigningOut ? 0.86 : pressed ? 0.94 : 1,
-            transform: [{ scale: pressed ? 0.99 : 1 }],
-          },
-        ]}
-      >
-        {isSigningOut ? (
-          <ActivityIndicator size={18} color={theme.colors.textMuted} />
-        ) : (
-          <Text style={[styles.signOutLabel, { color: theme.colors.textPrimary }]}>Sign out</Text>
-        )}
-      </Pressable>
+        loading={isSigningOut}
+      />
     </View>
   );
 }

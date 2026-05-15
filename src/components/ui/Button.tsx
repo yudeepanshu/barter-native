@@ -10,8 +10,40 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import type { AppTheme } from "@/theme/appTheme";
 
-type Variant = "primary" | "success" | "ghost";
+type Variant = "primary" | "success" | "ghost" | "tertiary";
+
+interface ResolvedButtonConfig {
+  backgroundColor: string;
+  pressedBackgroundColor: string;
+  borderColor: string;
+  borderWidth: number;
+  labelColor: string;
+  loadingColor: string;
+  rippleColor: string;
+}
+
+function getButtonConfig(
+  variant: Variant,
+  theme: AppTheme,
+  isDisabled: boolean,
+  textColor?: string,
+): ResolvedButtonConfig {
+  const base = theme.buttons[variant];
+
+  const labelColor = textColor ?? (isDisabled ? theme.colors.textMuted : base.labelColor);
+
+  return {
+    ...base,
+    labelColor,
+    loadingColor: labelColor,
+    rippleColor:
+      theme.mode === "dark"
+        ? "rgba(148, 163, 184, 0.18)"
+        : "rgba(15, 23, 42, 0.08)",
+  };
+}
 
 interface ButtonProps {
   label: string;
@@ -39,53 +71,39 @@ export function Button({
   const isDisabled = disabled || loading;
   const { theme } = useAppTheme();
 
-  const backgroundColor =
-    variant === "ghost"
-      ? theme.colors.surfaceMuted
-      : variant === "success"
-        ? theme.colors.success
-        : theme.colors.primary;
-  const borderColor = variant === "ghost" ? theme.colors.border : "transparent";
-  const labelColor =
-    textColor ??
-    (variant === "ghost"
-      ? isDisabled
-        ? theme.colors.textMuted
-        : theme.colors.textPrimary
-      : variant === "success"
-        ? theme.colors.onSuccess
-        : theme.colors.onPrimary);
-  const loadingColor = labelColor;
+  const config = getButtonConfig(variant, theme, isDisabled, textColor);
 
   return (
     <Pressable
       onPress={() => {
-        if (!isDisabled) {
-          onPress();
-        }
+        if (!isDisabled) onPress();
       }}
       disabled={isDisabled}
       accessibilityRole="button"
-      android_ripple={{ color: theme.mode === "dark" ? "rgba(148, 163, 184, 0.18)" : "rgba(15, 23, 42, 0.08)" }}
+      android_ripple={{ color: config.rippleColor }}
       style={({ pressed }) => [
         styles.base,
         {
           borderRadius: theme.roundness - 4,
-          opacity: isDisabled ? 0.86 : pressed ? 0.94 : 1,
+          opacity: isDisabled ? 0.86 : 1,
           transform: [{ scale: pressed ? 0.99 : 1 }],
-          backgroundColor,
-          borderColor,
-          borderWidth: variant === "ghost" ? 1 : 0,
+          backgroundColor: pressed
+            ? config.pressedBackgroundColor
+            : config.backgroundColor,
+          borderColor: config.borderColor,
+          borderWidth: config.borderWidth,
         },
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator size={18} color={loadingColor} />
+        <ActivityIndicator size={18} color={config.loadingColor} />
       ) : (
         <View style={styles.content}>
           {leftIcon ? <View style={styles.iconWrap}>{leftIcon}</View> : null}
-          <Text style={[styles.label, { color: labelColor }, labelStyle]}>
+          <Text
+            style={[styles.label, { color: config.labelColor }, labelStyle]}
+          >
             {label}
           </Text>
         </View>

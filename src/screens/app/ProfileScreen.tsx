@@ -37,7 +37,7 @@ import { AppCard } from "@/components/ui/AppCard";
 import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 
@@ -406,6 +406,43 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
   );
 }
 
+const AutoChip = () => {
+  const { theme, isAuto, setToAuto, setPreference, resolvedMode } = useAppTheme();
+
+  const handlePress = () => {
+    if (isAuto) {
+      setPreference(resolvedMode);
+    } else {
+      setToAuto();
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [
+        {
+          opacity: pressed ? 0.8 : 1,
+          width: 30,
+          height: 30,
+          borderRadius: 20,
+          borderWidth: isAuto ? 1 : 0,
+          backgroundColor: isAuto ? theme.colors.primary : theme.colors.surfaceMuted,
+          borderColor: "transparent",
+          alignItems: "center" as const,
+          justifyContent: "center" as const,
+        },
+      ]}
+    >
+      <Feather
+        name={resolvedMode === "dark" ? "moon" : "sun"}
+        size={16}
+        color={isAuto ? theme.colors.onPrimary : theme.colors.textMuted}
+      />
+    </Pressable>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Helpers (unchanged from original)
 // ---------------------------------------------------------------------------
@@ -444,7 +481,7 @@ export default function ProfileScreen() {
   const profileQuery = useProfileQuery(status === "authenticated");
   const { signOut, busy } = useOtpAuth();
   const updateProfileMutation = useUpdateProfileMutation();
-  const { theme, statusBarStyle, preference, resolvedMode, setPreference } = useAppTheme();
+  const { theme, statusBarStyle, preference, isAuto, resolvedMode, setPreference } = useAppTheme();
   const navigation = useNavigation();
   const dialog = useAppDialog();
   const sessionUser = session?.user ?? null;
@@ -716,8 +753,17 @@ export default function ProfileScreen() {
           />
         }
       >
-        <AppCard title="Appearance" subtitle={`Currently using ${resolvedMode} mode.`}>
-          <SegmentedControl value={preference} options={THEME_OPTIONS} onChange={setPreference} />
+        <AppCard
+          title="Appearance"
+          subtitle={isAuto ? "Following system theme." : `Currently using ${resolvedMode} mode.`}
+          rightSlot={<AutoChip />}
+        >
+          <SegmentedControl
+            value={preference}
+            options={THEME_OPTIONS}
+            onChange={setPreference}
+            disabled={isAuto}
+          />
         </AppCard>
 
         {profileQuery.isPending ? (
@@ -1288,5 +1334,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     textDecorationLine: "underline",
+  },
+  autoChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  autoChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
 });

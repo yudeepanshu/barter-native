@@ -1,5 +1,13 @@
-export type ThemePreference = "light" | "dark";
-export type ResolvedThemeMode = "light" | "dark";
+export type ThemePreference = "light" | "dark" | "auto";
+export type ResolvedThemeMode = "light" | "dark" | "auto";
+
+interface ButtonConfig {
+  backgroundColor: string;
+  pressedBackgroundColor: string;
+  borderColor: string;
+  borderWidth: number;
+  labelColor: string;
+}
 
 export interface AppTheme {
   mode: ResolvedThemeMode;
@@ -37,6 +45,12 @@ export interface AppTheme {
       elevation: number;
     };
   };
+  buttons: {
+    primary: ButtonConfig;
+    success: ButtonConfig;
+    ghost: ButtonConfig;
+    tertiary: ButtonConfig;
+  }
 }
 
 const sharedShadow = {
@@ -79,6 +93,36 @@ export const lightTheme: AppTheme = {
       shadowOpacity: 0.08,
     },
   },
+  buttons: {
+    primary: {
+      backgroundColor: "#111827",
+      pressedBackgroundColor: "#030712",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#f9fafb",
+    },
+    success: {
+      backgroundColor: "#f97316",
+      pressedBackgroundColor: "#f97316",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#fff7ed",
+    },
+    ghost: {
+      backgroundColor: "transparent",
+      pressedBackgroundColor: "#dbe3ee",  // was #eef2f7 — now uses border color as pressed fill
+      borderColor: "#ccd8e9",             // was #dbe3ee — stronger, slate-gray border
+      borderWidth: 1,
+      labelColor: "#0f172a",              // was #334155 — bump to textPrimary for contrast
+    },
+    tertiary: {
+      backgroundColor: "transparent",
+      pressedBackgroundColor: "#eef2f7",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#64748b",
+    },
+  },
 };
 
 export const darkTheme: AppTheme = {
@@ -112,6 +156,36 @@ export const darkTheme: AppTheme = {
     card: {
       ...sharedShadow,
       shadowOpacity: 0.28,
+    },
+  },
+  buttons: {
+    primary: {
+      backgroundColor: "#f8fafc",
+      pressedBackgroundColor: "#e2e8f0",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#0f172a",
+    }, 
+    success: {
+      backgroundColor: "#fb923c",
+      pressedBackgroundColor: "#fb923c",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#111827",
+    },
+    ghost: {
+      backgroundColor: "transparent",
+      pressedBackgroundColor: "#253247",  // unchanged, already fine
+      borderColor: "#3f4b5c",             // was #253247 — lighter, more visible against dark bg
+      borderWidth: 0.7,
+      labelColor: "#f8fafc",             // unchanged
+    },
+    tertiary: {
+      backgroundColor: "transparent",
+      pressedBackgroundColor: "#1e293b",
+      borderColor: "transparent",
+      borderWidth: 0,
+      labelColor: "#cbd5e1",
     },
   },
 };

@@ -10,12 +10,14 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   options: SegmentOption<T>[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: SegmentedControlProps<T>) {
   const { theme } = useAppTheme();
 
@@ -27,8 +29,10 @@ export function SegmentedControl<T extends string>({
           backgroundColor: theme.colors.surfaceMuted,
           borderColor: theme.colors.border,
           borderRadius: theme.roundness - 2,
+          opacity: disabled ? 0.45 : 1,
         },
       ]}
+      pointerEvents={disabled ? "none" : "auto"}
     >
       {options.map((option) => {
         const isActive = option.value === value;

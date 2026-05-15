@@ -468,7 +468,7 @@ export default function CreateListingScreen() {
                     ]}
                     hitSlop={8}
                   >
-                    <Text style={{ color: theme.colors.textSecondary }}>Tap to add Images.</Text>
+                    <Text style={{ color: theme.colors.textSecondary, fontWeight: "500" }}>Tap to add Images</Text>
                   </Pressable>
                 )}
                 {step2Errors.images ? (

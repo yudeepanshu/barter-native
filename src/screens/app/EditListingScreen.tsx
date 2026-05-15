@@ -252,7 +252,7 @@ function EditListingFormSection({
                 style={[styles.emptyImagesCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }]}
                 hitSlop={8}
               >
-                <Text style={{ color: theme.colors.textSecondary }}>Tap to add Images.</Text>
+                <Text style={{ color: theme.colors.textSecondary, fontWeight: "500" }}>Tap to add Images</Text>
               </Pressable>
             )}
             {form.state.fieldErrors.images ? (

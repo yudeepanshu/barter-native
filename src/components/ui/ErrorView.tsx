@@ -57,8 +57,8 @@ export function ErrorView({
           styles.card,
           {
             maxWidth: maxContentWidth,
-            backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
+            // backgroundColor: theme.colors.surface,
+            // borderColor: theme.colors.border,
           },
         ]}
       >

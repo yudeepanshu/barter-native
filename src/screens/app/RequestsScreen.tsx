@@ -31,6 +31,7 @@ import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
 import { RequestItem } from "./RequestItem";
+import { ErrorView } from "@/components/ui/ErrorView";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -632,10 +633,16 @@ function RequestSection({
       ) : null}
 
       {isError ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>Could not load {title.toLowerCase()} requests.</Text>
-          <Button label="Retry" onPress={onRetry} />
-        </View>
+        <ErrorView
+          title={`Could not load ${title.toLowerCase()} requests`}
+          message="Something went wrong. Please try again."
+          buttons={[
+            {
+              label: "Retry",
+              onPress: onRetry,
+            },
+          ]}
+        />
       ) : null}
 
       {!isPending && !isError && groups.length === 0 ? (

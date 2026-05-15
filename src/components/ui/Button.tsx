@@ -75,6 +75,7 @@ export function Button({
 
   return (
     <Pressable
+      key={`button-${label}-${variant}-${theme.mode}`}
       onPress={() => {
         if (!isDisabled) onPress();
       }}

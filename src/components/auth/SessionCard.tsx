@@ -1,6 +1,6 @@
 import type { AuthUser } from "@barter/types";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
 import { AppImage } from "@/components/ui/AppImage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Feather } from "@expo/vector-icons";
@@ -25,7 +25,7 @@ export function SessionCard({
   const isSigningOut = signingOut;
   const initials = user.userName.slice(0, 2).toUpperCase();
   const [imageFailed, setImageFailed] = useState(false);
-  const activeSinceLabel = useMemo(() => formatActiveSince(user.createdAt), [user.createdAt]);
+  const activeSinceLabel =formatActiveSince(user.createdAt);
 
   useEffect(() => {
     setImageFailed(false);

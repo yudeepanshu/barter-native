@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -12,6 +12,8 @@ import {
 } from "@/lib/listings/productCreationLimit";
 import { queryClient } from "@/lib/query/queryClient";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
+import { Animated } from "react-native";
 
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => (
@@ -25,10 +27,21 @@ export default function AppTabsLayout() {
   const session = useSession();
   const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
   const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
+  const tabBarVisible = useFeedScrollStore((state) => state.tabBarVisible);
   const dialog = useAppDialog();
   const createCheckInFlightRef = useRef(false);
   const tabBarBottomPadding = Math.max(insets.bottom, 10);
   const tabBarHeight = 58 + tabBarBottomPadding;
+
+  const tabBarTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(tabBarTranslateY, {
+      toValue: tabBarVisible ? 0 : tabBarHeight,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [tabBarVisible, tabBarHeight, tabBarTranslateY]);
 
   return (
     <Tabs
@@ -127,6 +140,11 @@ export default function AppTabsLayout() {
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           backgroundColor: theme.colors.backgroundElevated,
+          position: "absolute",
+          transform: [{ translateY: tabBarTranslateY }],
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
       }}
     >
@@ -136,15 +154,15 @@ export default function AppTabsLayout() {
       />
       <Tabs.Screen
         name="requests"
-        options={{ title: "Requests", tabBarIcon: renderTabIcon("swap-horizontal-outline") }}
+        options={{ title: "Requests", tabBarIcon: renderTabIcon("swap-horizontal-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
       />
       <Tabs.Screen
         name="create"
-        options={{ title: "Create", tabBarIcon: renderTabIcon("add-circle-outline") }}
+        options={{ title: "Create", tabBarIcon: renderTabIcon("add-circle-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
       />
       <Tabs.Screen
         name="my-listings"
-        options={{ title: "My Listings", tabBarIcon: renderTabIcon("pricetag-outline") }}
+        options={{ title: "My Listings", tabBarIcon: renderTabIcon("pricetag-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
       />
       <Tabs.Screen
         name="profile"

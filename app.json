@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.shinichi.flippeapp",
-      "versionCode": 38,
+      "versionCode": 39,
       "googleServicesFile": "./google-services.json",
       "enableProguardInReleaseBuilds": true,
       "enableShrinkResourcesInReleaseBuilds": true,
@@ -49,7 +49,8 @@
           "locationWhenInUsePermission": "Flippe uses your location to auto-fill listing details and improve nearby feed results."
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-system-ui"
     ],
     "experiments": {
       "typedRoutes": true

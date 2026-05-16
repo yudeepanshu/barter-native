@@ -8,8 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
 import type { NotificationSummary, ProductSummary, RequestStatus } from "@barter/types";
@@ -43,6 +44,7 @@ import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
 import { SortBottomSheet, type SortOrder } from "@/components/filters/SortBottomSheet";
 import { writeStartupFeedSnapshot } from "@/lib/feed/feedSnapshotCache";
 import { getFirstName } from "@/lib/utils/commonUtils";
+import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { ErrorView } from "../ui/ErrorView";
 import { EmptyView } from "../ui/EmptyView";
 
@@ -51,6 +53,7 @@ const MIN_PROXIMITY_KM = 2;
 const MAX_PROXIMITY_KM = 100;
 const DEFAULT_NEAREST_RADIUS_KM = 10;
 const LOCATION_RECALCULATE_THRESHOLD_KM = 5;
+const SCROLL_DIRECTION_THRESHOLD = 8;
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
@@ -92,6 +95,8 @@ interface FeedHeaderCardProps {
   onOpenNotificationsPanel: () => void;
   unreadCount: number;
   isBackgroundRefreshing: boolean;
+  headerExpanded?: boolean;
+  onHeaderExpandedChange?: (expanded: boolean) => void;
 }
 
 function FeedHeaderCard({
@@ -109,6 +114,8 @@ function FeedHeaderCard({
   onOpenNotificationsPanel,
   unreadCount,
   isBackgroundRefreshing,
+  headerExpanded,
+  onHeaderExpandedChange,
 }: FeedHeaderCardProps) {
   const { theme } = useAppTheme();
 
@@ -121,6 +128,8 @@ function FeedHeaderCard({
       title={`Hello, ${firstName}`}
       subtitle="Discover listings near you"
       defaultExpanded={true}
+      expanded={headerExpanded}
+      onExpandedChange={onHeaderExpandedChange}
       subtitleRight={
         isBackgroundRefreshing || filterState.isSearchDebouncing ? (
           <ActivityIndicator size={12} color={theme.colors.textMuted} />
@@ -208,6 +217,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [headerExpanded, setHeaderExpanded] = useState(true);
+  const lastScrollY = useRef(0);
+  const setTabBarVisible = useFeedScrollStore((state) => state.setTabBarVisible);
+
   const dialog = useAppDialog();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
@@ -466,6 +479,27 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     void writeStartupFeedSnapshot(userId, firstPageItems);
   }, [products.query.data, userId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => setTabBarVisible(true);
+    }, [setTabBarVisible]),
+  );
+
+  const handleFeedScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const deltaY = currentY - lastScrollY.current;
+
+    if(currentY <= 0) {
+      setTabBarVisible(true);
+    } else if (deltaY > SCROLL_DIRECTION_THRESHOLD) {
+      setHeaderExpanded(false);
+      setTabBarVisible(false);
+    } else if (deltaY < -SCROLL_DIRECTION_THRESHOLD) {
+      setTabBarVisible(true);
+    }
+    lastScrollY.current = currentY;
+  }, [setTabBarVisible]);
+
   const onRefreshNotifications = async () => {
     await notificationsQuery.refetch();
   };
@@ -673,6 +707,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             onOpenNotificationsPanel={onOpenNotificationsPanel}
             unreadCount={unreadCount}
             isBackgroundRefreshing={isBackgroundRefreshing}
+            headerExpanded={headerExpanded}
+            onHeaderExpandedChange={setHeaderExpanded}
           />
         </View>
 
@@ -683,6 +719,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
           initialNumToRender={6}
           maxToRenderPerBatch={8}
           windowSize={7}
+          onScroll={handleFeedScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefreshFeed} />
           }

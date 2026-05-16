@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SmoothCollapse } from "./SmoothCollapse";
@@ -18,6 +18,8 @@ interface CollapsibleHeaderCardProps extends PropsWithChildren {
   collapseDurationMs?: number;
   defaultExpanded?: boolean;
   style?: StyleProp<ViewStyle>;
+  expanded?: boolean; // If provided, controls the expanded state from the parent instead of internally.
+  onExpandedChange?: (expanded: boolean) => void; // Callback for when the expanded state changes, useful when `expanded` is controlled from the parent.
 }
 
 /**
@@ -34,10 +36,18 @@ export function CollapsibleHeaderCard({
   collapseDurationMs = 180,
   defaultExpanded = false,
   style,
+  expanded: controlledExpanded,
   children,
+  onExpandedChange,
 }: CollapsibleHeaderCardProps) {
   const { theme } = useAppTheme();
   const [expanded, setExpanded] = useState(defaultExpanded);
+
+  useEffect(() => {
+    if (controlledExpanded !== undefined) {
+      setExpanded(controlledExpanded);
+    }
+  }, [controlledExpanded]);
 
   return (
     <View
@@ -54,7 +64,10 @@ export function CollapsibleHeaderCard({
         <View style={styles.rightSlot}>
           {rightActions ?? null}
           <Pressable
-            onPress={() => setExpanded((v) => !v)}
+            onPress={() => {
+              setExpanded((v)=> !v);
+              onExpandedChange?.(!expanded);
+            }}
             style={[
               styles.toggleButton,
               { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },

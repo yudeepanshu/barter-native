@@ -15,7 +15,7 @@ export function useProfileQuery(enabled = true) {
       return envelope.data ?? null;
     },
     enabled,
-    initialData: profile ?? undefined,
+    placeholderData: profile ?? undefined,
     staleTime: 5 * 60 * 1000,
   });
 

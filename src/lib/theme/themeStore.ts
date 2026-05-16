@@ -11,6 +11,7 @@ const themeStorage = {
 
 interface ThemeState {
   preference: ThemePreference;
+  _hasHydrated?: boolean;
   setPreference: (preference: ThemePreference) => void;
   setToAuto: () => void;
 }
@@ -19,6 +20,7 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       preference: "auto",
+      _hasHydrated: false,
       setPreference: (preference) => set({ preference }),
       setToAuto: () => set({ preference: "auto" }),
     }),
@@ -26,6 +28,11 @@ export const useThemeStore = create<ThemeState>()(
       name: "barter-theme-preference",
       storage: createJSONStorage(() => themeStorage),
       partialize: (state) => ({ preference: state.preference }),
+      onRehydrateStorage: () => {
+        return () => {
+          useThemeStore.setState({ _hasHydrated: true });
+        }
+      },
     },
   ),
 );

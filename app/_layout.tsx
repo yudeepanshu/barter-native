@@ -9,6 +9,7 @@ import {
   addNotificationResponseReceivedListener,
   getLastNotificationResponse,
 } from "@/lib/notifications/pushRegistration";
+import { useThemeStore } from "@/lib/theme/themeStore";
 
 const ROUTE_GUARD_LOADING_TIMEOUT_MS = 10000;
 
@@ -136,9 +137,10 @@ function NotificationNavigationBootstrap() {
 
 function SplashScreenBootstrap() {
   const status = useAuthStatus();
+  const themeHydrated = useThemeStore((state) => state._hasHydrated);
 
   useEffect(() => {
-    if (status === "loading") {
+    if (status === "loading" || !themeHydrated) {
       return;
     }
 
@@ -147,7 +149,7 @@ function SplashScreenBootstrap() {
         // Best effort. Ignore if already hidden.
       });
     });
-  }, [status]);
+  }, [status, themeHydrated]);
 
   return null;
 }

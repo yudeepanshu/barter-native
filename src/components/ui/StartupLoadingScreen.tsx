@@ -117,7 +117,7 @@ export function StartupLoadingScreen({ timedOut, onContinue }: StartupLoadingScr
 
         <ActivityIndicator size={28} color={theme.colors.primary} />
         <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Loading your marketplace</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Syncing account and startup data...</Text>
+        {/* <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Syncing account and startup data...</Text> */}
 
         {timedOut ? (
           <View style={styles.timeoutWrap}>

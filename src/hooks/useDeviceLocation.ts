@@ -20,18 +20,31 @@ function buildLocationName(
     region?: string | null;
     country?: string | null;
     name?: string | null;
+    street?: string | null;
   } | null,
 ): string | undefined {
   if (!placemark) return undefined;
 
-  const city = [placemark.city, placemark.district, placemark.subregion, placemark.name]
-    .map((value) => value?.trim())
-    .find((value): value is string => Boolean(value));
+  // Prefer area-level fields; avoid `name` (POI/street number) and `street`
+  // as the primary label — they're too granular and look wrong as a location name.
+  const locality = [placemark.district, placemark.subregion, placemark.city]
+    .map((v) => v?.trim())
+    .find((v): v is string => Boolean(v));
+
   const state = placemark.region?.trim() || null;
   const country = placemark.country?.trim() || null;
 
-  const parts = [city, state]
-    .filter((value, index, arr): value is string => Boolean(value) && arr.indexOf(value) === index);
+  // Fall back to `name` only if nothing area-level exists AND it doesn't look
+  // like a street address (i.e. contains no digits like "14, MG Road").
+  const resolvedLocality =
+    locality ??
+    (placemark.name?.trim() && !/\d/.test(placemark.name)
+      ? placemark.name.trim()
+      : null);
+
+  const parts = [resolvedLocality, state].filter(
+    (v, i, arr): v is string => Boolean(v) && arr.indexOf(v) === i,
+  );
 
   if (country && country.toLowerCase() !== "india" && !parts.includes(country)) {
     parts.push(country);
@@ -80,7 +93,9 @@ function hasRequiredAccuracy(
 
 // Fetches the best available position.
 // Strategy: precise cached fix first → high-accuracy fresh fix.
-async function fetchPositionSnapshot(options?: RequestLocationOptions): Promise<DeviceLocationSnapshot> {
+async function fetchPositionSnapshot(
+  options?: RequestLocationOptions,
+): Promise<DeviceLocationSnapshot> {
   const maxAccuracyMeters = options?.maxAccuracyMeters ?? 500;
   let coords: { latitude: number; longitude: number } | null = null;
   let accuracyMeters: number | undefined;
@@ -159,26 +174,29 @@ export function useDeviceLocation() {
 
   // requestForegroundPermissionsAsync is idempotent: if already granted the OS resolves
   // it instantly without showing a dialog again.
-  const requestLocation = useCallback(async (options?: RequestLocationOptions) => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    const granted = status === "granted";
-    setPermission(granted ? "granted" : "denied");
+  const requestLocation = useCallback(
+    async (options?: RequestLocationOptions) => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      const granted = status === "granted";
+      setPermission(granted ? "granted" : "denied");
 
-    if (!granted) {
-      setLastKnown(null);
-      return null;
-    }
+      if (!granted) {
+        setLastKnown(null);
+        return null;
+      }
 
-    // Isolate GPS/hardware errors from the permission state — permission is fine,
-    // so a position failure should NOT mark permission as denied.
-    try {
-      const snapshot = await fetchPositionSnapshot(options);
-      setLastKnown(snapshot);
-      return snapshot;
-    } catch {
-      return null;
-    }
-  }, [setLastKnown, setPermission]);
+      // Isolate GPS/hardware errors from the permission state — permission is fine,
+      // so a position failure should NOT mark permission as denied.
+      try {
+        const snapshot = await fetchPositionSnapshot(options);
+        setLastKnown(snapshot);
+        return snapshot;
+      } catch {
+        return null;
+      }
+    },
+    [setLastKnown, setPermission],
+  );
 
   return { permission, lastKnown, requestLocation };
 }

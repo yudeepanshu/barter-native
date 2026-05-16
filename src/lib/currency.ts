@@ -106,3 +106,58 @@ export function parseRawCurrencyInput(raw: string): number | null {
   const parsed = parseFloat(stripped);
   return Number.isNaN(parsed) ? null : parsed;
 }
+
+// ---------------------------------------------------------------------------
+// Phone / dialling code config — mirrors the SupportedCountry type
+// ---------------------------------------------------------------------------
+type PhoneConfig = {
+  dialCode: string;   // e.g. "+91"
+  flag: string;       // emoji flag for display
+  maxDigits: number;  // local number length (after dial code)
+};
+
+const phoneConfig: Record<SupportedCountry, PhoneConfig> = {
+  IN: { dialCode: "+91", flag: "🇮🇳", maxDigits: 10 },
+  // US: { dialCode: "+1",  flag: "🇺🇸", maxDigits: 10 },
+  // GB: { dialCode: "+44", flag: "🇬🇧", maxDigits: 10 },
+};
+
+export function getDialCode(country: SupportedCountry = DEFAULT_COUNTRY): string {
+  return phoneConfig[country]?.dialCode ?? "+91";
+}
+
+export function getPhoneFlag(country: SupportedCountry = DEFAULT_COUNTRY): string {
+  return phoneConfig[country]?.flag ?? "🇮🇳";
+}
+
+export function getPhoneMaxDigits(country: SupportedCountry = DEFAULT_COUNTRY): number {
+  return phoneConfig[country]?.maxDigits ?? 10;
+}
+
+/**
+ * Format a stored E.164-style number ("+919876543210") for display:
+ * strips the dial code and returns the local digits only.
+ * Falls back to returning the raw value if it doesn't start with the dial code.
+ */
+export function stripDialCode(
+  value: string,
+  country: SupportedCountry = DEFAULT_COUNTRY,
+): string {
+  const dial = getDialCode(country);
+  const normalized = value.replace(/\s+/g, "");
+  return normalized.startsWith(dial) ? normalized.slice(dial.length) : normalized;
+}
+
+/**
+ * Prepend the dial code for storage / submission.
+ * "9876543210" → "+919876543210"
+ * Already-prefixed values are returned unchanged.
+ */
+export function prependDialCode(
+  localDigits: string,
+  country: SupportedCountry = DEFAULT_COUNTRY,
+): string {
+  const dial = getDialCode(country);
+  const normalized = localDigits.replace(/\s+/g, "");
+  return normalized.startsWith(dial) ? normalized : `${dial}${normalized}`;
+}

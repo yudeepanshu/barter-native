@@ -639,7 +639,7 @@ export default function MyListingsScreen() {
           <View style={styles.fixedTopContent}>
             <CollapsibleHeaderCard
               title="My Listings"
-              subtitle="Manage your listings."
+              subtitle="Manage your listings"
               collapseMaxHeight={320}
               footerSlot={
                 <View style={styles.headerMetaRow}>
@@ -654,7 +654,7 @@ export default function MyListingsScreen() {
                     </Text>
                   </View>
                   <Text style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                    {selectedFilterSummary || "Showing all listings."}
+                    {selectedFilterSummary || "Showing all listings"}
                   </Text>
                 </View>
               }

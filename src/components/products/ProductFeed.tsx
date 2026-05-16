@@ -126,8 +126,8 @@ function FeedHeaderCard({
   return (
     <CollapsibleHeaderCard
       title={`Hello, ${firstName}`}
-      subtitle="Discover listings near you"
-      defaultExpanded={true}
+      subtitle="See what's out there"
+      defaultExpanded={false}
       expanded={headerExpanded}
       onExpandedChange={onHeaderExpandedChange}
       subtitleRight={
@@ -217,7 +217,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-  const [headerExpanded, setHeaderExpanded] = useState(true);
+  const [headerExpanded, setHeaderExpanded] = useState(false);
   const lastScrollY = useRef(0);
   const setTabBarVisible = useFeedScrollStore((state) => state.setTabBarVisible);
 

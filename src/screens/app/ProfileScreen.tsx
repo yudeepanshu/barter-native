@@ -40,6 +40,7 @@ import { useAppDialog } from "@/providers/AppDialogProvider";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
+import { FloatingModal } from "@/components/ui/FloatingModal";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -815,172 +816,134 @@ export default function ProfileScreen() {
               }}
             />
 
-            {isEditing ? (
-              <View
-                style={[
-                  styles.formCard,
-                  {
-                    borderColor: theme.colors.border,
-                    borderRadius: theme.roundness,
-                    backgroundColor: theme.colors.surface,
-                  },
-                ]}
-              >
-                <View style={styles.formHeaderRow}>
-                  <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}> 
-                    Edit details
-                  </Text>
-                  <Pressable
-                    onPress={() => {
-                      if (updateProfileMutation.isPending || isUploadingPhoto) return;
-                      onReset();
-                      setIsEditing(false);
-                    }}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: updateProfileMutation.isPending || isUploadingPhoto }}
-                    accessibilityLabel="Close edit form"
-                    style={({ pressed }) => [
-                      styles.closeButton,
-                      {
-                        opacity:
-                          updateProfileMutation.isPending || isUploadingPhoto
-                            ? 0.5
-                            : pressed
-                            ? 0.7
-                            : 1,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="close"
-                      size={14}
-                      color={theme.colors.textSecondary}
-                    />
-                  </Pressable>
-                </View>
+            {/* ----------------------------------------------------------------
+                Edit profile modal
+            ---------------------------------------------------------------- */}
+            <FloatingModal
+              visible={isEditing}
+              title="Edit details"
+              onClose={() => {
+                if (updateProfileMutation.isPending || isUploadingPhoto) return;
+                onReset();
+                setIsEditing(false);
+              }}
+              preferCenter
+            >
+              <Button
+                label="Change profile picture"
+                variant="ghost"
+                onPress={() => void onSelectProfilePicture()}
+                loading={false}
+                disabled={updateProfileMutation.isPending || isUploadingPhoto}
+              />
 
-                <Button
-                  label="Change profile picture"
-                  variant="ghost"
-                  onPress={() => void onSelectProfilePicture()}
-                  loading={false}
-                  disabled={updateProfileMutation.isPending || isUploadingPhoto}
-                />
+              {pendingProfileAsset ? (
+                <Text style={[styles.pendingPhotoText, { color: theme.colors.textMuted }]}>
+                  New photo selected. It will upload on save.
+                </Text>
+              ) : null}
 
-                {pendingProfileAsset ? (
-                  <Text style={[styles.pendingPhotoText, { color: theme.colors.textMuted }]}>
-                    New photo selected. It will upload on save.
-                  </Text>
-                ) : null}
+              <Input
+                label="Name"
+                value={userName}
+                onChangeText={(value) => {
+                  setUserName(value);
+                  setFormMessage(null);
+                }}
+                error={fieldErrors.userName ?? null}
+                autoCapitalize="words"
+              />
 
-                <Input
-                  label="Name"
-                  value={userName}
-                  onChangeText={(value) => {
-                    setUserName(value);
-                    setFormMessage(null);
+              <Input
+                label="Email"
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setFormMessage(null);
+                }}
+                error={fieldErrors.email ?? null}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                placeholder="Enter your email address"
+                editable={!hasExistingValue(user?.email)}
+                disabled={hasExistingValue(user?.email)}
+              />
+
+              <Input
+                label="Phone number"
+                value={mobileNumber}
+                onChangeText={(value) => {
+                  setMobileNumber(value);
+                  setFormMessage(null);
+                }}
+                error={fieldErrors.mobileNumber ?? null}
+                keyboardType="phone-pad"
+                placeholder="Enter your phone number"
+                editable={!hasExistingValue(user?.mobileNumber)}
+                disabled={hasExistingValue(user?.mobileNumber)}
+              />
+
+              {formMessage ? (
+                <Text
+                  style={[
+                    styles.formMessage,
+                    {
+                      color: updateProfileMutation.isError
+                        ? theme.colors.danger
+                        : theme.colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {formMessage}
+                </Text>
+              ) : null}
+
+              <View style={styles.formActionsRow}>
+                <Pressable
+                  onPress={() => {
+                    if (!isDirty || updateProfileMutation.isPending || isUploadingPhoto) return;
+                    onReset();
                   }}
-                  error={fieldErrors.userName ?? null}
-                  autoCapitalize="words"
-                />
-
-                <Input
-                  label="Email"
-                  value={email}
-                  onChangeText={(value) => {
-                    setEmail(value);
-                    setFormMessage(null);
+                  disabled={!isDirty || updateProfileMutation.isPending || isUploadingPhoto}
+                  accessibilityRole="button"
+                  android_ripple={{
+                    color:
+                      theme.mode === "dark"
+                        ? "rgba(248, 113, 113, 0.14)"
+                        : "rgba(220, 38, 38, 0.08)",
                   }}
-                  error={fieldErrors.email ?? null}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoCorrect={false}
-                  placeholder="Enter your email address"
-                  editable={!hasExistingValue(user?.email)}
-                  disabled={hasExistingValue(user?.email)}
-                />
-
-                <Input
-                  label="Phone number"
-                  value={mobileNumber}
-                  onChangeText={(value) => {
-                    setMobileNumber(value);
-                    setFormMessage(null);
-                  }}
-                  error={fieldErrors.mobileNumber ?? null}
-                  keyboardType="phone-pad"
-                  placeholder="Enter your phone number"
-                  editable={!hasExistingValue(user?.mobileNumber)}
-                  disabled={hasExistingValue(user?.mobileNumber)}
-                />
-
-                {formMessage ? (
-                  <Text
-                    style={[
-                      styles.formMessage,
-                      {
-                        color: updateProfileMutation.isError
-                          ? theme.colors.danger
-                          : theme.colors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {formMessage}
+                  style={({ pressed }) => [
+                    styles.formActionCell,
+                    styles.resetButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderRadius: theme.roundness - 4,
+                      opacity:
+                        !isDirty || updateProfileMutation.isPending || isUploadingPhoto
+                          ? 0.86
+                          : pressed
+                          ? 0.94
+                          : 1,
+                      transform: [{ scale: pressed ? 0.99 : 1 }],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.resetButtonLabel, { color: theme.colors.danger }]}>
+                    Reset
                   </Text>
-                ) : null}
-
-                <View style={styles.formActions}>
-                  <View style={styles.formActionsRow}>
-                    <Pressable
-                      onPress={() => {
-                        if (!isDirty || updateProfileMutation.isPending || isUploadingPhoto)
-                          return;
-                        onReset();
-                      }}
-                      disabled={!isDirty || updateProfileMutation.isPending || isUploadingPhoto}
-                      accessibilityRole="button"
-                      android_ripple={{
-                        color:
-                          theme.mode === "dark"
-                            ? "rgba(248, 113, 113, 0.14)"
-                            : "rgba(220, 38, 38, 0.08)",
-                      }}
-                      style={({ pressed }) => [
-                        styles.formActionCell,
-                        styles.resetButton,
-                        {
-                          borderColor: theme.colors.border,
-                          backgroundColor: theme.colors.surfaceMuted,
-                          borderRadius: theme.roundness - 4,
-                          opacity:
-                            !isDirty || updateProfileMutation.isPending || isUploadingPhoto
-                              ? 0.86
-                              : pressed
-                              ? 0.94
-                              : 1,
-                          transform: [{ scale: pressed ? 0.99 : 1 }],
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.resetButtonLabel, { color: theme.colors.danger }]}
-                      >
-                        Reset
-                      </Text>
-                    </Pressable>
-                    <View style={styles.formActionCell}>
-                      <Button
-                        label="Update"
-                        onPress={() => void onSave()}
-                        loading={updateProfileMutation.isPending}
-                        disabled={!isDirty || isUploadingPhoto}
-                      />
-                    </View>
-                  </View>
+                </Pressable>
+                <View style={styles.formActionCell}>
+                  <Button
+                    label="Update"
+                    onPress={() => void onSave()}
+                    loading={updateProfileMutation.isPending}
+                    disabled={!isDirty || isUploadingPhoto}
+                  />
                 </View>
               </View>
-            ) : null}
+            </FloatingModal>
           </>
         ) : (
           <View style={styles.errorCard}>
@@ -1224,27 +1187,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   serverWarningText: { fontSize: 13, lineHeight: 19 },
-  formCard: {
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
-    overflow: "visible",
-  },
-  formHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  closeButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "800" },
   formMessage: { fontSize: 13 },
   pendingPhotoText: { fontSize: 12 },
   // ── Feedback teaser ──

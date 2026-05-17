@@ -6,7 +6,6 @@ import type { RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { formatTimeAgo, getOfferTypeLabel } from "@/lib/utils/commonUtils";
 import { formatCurrency } from "@/lib/currency";
-import { AppImage } from "@/components/ui/AppImage";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +44,7 @@ export type RequestItemProps = {
   router: ReturnType<typeof useRouter>;
   actorTurn: RequestTurn;
   sessionUserId: string;
+  showTurnLabel?: boolean;
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -54,11 +54,13 @@ export const RequestItem = memo(function RequestItem({
   router,
   actorTurn,
   sessionUserId,
+  showTurnLabel = true,
 }: RequestItemProps) {
   const { theme } = useAppTheme();
 
-  const activeOffer = item.offers[item.offers.length - 1];
-  const isExchangeFinalized = item.product.status === "EXCHANGED";
+  const activeOffer = item.offers?.[item.offers.length - 1];
+  const isExchangeFinalized = item.product?.status === "EXCHANGED";
+
   const isRequestCompleted =
     item.status === "COMPLETED" ||
     (item.status === "ACCEPTED" && isExchangeFinalized);
@@ -71,7 +73,7 @@ export const RequestItem = memo(function RequestItem({
   const isBuyer = sessionUserId === item.buyerId;
   const requestedByLabel = isBuyer
     ? "You"
-    : item.buyer.userName?.trim() || "Unknown";
+    : item.buyer?.userName?.trim() || "Unknown";
   const initials = requestedByLabel
     .trim()
     .split(/\s+/)
@@ -160,7 +162,7 @@ export const RequestItem = memo(function RequestItem({
               </Text>
             </View>
 
-            {showTurn && (
+            {showTurn && showTurnLabel && (
               <Text
                 style={[
                   styles.itemTurnText,

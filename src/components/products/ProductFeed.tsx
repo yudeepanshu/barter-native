@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -13,14 +12,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
-import type { NotificationSummary, ProductSummary, RequestStatus } from "@barter/types";
+import type { ProductSummary, RequestStatus } from "@barter/types";
 import { useCategoriesQuery } from "@/hooks/queries/useCategoriesQuery";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
-import {
-  useMarkAllNotificationsReadMutation,
-  useMarkNotificationReadMutation,
-  useClearAllNotificationsMutation,
-} from "@/hooks/mutations/useNotificationMutations";
 import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
 import { REQUESTS_SENT_MATCH_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useAppDataStore } from "@/lib/store/appDataStore";
@@ -47,6 +41,7 @@ import { getFirstName } from "@/lib/utils/commonUtils";
 import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { ErrorView } from "../ui/ErrorView";
 import { EmptyView } from "../ui/EmptyView";
+import { NotificationsPanel } from "@/components/products/NotificationsPanel";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -157,14 +152,12 @@ function FeedHeaderCard({
       collapseDurationMs={160}
       footerSlot={
         <View style={styles.headerMetaRow}>
-          <View style={[
-            styles.headerMetaCounterPill,
-          ]}>
+          <View style={[styles.headerMetaCounterPill]}>
             <Text style={[styles.headerMetaCountText, { color: theme.colors.textPrimary }]}>
               {productCount}
             </Text>
             <Text style={[styles.headerMetaCountLabel, { color: theme.colors.textMuted }]}>
-              {(productCount === 1 || productCount === 0) ? "listing" : "listings"}
+              {productCount === 1 || productCount === 0 ? "listing" : "listings"}
             </Text>
           </View>
           <View style={styles.headerMetaSummaryContainer}>
@@ -175,7 +168,9 @@ function FeedHeaderCard({
               style={[styles.headerMetaSummaryText, { color: theme.colors.textMuted }]}
               numberOfLines={2}
             >
-              {filterState.proximity?.radiusKm ? `Within ${filterState.proximity.radiusKm} km` : "Showing all matches"}
+              {filterState.proximity?.radiusKm
+                ? `Within ${filterState.proximity.radiusKm} km`
+                : "Showing all matches"}
             </Text>
           </View>
         </View>
@@ -217,13 +212,12 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const filterState = useProductFeedFilters({ limit: 20, excludeOwnerId: userId });
   const [initialLoadTimedOut, setInitialLoadTimedOut] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-  const [headerExpanded, setHeaderExpanded] = useState(false);
+  const [headerExpanded, setHeaderExpanded] = useState(true);
   const lastScrollY = useRef(0);
   const setTabBarVisible = useFeedScrollStore((state) => state.setTabBarVisible);
 
   const dialog = useAppDialog();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
   const [filterAnchor, setFilterAnchor] = useState<ContextMenuAnchor | null>(null);
@@ -236,20 +230,17 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   const [draftRadiusKm, setDraftRadiusKm] = useState<number | null>(null);
   const [selectedTradeType, setSelectedTradeType] = useState<TradeTypeFilter>("ALL");
   const [draftTradeType, setDraftTradeType] = useState<TradeTypeFilter>("ALL");
-  const [viewerLocation, setViewerLocation] = useState<{ latitude: number; longitude: number } | null>(
+  const [viewerLocation, setViewerLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(
     lastKnown
-      ? {
-          latitude: lastKnown.latitude,
-          longitude: lastKnown.longitude,
-        }
+      ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
       : null,
   );
   const lastRecalcLocationRef = useRef<{ latitude: number; longitude: number } | null>(
     lastKnown
-      ? {
-          latitude: lastKnown.latitude,
-          longitude: lastKnown.longitude,
-        }
+      ? { latitude: lastKnown.latitude, longitude: lastKnown.longitude }
       : null,
   );
 
@@ -266,15 +257,8 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     { enabled: cachedSentRequests.length === 0 },
   );
   const notificationsQuery = useNotificationsQuery({ limit: 20 });
-  const markNotificationReadMutation = useMarkNotificationReadMutation();
-  const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation();
-  const clearAllNotificationsMutation = useClearAllNotificationsMutation();
 
   const categories = categoriesQuery.data ?? [];
-  const notifications = useMemo(
-    () => notificationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [notificationsQuery.data],
-  );
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
   const requestedProductIds = useMemo(() => {
     const items = sentRequestsQuery.data?.pages.flatMap((page) => page.items) ?? cachedSentRequests;
@@ -286,8 +270,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
   }, [sentRequestsQuery.data]);
 
   const showInitialLoading =
-    products.items.length === 0 &&
-    (!isDiscoveryReady || products.query.isPending);
+    products.items.length === 0 && (!isDiscoveryReady || products.query.isPending);
   const showInitialError = Boolean(products.query.error) && products.items.length === 0;
 
   const visibleProducts = useMemo(() => {
@@ -301,19 +284,28 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         return false;
       }
 
-      if (freeOnly  && !item.isFree) {
+      if (freeOnly && !item.isFree) {
         return false;
       }
 
-      if (selectedTradeType === "MONEY_ONLY" && !(item.requestByMoney && !item.allowTradeRequest && !item.isFree)) {
+      if (
+        selectedTradeType === "MONEY_ONLY" &&
+        !(item.requestByMoney && !item.allowTradeRequest && !item.isFree)
+      ) {
         return false;
       }
 
-      if (selectedTradeType === "OPEN_FOR_MONEY" && !(item.allowTradeRequest && item.requestByMoney && !item.isFree)) {
+      if (
+        selectedTradeType === "OPEN_FOR_MONEY" &&
+        !(item.allowTradeRequest && item.requestByMoney && !item.isFree)
+      ) {
         return false;
       }
 
-      if (selectedTradeType === "BARTER_ONLY" && !(item.allowTradeRequest && !item.requestByMoney && !item.isFree)) {
+      if (
+        selectedTradeType === "BARTER_ONLY" &&
+        !(item.allowTradeRequest && !item.requestByMoney && !item.isFree)
+      ) {
         return false;
       }
 
@@ -353,10 +345,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
       return;
     }
 
-    const next = {
-      latitude: lastKnown.latitude,
-      longitude: lastKnown.longitude,
-    };
+    const next = { latitude: lastKnown.latitude, longitude: lastKnown.longitude };
     setViewerLocation(next);
     lastRecalcLocationRef.current = next;
   }, [lastKnown]);
@@ -485,60 +474,37 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     }, [setTabBarVisible]),
   );
 
-  const handleFeedScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const currentY = event.nativeEvent.contentOffset.y;
-    const deltaY = currentY - lastScrollY.current;
+  const handleFeedScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const currentY = event.nativeEvent.contentOffset.y;
+      const deltaY = currentY - lastScrollY.current;
 
-    if(currentY <= 0) {
-      setTabBarVisible(true);
-    } else if (deltaY > SCROLL_DIRECTION_THRESHOLD) {
-      setHeaderExpanded(false);
-      setTabBarVisible(false);
-    } else if (deltaY < -SCROLL_DIRECTION_THRESHOLD) {
-      setTabBarVisible(true);
-    }
-    lastScrollY.current = currentY;
-  }, [setTabBarVisible]);
-
-  const onRefreshNotifications = async () => {
-    await notificationsQuery.refetch();
-  };
+      if (currentY <= 0) {
+        setTabBarVisible(true);
+      } else if (deltaY > SCROLL_DIRECTION_THRESHOLD) {
+        setHeaderExpanded(false);
+        setTabBarVisible(false);
+      } else if (deltaY < -SCROLL_DIRECTION_THRESHOLD) {
+        setTabBarVisible(true);
+      }
+      lastScrollY.current = currentY;
+    },
+    [setTabBarVisible],
+  );
 
   const onManualRefreshFeed = () => {
     setIsManualRefreshing(true);
 
-    void products.query
-      .refetch()
-      .finally(() => {
-        setIsManualRefreshing(false);
-      });
+    void products.query.refetch().finally(() => {
+      setIsManualRefreshing(false);
+    });
   };
 
-  const onOpenNotification = async (item: NotificationSummary) => {
-    if (!item.isRead) {
-      await markNotificationReadMutation.mutateAsync(item.id);
-    }
-
-    setShowNotifications(false);
-
-    const payload = item.data ?? {};
-    const requestId = typeof payload.requestId === "string" ? payload.requestId : null;
-    const productId = typeof payload.productId === "string" ? payload.productId : null;
-
-    if (requestId) {
-      router.push(`/(app)/requests/${requestId}`);
-      return;
-    }
-
-    if (productId) {
-      router.push(`/(app)/products/${productId}`);
-    }
-  };
-
-  const onToggleFree = useCallback(() =>   setFreeOnly((current) => {
-    if (!current) setSelectedTradeType("ALL");
-    return !current;
-  }), []);
+  const onToggleFree = useCallback(() =>
+    setFreeOnly((current) => {
+      if (!current) setSelectedTradeType("ALL");
+      return !current;
+    }), []);
 
   const onOpenNotificationsPanel = useCallback(() => {
     setShowNotifications(true);
@@ -730,28 +696,18 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
             showInitialLoading ? (
               initialLoadTimedOut ? (
                 <ErrorView
-                  title='Taking longer than expected'
-                  message='Loading is taking longer than expected. Check your connection and retry.'
-                  buttons={[
-                    {
-                      label: 'Retry',
-                      onPress: products.refresh,
-                    },
-                  ]}
+                  title="Taking longer than expected"
+                  message="Loading is taking longer than expected. Check your connection and retry."
+                  buttons={[{ label: "Retry", onPress: products.refresh }]}
                 />
               ) : (
                 <ProductListLoadingState spinnerSize={30} />
               )
             ) : showInitialError ? (
               <ErrorView
-                title='Could not load listings'
-                message='Something went wrong. Please try again.'
-                buttons={[
-                  {
-                    label: 'Retry',
-                    onPress: products.refresh,
-                  },
-                ]}
+                title="Could not load listings"
+                message="Something went wrong. Please try again."
+                buttons={[{ label: "Retry", onPress: products.refresh }]}
               />
             ) : (
               <EmptyView
@@ -765,7 +721,9 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               <ProductListFooterLoadingState />
             ) : showFeedEndMessage ? (
               <View style={styles.endListWrap}>
-                <Text style={[styles.endListText, { color: theme.colors.textMuted }]}>You made it to the end. No more listings hiding below.</Text>
+                <Text style={[styles.endListText, { color: theme.colors.textMuted }]}>
+                  You made it to the end. No more listings hiding below.
+                </Text>
               </View>
             ) : null
           }
@@ -781,132 +739,138 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         anchor={filterAnchor}
         preferCenter
       >
-            <View style={styles.filterSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
-              <CategoryMultiSelectChips
-                categories={categories}
-                selectedIds={draftCategoryIds}
-                onChangeSelectedIds={setDraftCategoryIds}
-                containerStyle={styles.filterOptionsWrap}
+        <View style={styles.filterSection}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Category</Text>
+          <CategoryMultiSelectChips
+            categories={categories}
+            selectedIds={draftCategoryIds}
+            onChangeSelectedIds={setDraftCategoryIds}
+            containerStyle={styles.filterOptionsWrap}
+          />
+        </View>
+
+        <View style={styles.filterSection}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Proximity</Text>
+          <View style={styles.filterOptionsWrap}>
+            <FilterChip
+              active={draftRadiusKm == null}
+              label="Anywhere"
+              onPress={() => setDraftRadiusKm(null)}
+            />
+            <FilterChip
+              active={draftRadiusKm != null}
+              label="Nearby"
+              onPress={() => {
+                void onRequestEnableNearby();
+              }}
+            />
+          </View>
+
+          {permission !== "granted" ? (
+            <Text style={[styles.sliderHintText, { color: theme.colors.textMuted }]}>
+              Nearby is disabled until location permission is granted.
+            </Text>
+          ) : null}
+
+          {draftRadiusKm != null && permission === "granted" ? (
+            <View
+              style={[
+                styles.radiusSliderWrap,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surfaceMuted,
+                },
+              ]}
+            >
+              <Text style={[styles.radiusValueText, { color: theme.colors.textPrimary }]}>
+                Range: {Math.round(draftRadiusKm)} km
+              </Text>
+              <RangeSlider
+                style={styles.radiusSlider}
+                minimumValue={MIN_PROXIMITY_KM}
+                maximumValue={MAX_PROXIMITY_KM}
+                step={1}
+                value={Math.round(draftRadiusKm)}
+                disabled={false}
+                minimumTrackTintColor={theme.colors.primary}
+                maximumTrackTintColor={theme.colors.border}
+                thumbTintColor={theme.colors.primary}
+                onValueChange={(value: number) => {
+                  setDraftRadiusKm(Math.round(value));
+                }}
               />
-            </View>
-
-            <View style={styles.filterSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Proximity</Text>
-              <View style={styles.filterOptionsWrap}>
-                <FilterChip
-                  active={draftRadiusKm == null}
-                  label="Anywhere"
-                  onPress={() => setDraftRadiusKm(null)}
-                />
-                <FilterChip
-                  active={draftRadiusKm != null}
-                  label="Nearby"
-                  onPress={() => {
-                    void onRequestEnableNearby();
-                  }}
-                />
-              </View>
-
-              {permission !== "granted" ? (
-                <Text style={[styles.sliderHintText, { color: theme.colors.textMuted }]}> 
-                  Nearby is disabled until location permission is granted.
+              <View style={styles.radiusLabelsRow}>
+                <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>
+                  {MIN_PROXIMITY_KM} km
                 </Text>
-              ) : null}
-
-              {draftRadiusKm != null && permission === "granted" ? (
-                <View
-                  style={[
-                    styles.radiusSliderWrap,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.surfaceMuted,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.radiusValueText, { color: theme.colors.textPrimary }]}> 
-                    Range: {Math.round(draftRadiusKm)} km
-                  </Text>
-                  <RangeSlider
-                    style={styles.radiusSlider}
-                    minimumValue={MIN_PROXIMITY_KM}
-                    maximumValue={MAX_PROXIMITY_KM}
-                    step={1}
-                    value={Math.round(draftRadiusKm)}
-                    disabled={false}
-                    minimumTrackTintColor={theme.colors.primary}
-                    maximumTrackTintColor={theme.colors.border}
-                    thumbTintColor={theme.colors.primary}
-                    onValueChange={(value: number) => {
-                      setDraftRadiusKm(Math.round(value));
-                    }}
-                  />
-                  <View style={styles.radiusLabelsRow}>
-                    <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>{MIN_PROXIMITY_KM} km</Text>
-                    <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>{MAX_PROXIMITY_KM} km</Text>
-                  </View>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={styles.filterSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Type</Text>
-              <View style={styles.filterOptionsWrap}>
-                <FilterChip
-                  active={draftTradeType === "ALL"}
-                  label="All"
-                  onPress={() => setDraftTradeType("ALL")}
-                />
-                <FilterChip
-                  active={draftTradeType === "BARTER_ONLY"}
-                  label="Trade only"
-                  onPress={() => setDraftTradeType("BARTER_ONLY")}
-                />
-                <FilterChip
-                  active={draftTradeType === "OPEN_FOR_MONEY"}
-                  label="Cash or Trade"
-                  onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
-                />
-                <FilterChip
-                  active={draftTradeType === "MONEY_ONLY"}
-                  label="Cash only"
-                  onPress={() => setDraftTradeType("MONEY_ONLY")}
-                />
+                <Text style={[styles.radiusLabelText, { color: theme.colors.textMuted }]}>
+                  {MAX_PROXIMITY_KM} km
+                </Text>
               </View>
             </View>
+          ) : null}
+        </View>
 
-            <View style={styles.filterActionsRow}>
-              <Pressable
-                style={[
-                  styles.filterActionButton,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceMuted,
-                  },
-                ]}
-                onPress={() => {
-                  setDraftCategoryIds([]);
-                  setDraftRadiusKm(null);
-                  setDraftTradeType("ALL");
-                }}
-              >
-                <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>Clear</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.filterActionButton,
-                  {
-                    borderColor: theme.colors.primary,
-                    backgroundColor: theme.colors.primary,
-                  },
-                ]}
-                onPress={() => {
-                  void onApplyFilters();
-                }}
-              >
-                <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
-              </Pressable>
-            </View>
+        <View style={styles.filterSection}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Type</Text>
+          <View style={styles.filterOptionsWrap}>
+            <FilterChip
+              active={draftTradeType === "ALL"}
+              label="All"
+              onPress={() => setDraftTradeType("ALL")}
+            />
+            <FilterChip
+              active={draftTradeType === "BARTER_ONLY"}
+              label="Trade only"
+              onPress={() => setDraftTradeType("BARTER_ONLY")}
+            />
+            <FilterChip
+              active={draftTradeType === "OPEN_FOR_MONEY"}
+              label="Cash or Trade"
+              onPress={() => setDraftTradeType("OPEN_FOR_MONEY")}
+            />
+            <FilterChip
+              active={draftTradeType === "MONEY_ONLY"}
+              label="Cash only"
+              onPress={() => setDraftTradeType("MONEY_ONLY")}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filterActionsRow}>
+          <Pressable
+            style={[
+              styles.filterActionButton,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surfaceMuted,
+              },
+            ]}
+            onPress={() => {
+              setDraftCategoryIds([]);
+              setDraftRadiusKm(null);
+              setDraftTradeType("ALL");
+            }}
+          >
+            <Text style={[styles.filterActionText, { color: theme.colors.textSecondary }]}>
+              Clear
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.filterActionButton,
+              {
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.primary,
+              },
+            ]}
+            onPress={() => {
+              void onApplyFilters();
+            }}
+          >
+            <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
+          </Pressable>
+        </View>
       </FloatingModal>
 
       <SortBottomSheet
@@ -918,140 +882,10 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         canUseNearest={permission === "granted" && viewerLocation != null}
       />
 
-      <Modal
+      <NotificationsPanel
         visible={showNotifications}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowNotifications(false)}
-      >
-        <Pressable
-          style={[styles.notificationsBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setShowNotifications(false)}
-        >
-          <Pressable
-            style={[
-              styles.notificationsPanel,
-              {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-            onPress={() => {
-              // Keep panel open when tapping inside.
-            }}
-          >
-            <View style={styles.notificationsHeaderRow}>
-              <Text style={[styles.notificationsTitle, { color: theme.colors.textPrimary }]}>Notifications</Text>
-              <View style={styles.notificationsActionsRow}>
-                <Pressable
-                  onPress={() => void onRefreshNotifications()}
-                  disabled={notificationsQuery.isFetching}
-                  style={styles.notificationsIconAction}
-                >
-                  {notificationsQuery.isFetching ? (
-                    <ActivityIndicator size={14} color={theme.colors.textSecondary} />
-                  ) : (
-                    <Feather name="refresh-cw" size={15} color={theme.colors.textSecondary} />
-                  )}
-                </Pressable>
-
-
-                {notifications.length > 0 ? (
-                  <>
-                    <Pressable
-                      onPress={() => {
-                        void clearAllNotificationsMutation.mutateAsync();
-                        setShowNotifications(false);
-                      }}
-                      disabled={clearAllNotificationsMutation.isPending}
-                      style={styles.notificationsActionButton}
-                    >
-                      <Text style={[styles.notificationsActionText, { color: theme.colors.textSecondary }]}>Clear all</Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => setShowNotificationsMenu((prev) => !prev)}
-                      style={styles.notificationsIconAction}
-                    >
-                      <Feather
-                        name={showNotificationsMenu ? "chevron-up" : "chevron-down"}
-                        size={15}
-                        color={theme.colors.textSecondary}
-                      />
-                    </Pressable>
-                  </>
-                ) : null}
-              </View>
-            </View>
-
-            {showNotificationsMenu ? (
-              <View style={[styles.notificationsMenu, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-                <Pressable
-                  onPress={() => {
-                    void markAllNotificationsReadMutation.mutateAsync();
-                    setShowNotificationsMenu(false);
-                  }}
-                  disabled={unreadCount === 0 || markAllNotificationsReadMutation.isPending}
-                  style={styles.notificationsMenuItem}
-                >
-                  {markAllNotificationsReadMutation.isPending ? (
-                    <ActivityIndicator size={14} color={theme.colors.textPrimary} />
-                  ) : (
-                    <Feather name="check" size={14} color={theme.colors.textPrimary} />
-                  )}
-                  <Text style={[styles.notificationsMenuItemText, { color: theme.colors.textPrimary }]}>Mark all read</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {notificationsQuery.isFetching && notifications.length === 0 ? (
-              <View style={styles.notificationsLoadingWrap}>
-                <ActivityIndicator size={20} color={theme.colors.primary} />
-              </View>
-            ) : notifications.length === 0 ? (
-              <Text style={[styles.notificationsEmpty, { color: theme.colors.textMuted }]}>No updates yet.</Text>
-            ) : (
-              <FlatList
-                data={notifications}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.notificationsList}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => void onOpenNotification(item)}
-                    style={[
-                      styles.notificationItem,
-                      {
-                        borderColor: theme.colors.border,
-                        backgroundColor: item.isRead ? theme.colors.surface : theme.colors.surfaceMuted,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.notificationItemTitle, { color: theme.colors.textPrimary }]}>{item.title}</Text>
-                    <Text style={[styles.notificationItemBody, { color: theme.colors.textSecondary }]}>{item.body}</Text>
-                    <Text style={[styles.notificationItemMeta, { color: theme.colors.textMuted }]}>
-                      {new Date(item.createdAt).toLocaleString()}
-                    </Text>
-                  </Pressable>
-                )}
-                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-                onEndReachedThreshold={0.3}
-                onEndReached={() => {
-                  if (notificationsQuery.hasNextPage && !notificationsQuery.isFetchingNextPage) {
-                    void notificationsQuery.fetchNextPage();
-                  }
-                }}
-                ListFooterComponent={
-                  notificationsQuery.isFetchingNextPage ? (
-                    <View style={styles.notificationsLoadingWrap}>
-                      <ActivityIndicator size={16} color={theme.colors.primary} />
-                    </View>
-                  ) : null
-                }
-              />
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setShowNotifications(false)}
+      />
     </>
   );
 }
@@ -1138,92 +972,6 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 6 },
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
-  notificationsBackdrop: {
-    flex: 1,
-    justifyContent: "flex-start",
-    paddingHorizontal: 16,
-    paddingTop: 96,
-    paddingBottom: 24,
-  },
-  notificationsPanel: {
-    borderWidth: 1,
-    borderRadius: 14,
-    maxHeight: "76%",
-    padding: 12,
-    gap: 10,
-  },
-  notificationsHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  notificationsActionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  notificationsIconAction: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notificationsTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  notificationsActionText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  notificationsActionButton: {
-    paddingHorizontal: 4,
-  },
-  notificationsMenu: {
-    borderWidth: 1,
-    borderRadius: 8,
-    overflow: "hidden",
-    marginTop: 8,
-  },
-  notificationsMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-  },
-  notificationsMenuItemText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  notificationsList: {
-    paddingBottom: 6,
-  },
-  notificationsLoadingWrap: {
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  notificationsEmpty: {
-    fontSize: 13,
-    textAlign: "center",
-    paddingVertical: 14,
-  },
-  notificationItem: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    gap: 4,
-  },
-  notificationItemTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  notificationItemBody: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  notificationItemMeta: {
-    fontSize: 11,
-  },
   filterSection: {
     gap: 8,
   },

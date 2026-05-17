@@ -12,6 +12,7 @@ export interface ProductTagSpec {
   label: string;
   tone: ProductTagTone;
   icon?: FeatherIconName;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const TAG_TONES: Record<
@@ -109,20 +110,44 @@ export const TAG_TONES: Record<
   },
 };
 
-export function getTopTypeTag(product: ProductSummary): ProductTagSpec {
+const SIZE_STYLES = {
+  sm: {
+    badge: { paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.25, borderRadius: 6 },
+    text: { fontSize: 9, letterSpacing: 0.3 },
+    chip: { paddingHorizontal: 6, paddingVertical: 2, minHeight: 20 },
+    chipText: { fontSize: 9 },
+    iconSize: 10,
+  },
+  md: {
+    badge: { paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1.75, borderRadius: 8 },
+    text: { fontSize: 11, letterSpacing: 0.4 },
+    chip: { paddingHorizontal: 8, paddingVertical: 3, minHeight: 24 },
+    chipText: { fontSize: 11 },
+    iconSize: 12,
+  },
+  lg: {
+    badge: { paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1.75, borderRadius: 8 },
+    text: { fontSize: 11, letterSpacing: 0.4 },
+    chip: { paddingHorizontal: 8, paddingVertical: 3, minHeight: 24 },
+    chipText: { fontSize: 11 },
+    iconSize: 12,
+  },
+};
+
+export function getTopTypeTag(product: ProductSummary, size: 'sm' | 'md' | 'lg' = 'md'): ProductTagSpec {
   if (product.isFree) {
-    return { label: "Free", tone: "mint" };
+    return { label: "Free", tone: "mint", size };
   }
 
   if(product.requestByMoney && product.allowTradeRequest) {
-    return { label: "Cash or Trade", tone: "blue" };
+    return { label: "Cash or Trade", tone: "blue", size };
   }
 
   if (product.requestByMoney) {
-    return { label: "Cash Only", tone: "amber" };
+    return { label: "Cash Only", tone: "amber", size };
   }
 
-  return { label: "Trade Only", tone: "violet" };
+  return { label: "Trade Only", tone: "violet", size };
 }
 
 export function getContextTag(product: ProductSummary, isRequested: boolean): ProductTagSpec | null {
@@ -162,17 +187,19 @@ export function ProductTag({
   const { theme } = useAppTheme();
   const mode = theme.mode === "dark" ? "dark" : "light";
   const palette = variant === "top-text" ? TAG_TONES[tag.tone].top[mode] : TAG_TONES[tag.tone].bottom[mode];
+  const sz = SIZE_STYLES[tag.size ?? "md"];
 
   if (variant === "top-text") {
     return (
       <View
         style={[
           styles.topTypeBadge,
+          sz.badge,
           { borderColor: palette.border, backgroundColor: palette.bg },
           style,
         ]}
       >
-        <Text style={[styles.topTypeText, { color: palette.text }]} numberOfLines={1}>
+        <Text style={[styles.topTypeText, sz.text, { color: palette.text }]} numberOfLines={1}>
           {tag.label}
         </Text>
       </View>
@@ -183,12 +210,13 @@ export function ProductTag({
     <View
       style={[
         styles.bottomTag,
+        sz.chip,
         { backgroundColor: palette.bg, borderColor: palette.border },
         style,
       ]}
     >
-      {tag.icon ? <Feather name={tag.icon} size={12} color={palette.text} /> : null}
-      <Text style={[styles.bottomTagText, { color: palette.text }]} numberOfLines={1}>
+      {tag.icon ? <Feather name={tag.icon} size={sz.iconSize} color={palette.text} /> : null}
+      <Text style={[styles.bottomTagText, sz.chipText, { color: palette.text }]} numberOfLines={1}>
         {tag.label}
       </Text>
     </View>

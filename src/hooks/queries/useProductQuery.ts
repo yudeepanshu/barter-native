@@ -4,14 +4,14 @@ import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useSyncEntity } from "@/lib/store/useStoreSync";
 
-export function useProductQuery(productId: string) {
+export function useProductQuery(productId: string, includeOwnerRequests: boolean = false) {
   const cachedProduct = useAppDataStore((state) => (productId ? state.productsById[productId] ?? null : null));
   const upsertProduct = useAppDataStore((state) => state.upsertProduct);
 
   const query = useQuery({
-    queryKey: queryKeys.products.detail(productId),
+    queryKey: [...queryKeys.products.detail(productId), includeOwnerRequests],
     queryFn: async () => {
-      const envelope = await mobileApiClient.getProductById(productId);
+      const envelope = await mobileApiClient.getProductById(productId, includeOwnerRequests);
       return envelope.data ?? null;
     },
     enabled: Boolean(productId),

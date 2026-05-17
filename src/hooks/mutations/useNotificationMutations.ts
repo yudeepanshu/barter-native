@@ -292,3 +292,31 @@ export function useClearAllNotificationsMutation() {
     },
   });
 }
+
+export function useClearNotificationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const envelope = await mobileApiClient.deleteNotification(notificationId);
+      return envelope.data ?? null;
+    },
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const context = getNotificationsMutationContext(queryClient);
+
+      patchNotificationQueries(queryClient, (data) =>
+        markNotificationReadInData(data, notificationId, new Date().toISOString()),
+      );
+      optimisticallyMarkNotificationRead(notificationId, new Date().toISOString());
+
+      return context;
+    },
+    onError: (_error, _notificationId, context) => {
+      restoreNotificationsMutationContext(queryClient, context);
+    },
+    onSettled: () => {
+      void invalidateNotifications(queryClient);
+    },
+  });
+}

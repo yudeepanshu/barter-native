@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
   },
 });

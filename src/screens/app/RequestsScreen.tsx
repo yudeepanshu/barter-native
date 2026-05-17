@@ -50,6 +50,7 @@ const ALL_REQUEST_STATUSES: RequestStatus[] = [
   "COMPLETED",
 ];
 
+type OfferTypeFilter = "PRODUCT" | "MONEY" | "MIXED" | "NONE" | null;
 type TurnFilter = "MY_TURN" | "THEIR_TURN" | null;
 
 type ProductRequestGroup = {
@@ -61,15 +62,33 @@ type ProductRequestGroup = {
 
 type TabFilterState = {
   productId: string;
+  // Sent-tab only: filter by the buyer's own offered/attached product
+  myProductId: string;
   statuses: RequestStatus[];
   turn: TurnFilter;
+  offerType: OfferTypeFilter;
 };
 
 const DEFAULT_TAB_FILTER: TabFilterState = {
   productId: ALL_PRODUCTS_FILTER,
+  myProductId: ALL_PRODUCTS_FILTER,
   statuses: [],
   turn: null,
+  offerType: null,
 };
+
+// ── Offer-type helpers ─────────────────────────────────────────────────────────
+
+type OfferTypeLiteral = "PRODUCT" | "MONEY" | "MIXED" | "NONE";
+
+const OFFER_TYPE_OPTIONS: { value: OfferTypeLiteral; label: string }[] = [
+  { value: "PRODUCT", label: "Trade" },
+  { value: "MONEY",   label: "Money" },
+  { value: "MIXED",   label: "Both" },
+  { value: "NONE",    label: "None" },
+];
+
+// ── Grouping helpers ───────────────────────────────────────────────────────────
 
 function buildProductRequestGroups(items: RequestSummary[]) {
   const map = new Map<string, ProductRequestGroup>();
@@ -102,6 +121,56 @@ function buildProductRequestGroups(items: RequestSummary[]) {
     .sort((a, b) => b.latestUpdatedAtMs - a.latestUpdatedAtMs);
 }
 
+// TODO: Uncomment when enabling "Your Offered Products" filter on Sent tab
+// /**
+//  * Build a productId -> title lookup by scanning visibleProducts and all offer
+//  * products across every request. Casts the widest net so titles are always found.
+//  */
+// function buildProductTitleCache(items: RequestSummary[]): Map<string, string> {
+//   const cache = new Map<string, string>();
+//   for (const req of items) {
+//     for (const vp of req.visibleProducts) {
+//       if (!cache.has(vp.productId)) cache.set(vp.productId, vp.product.title);
+//     }
+//     for (const offer of req.offers) {
+//       for (const op of offer.offeredProducts) {
+//         if (!cache.has(op.productId) && op.product?.title) {
+//           cache.set(op.productId, op.product.title);
+//         }
+//       }
+//     }
+//   }
+//   return cache;
+// }
+
+// TODO: Uncomment when enabling "Your Offered Products" filter on Sent tab
+// /**
+//  * For the Sent tab: collect unique products from the active offer (accepted if
+//  * one exists, otherwise the latest by createdAt) of each request.
+//  */
+// function buildMyOfferedProductOptions(items: RequestSummary[]) {
+//   const titleCache = buildProductTitleCache(items);
+//   const map = new Map<string, { productId: string; productTitle: string; count: number }>();
+//   for (const req of items) {
+//     if (req.offers.length === 0) continue;
+//     const activeOffer =
+//       req.offers.find((o) => o.id === req.acceptedOfferId) ??
+//       req.offers.reduce((latest, o) =>
+//         new Date(o.createdAt) > new Date(latest.createdAt) ? o : latest,
+//       );
+//     for (const op of activeOffer.offeredProducts) {
+//       const existing = map.get(op.productId);
+//       if (existing) {
+//         existing.count += 1;
+//       } else {
+//         const productTitle = titleCache.get(op.productId) ?? op.productId;
+//         map.set(op.productId, { productId: op.productId, productTitle, count: 1 });
+//       }
+//     }
+//   }
+//   return Array.from(map.values()).sort((a, b) => b.count - a.count);
+// }
+
 function getStatusLabel(status: RequestStatus): string {
   switch (status) {
     case "PENDING":     return "Pending";
@@ -115,20 +184,41 @@ function getStatusLabel(status: RequestStatus): string {
 }
 
 /**
- * Applies status and turn filters to requests within each product group,
- * then drops groups that become empty after filtering.
+ * Applies all filters (product, myProduct, status, turn, offerType) to
+ * requests within each group, then drops groups that become empty.
  */
 function applyRequestFilters(
   groups: ProductRequestGroup[],
-  statuses: RequestStatus[],
-  turn: TurnFilter,
+  filter: TabFilterState,
   actorTurn: RequestTurn,
 ): ProductRequestGroup[] {
+  const { statuses, turn, offerType } = filter; // myProductId omitted until "Your Offered Products" filter is re-enabled
+
   return groups
     .map((group) => {
       const filtered = group.requests.filter((req) => {
-        // Status filter: if any statuses selected, request must match one.
-        // Treat COMPLETED as matching both "COMPLETED" status and ACCEPTED+EXCHANGED.
+        // ── Resolve the "active" offer: accepted first, otherwise latest by createdAt ──
+        const activeOffer = req.offers.length === 0
+          ? null
+          : req.offers.find((o) => o.id === req.acceptedOfferId) ??
+            req.offers.reduce((latest, o) =>
+              new Date(o.createdAt) > new Date(latest.createdAt) ? o : latest,
+            );
+
+        // ── Offer-type filter ──────────────────────────────────────────────────
+        if (offerType !== null) {
+          if (!activeOffer || activeOffer.type !== offerType) return false;
+        }
+
+        // TODO: Uncomment when enabling "Your Offered Products" filter on Sent tab
+        // if (myProductId !== ALL_PRODUCTS_FILTER) {
+        //   const hasProduct = activeOffer?.offeredProducts.some(
+        //     (op) => op.productId === myProductId,
+        //   ) ?? false;
+        //   if (!hasProduct) return false;
+        // }
+
+        // ── Status filter ──────────────────────────────────────────────────────
         if (statuses.length > 0) {
           const isExchangeFinalized = req.product.status === "EXCHANGED";
           const effectiveStatus: RequestStatus =
@@ -136,7 +226,7 @@ function applyRequestFilters(
           if (!statuses.includes(effectiveStatus)) return false;
         }
 
-        // Turn filter: only applies to open requests.
+        // ── Turn filter (open requests only) ───────────────────────────────────
         if (turn !== null) {
           const isOpen = OPEN_STATUSES.includes(req.status);
           if (!isOpen) return false;
@@ -153,6 +243,8 @@ function applyRequestFilters(
     .filter((group) => group.requests.length > 0);
 }
 
+// ── Screen ─────────────────────────────────────────────────────────────────────
+
 export default function RequestsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; productId?: string; _t?: string }>();
@@ -165,6 +257,12 @@ export default function RequestsScreen() {
   const receivedItems = receivedQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const receivedGroups = useMemo(() => buildProductRequestGroups(receivedItems), [receivedItems]);
   const sentGroups = useMemo(() => buildProductRequestGroups(sentItems), [sentItems]);
+
+  // TODO: Uncomment when enabling "Your Offered Products" filter on Sent tab
+  // const myOfferedProductOptions = useMemo(
+  //   () => buildMyOfferedProductOptions(sentItems),
+  //   [sentItems],
+  // );
 
   const [activeTab, setActiveTab] = useState<"received" | "sent">(
     params.tab === "sent" ? "sent" : "received",
@@ -239,17 +337,18 @@ export default function RequestsScreen() {
   const currentFilter = filterByTab[activeTab];
   const actorTurn: RequestTurn = activeTab === "received" ? "SELLER" : "BUYER";
 
-  // ── Filtered groups: listing → status → turn ─────────────────────────────────
+  // ── Filtered groups ───────────────────────────────────────────────────────────
   const filteredGroups = useMemo(() => {
     let groups = currentFilter.productId === ALL_PRODUCTS_FILTER
       ? currentGroups
       : currentGroups.filter((g) => g.productId === currentFilter.productId);
 
-    groups = applyRequestFilters(groups, currentFilter.statuses, currentFilter.turn, actorTurn);
+    groups = applyRequestFilters(groups, currentFilter, actorTurn);
 
     return groups;
   }, [currentGroups, currentFilter, actorTurn]);
 
+  // ── Filter modal options ──────────────────────────────────────────────────────
   const productFilterOptions = useMemo(
     () => [
       {
@@ -271,8 +370,10 @@ export default function RequestsScreen() {
 
   const activeFilterCount =
     (currentFilter.productId === ALL_PRODUCTS_FILTER ? 0 : 1) +
+    // TODO: Uncomment when enabling "Your Offered Products" filter: (currentFilter.myProductId === ALL_PRODUCTS_FILTER ? 0 : 1) +
     currentFilter.statuses.length +
-    (currentFilter.turn !== null ? 1 : 0);
+    (currentFilter.turn !== null ? 1 : 0) +
+    (currentFilter.offerType !== null ? 1 : 0);
 
   // Turn filter is only shown when Pending or Negotiating is explicitly selected in the draft.
   const draftHasOpenStatus = draftFilter.statuses.some((s) => OPEN_STATUSES.includes(s));
@@ -299,6 +400,7 @@ export default function RequestsScreen() {
     lastAppliedParamKeyRef.current = paramKey;
   }, [params.productId, params.tab, receivedGroups, sentGroups]);
 
+  // ── Modal handlers ────────────────────────────────────────────────────────────
   const onOpenProductFilter = () => {
     setDraftFilter({ ...currentFilter });
     setShowProductFilterModal(true);
@@ -338,6 +440,13 @@ export default function RequestsScreen() {
     setDraftFilter((prev) => ({
       ...prev,
       turn: prev.turn === turn ? null : turn,
+    }));
+  };
+
+  const setDraftOfferType = (type: OfferTypeLiteral) => {
+    setDraftFilter((prev) => ({
+      ...prev,
+      offerType: prev.offerType === type ? null : type,
     }));
   };
 
@@ -470,9 +579,10 @@ export default function RequestsScreen() {
                   contentContainerStyle={styles.filterScrollContentContainer}
                   showsVerticalScrollIndicator={true}
                 >
-                  {/* ── Section 1: Filter by listing ── */}
+
+                  {/* ── Section 1: Filter by listing (seller's product) ── */}
                   <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary }]}>
-                    Listing
+                    {activeTab === "received" ? "Your Listings" : "Requested Listings"}
                   </Text>
                   <View style={styles.filterChipsContainer}>
                     {productFilterOptions.map((option) => (
@@ -485,7 +595,51 @@ export default function RequestsScreen() {
                     ))}
                   </View>
 
-                  {/* ── Section 2: Filter by status ── */}
+
+                  {/* ── Section 2: Offer type ── */}
+                  <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
+                    Offer Type
+                  </Text>
+                  <View style={styles.filterChipsContainer}>
+                    {OFFER_TYPE_OPTIONS.map((option) => (
+                      <FilterChip
+                        key={option.value}
+                        active={draftFilter.offerType === option.value}
+                        label={option.label}
+                        onPress={() => setDraftOfferType(option.value)}
+                      />
+                    ))}
+                  </View>
+
+                  {/* TODO: Uncomment when enabling "Your Offered Products" filter on Sent tab */}
+                  {/* {activeTab === "sent" && myOfferedProductOptions.length > 0 ? (
+                    <>
+                      <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
+                        Your Offered Products
+                      </Text>
+                      <View style={styles.filterChipsContainer}>
+                        <FilterChip
+                          active={draftFilter.myProductId === ALL_PRODUCTS_FILTER}
+                          label="All"
+                          onPress={() =>
+                            setDraftFilter((prev) => ({ ...prev, myProductId: ALL_PRODUCTS_FILTER }))
+                          }
+                        />
+                        {myOfferedProductOptions.map((option) => (
+                          <FilterChip
+                            key={option.productId}
+                            active={draftFilter.myProductId === option.productId}
+                            label={`${option.productTitle} (${option.count})`}
+                            onPress={() =>
+                              setDraftFilter((prev) => ({ ...prev, myProductId: option.productId }))
+                            }
+                          />
+                        ))}
+                      </View>
+                    </>
+                  ) : null} */}
+
+                  {/* ── Section 4: Filter by status ── */}
                   <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
                     Status
                   </Text>
@@ -500,7 +654,7 @@ export default function RequestsScreen() {
                     ))}
                   </View>
 
-                  {/* ── Section 3: Filter by turn — only shown when Pending/Negotiating could be in results ── */}
+                  {/* ── Section 5: Filter by turn — only when Pending/Negotiating could be in results ── */}
                   {draftHasOpenStatus ? (
                     <>
                       <Text style={[styles.filterSectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>

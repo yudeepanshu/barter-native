@@ -38,7 +38,7 @@ export default function AppTabsLayout() {
   useEffect(() => {
     Animated.timing(tabBarTranslateY, {
       toValue: tabBarVisible ? 0 : tabBarHeight,
-      duration: 250,
+      duration: 100,
       useNativeDriver: true,
     }).start();
   }, [tabBarVisible, tabBarHeight, tabBarTranslateY]);

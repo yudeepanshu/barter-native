@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState } from "react";
-import type { ProductSummary, RequestStatus } from "@barter/types";
+import type { ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
@@ -68,7 +68,7 @@ export default function ProductDetailScreen() {
   const backTo = params.backTo === "my-listings" ? "my-listings" : undefined;
   const routeDistanceKm = typeof params.distanceKm === "string" ? Number(params.distanceKm) : Number.NaN;
   const routeDistanceOverrideKm = Number.isFinite(routeDistanceKm) ? routeDistanceKm : null;
-  const query = useProductQuery(productId);
+  const query = useProductQuery(productId, params.backTo === "my-listings");
 
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const { mutate: reportProduct, isPending } = useReportProductMutation(productId);
@@ -76,6 +76,7 @@ export default function ProductDetailScreen() {
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const productData = query.data ?? null;
+
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
   const handleBack = () => {
@@ -194,7 +195,7 @@ export default function ProductDetailScreen() {
     isOwner &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
   const isRequested = Boolean(activeRequest);
-  const typeTag = getTopTypeTag(product);
+  const typeTag = getTopTypeTag(product, 'sm');
   const contextTag = getContextTag(product, isRequested);
   const imageFrameSize = Math.max(220, Math.round(width - 68));
   const listedOnDate = (() => {
@@ -242,7 +243,7 @@ export default function ProductDetailScreen() {
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
         contextMenuItems={
-          productData?.status === "ACTIVE" && !isOwner
+          !isOwner
             ? [
                 {
                   key: "report-listing",
@@ -457,6 +458,14 @@ export default function ProductDetailScreen() {
               sessionUserId={session?.user.id ?? ""}
             />
           </View>
+        ) : null}
+
+        {/* ── Owner requests (my-listings view) ──────────────────────────────── */}
+        {isOwner && session && (product.ownerRequests?.length ?? 0) > 0 ? (
+          <OwnerRequestsList
+            requests={product.ownerRequests!}
+            sessionUserId={session.user.id}
+          />
         ) : null}
 
         {session && !activeRequest ? (
@@ -815,6 +824,47 @@ function RequestComposer({
   );
 }
 
+// ── OwnerRequestsList ──────────────────────────────────────────────────────────
+
+function OwnerRequestsList({
+  requests,
+  sessionUserId,
+}: {
+  requests: RequestSummary[];
+  sessionUserId: string;
+}) {
+  const router = useRouter();
+  const { theme } = useAppTheme();
+
+  return (
+    <View
+      style={[
+        styles.activeRequestCard,
+        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+      ]}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Text style={[{ color: theme.colors.textSecondary, fontSize: 13, fontWeight: "600" }]}>
+          Used in {requests.length} request{requests.length === 1 ? "" : "s"}
+        </Text>
+        <InfoTooltip text="Showing the 3 most recent requests only." />
+      </View>
+      <View style={{ gap: 10 }}>
+        {requests.map((item) => (
+          <RequestItem
+            key={item.id}
+            item={item}
+            router={router}
+            actorTurn="SELLER"
+            sessionUserId={sessionUserId}
+            showTurnLabel={false}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -831,7 +881,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: "700",
   },
   headerRow: {

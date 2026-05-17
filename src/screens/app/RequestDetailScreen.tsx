@@ -951,7 +951,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                     backgroundColor: isYourTurn ? '#dcfce7' : '#f1f5f9',
                   }}>
                     <Text style={{
-                      fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+                      fontSize: 10, fontWeight: '700', letterSpacing: 0.5,
                       color: isYourTurn ? '#15803d' : '#64748b',
                     }}>
                       {isYourTurn ? 'YOUR TURN' : 'THEIR TURN'}
@@ -1141,7 +1141,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
         {/* Request Details */}
         {showRequestDetailsSection ? (
           <View> 
-            {showPendingTurnDetails && latestActiveOffer && latestActiveOffer.type !== "NONE" ? (
+            {showPendingTurnDetails && latestActiveOffer ? (
               <>
 
                {/* Latest Offer — fieldset style with floating label on border */}
@@ -1151,7 +1151,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 </Text>
 
                 {/* Type inline with dot separator + Amount on right (only if cash/mixed) */}
-                <View style={styles.detailRow}>
+                {latestActiveOffer.type !== "NONE" ? <View style={styles.detailRow}>
                   <View style={{ flexDirection: "column" }}>
                     <Text style={[styles.label, { color: theme.colors.textMuted }]}>Type</Text>
                     {/* <View style={styles.latestOfferDot} /> */}
@@ -1167,7 +1167,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                       </Text>
                     </View>
                   ) : null}
-                </View>
+                </View> : null}
 
                 {/* Offered products — below the type/amount row */}
                 {latestActiveOffer.offeredProducts.length > 0 && (
@@ -1721,7 +1721,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  title: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: "800" },
+  title: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: "800" },
   description: { fontSize: 14 },
   sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 6 },
   sectionTitleNoMargin: { marginBottom: 0 },

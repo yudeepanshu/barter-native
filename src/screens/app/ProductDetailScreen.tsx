@@ -45,6 +45,7 @@ import { resolveImageBadge } from "@/components/products/ProductCard";
 import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 import { ProductImageCarousel } from "@/components/products/ProductImageCarousel";
 import { RequestItem } from "./RequestItem";
+import { TradeCardItem } from "./TradeCardItem";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -851,7 +852,7 @@ function OwnerRequestsList({
       </View>
       <View style={{ gap: 10 }}>
         {requests.map((item) => (
-          <RequestItem
+          <TradeCardItem
             key={item.id}
             item={item}
             router={router}

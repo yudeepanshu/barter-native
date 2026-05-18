@@ -46,6 +46,7 @@ import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThr
 import { ProductImageCarousel } from "@/components/products/ProductImageCarousel";
 import { RequestItem } from "./RequestItem";
 import { TradeCardItem } from "./TradeCardItem";
+import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -150,6 +151,13 @@ export default function ProductDetailScreen() {
     return null;
   }, [sentRequestsQuery.data, cachedSentRequests, productData, isOwner]);
 
+  // Shared context-menu hook for edit/delete/relist/unlist
+  const { items: ownerContextMenuItems } = useListingContextMenuItems({
+    product: productData ?? null,
+    returnTo: backTo,
+    onMutationSuccess: () => router.replace("/(app)/(tabs)/my-listings"),
+  });
+
   const onManualRefresh = () => {
     setIsManualRefreshing(true);
     query
@@ -244,8 +252,9 @@ export default function ProductDetailScreen() {
         onBack={handleBack}
         textColor={theme.colors.textPrimary}
         contextMenuItems={
-          !isOwner
-            ? [
+          isOwner
+            ? ownerContextMenuItems
+            : [
                 {
                   key: "report-listing",
                   label: "Report listing",
@@ -253,7 +262,6 @@ export default function ProductDetailScreen() {
                   onPress: handleReportListing,
                 },
               ]
-            : []
         }
       />
       <KeyboardAwareScrollView

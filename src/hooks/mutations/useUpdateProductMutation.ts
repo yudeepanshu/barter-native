@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape, UpdateProductInput } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { queryKeys } from "@/lib/query/queryKeys";
 import { invalidateRequestCollections, invalidateProductCollections, syncProductEntity } from "@/lib/query/mutationSync";
 
 export function useUpdateProductMutation(productId: string) {
@@ -18,6 +19,7 @@ export function useUpdateProductMutation(productId: string) {
     onSuccess: (updatedProduct) => {
       syncProductEntity(queryClient, updatedProduct);
       void Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) }),
         invalidateProductCollections(queryClient),
         invalidateRequestCollections(queryClient),
       ]);

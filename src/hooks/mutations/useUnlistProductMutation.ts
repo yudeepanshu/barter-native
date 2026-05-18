@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiClient } from "@barter/api-client";
 import type { ApiErrorShape } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
+import { queryKeys } from "@/lib/query/queryKeys";
 import {
   invalidateProductCollections,
   invalidateRequestCollections,
@@ -16,7 +17,7 @@ export function useUnlistProductMutation() {
       const result = await mobileApiClient.updateProduct(productId, { isListed: false });
       return result.data ?? null;
     },
-    onSuccess: (updated) => {
+    onSuccess: (updated, productId) => {
       if (!updated) {
         void Promise.all([
           invalidateProductCollections(queryClient),
@@ -26,7 +27,10 @@ export function useUnlistProductMutation() {
       }
 
       syncProductEntity(queryClient, updated);
-      void invalidateRequestCollections(queryClient);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) }),
+        invalidateRequestCollections(queryClient),
+      ]);
     },
   });
 }

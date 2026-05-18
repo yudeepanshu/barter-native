@@ -1143,7 +1143,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           <View> 
             {showPendingTurnDetails && latestActiveOffer ? (
               <>
-
                {/* Latest Offer — fieldset style with floating label on border */}
               <View style={[styles.latestOfferSection, { borderColor: theme.colors.border }]}>
                 <Text style={[styles.latestOfferLabel, { backgroundColor: theme.colors.surface, color: theme.colors.textMuted }]}>
@@ -1151,23 +1150,29 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 </Text>
 
                 {/* Type inline with dot separator + Amount on right (only if cash/mixed) */}
-                {latestActiveOffer.type !== "NONE" ? <View style={styles.detailRow}>
-                  <View style={{ flexDirection: "column" }}>
-                    <Text style={[styles.label, { color: theme.colors.textMuted }]}>Type</Text>
-                    {/* <View style={styles.latestOfferDot} /> */}
-                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                      {getOfferTypeLabel(latestActiveOffer.type)}
-                    </Text>
-                  </View>
-                  {latestActiveOffer.offeredAmount ? (
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-                      <Text style={[styles.value, { color: theme.colors.textPrimary }]}>
-                        {formatCurrency(latestActiveOffer.offeredAmount)}
+                {latestActiveOffer.type !== "NONE" ? (
+                  <View style={styles.detailRow}>
+                    <View style={{ flexDirection: "column" }}>
+                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Type</Text>
+                      {/* <View style={styles.latestOfferDot} /> */}
+                      <Text style={[styles.value, { color: theme.colors.textPrimary }]}> 
+                        {getOfferTypeLabel(latestActiveOffer.type)}
                       </Text>
                     </View>
-                  ) : null}
-                </View> : null}
+                    {latestActiveOffer.offeredAmount ? (
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
+                        <Text style={[styles.value, { color: theme.colors.textPrimary }]}> 
+                          {formatCurrency(latestActiveOffer.offeredAmount)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.value, { color: theme.colors.textPrimary }]}>Nothing Offered</Text>
+                  </View>
+                )}
 
                 {/* Offered products — below the type/amount row */}
                 {latestActiveOffer.offeredProducts.length > 0 && (

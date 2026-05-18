@@ -19,7 +19,7 @@ import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
 import { REQUESTS_SENT_MATCH_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
 import { useAppDataStore } from "@/lib/store/appDataStore";
 import { useProductFeedFilters } from "@/hooks/useProductFeedFilters";
-import { Input } from "@/components/ui/Input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { ProductCard } from "@/components/products/ProductCard";
 import {
   ProductListFooterLoadingState,
@@ -177,9 +177,7 @@ function FeedHeaderCard({
       }
     >
       <View style={{ marginTop: 10 }}>
-        <Input
-          label=""
-          placeholder="Try bicycle, books, guitar..."
+        <SearchInput
           value={filterState.search}
           onChangeText={filterState.setSearch}
         />

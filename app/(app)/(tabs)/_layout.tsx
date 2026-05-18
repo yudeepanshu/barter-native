@@ -146,6 +146,7 @@ export default function AppTabsLayout() {
           left: 0,
           right: 0,
         },
+        sceneStyle: { paddingBottom: tabBarHeight },
       }}
     >
       <Tabs.Screen

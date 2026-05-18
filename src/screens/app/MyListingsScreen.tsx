@@ -12,7 +12,7 @@ import {
   ProductListFooterLoadingState,
   ProductListLoadingState,
 } from "@/components/products/ProductListStates";
-import { Input } from "@/components/ui/Input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { CollapsibleHeaderCard } from "@/components/ui/CollapsibleHeaderCard";
 import { FilterChip } from "@/components/filters/FilterChip";
 import { CategoryMultiSelectChips } from "@/components/filters/CategoryMultiSelectChips";
@@ -400,9 +400,7 @@ export default function MyListingsScreen() {
               }
             >
               <View style={{ marginTop: 10 }}>
-                <Input
-                  label=""
-                  placeholder="Try bicycle, books, guitar..."
+                <SearchInput
                   value={search}
                   onChangeText={setSearch}
                 />

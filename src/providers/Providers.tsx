@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import * as Font from "expo-font";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { ApiClient } from "@barter/api-client";
 import { mobileApiClient } from "@/lib/api/client";
 import { queryClient } from "@/lib/query/queryClient";
@@ -397,8 +398,10 @@ export function Providers({ children }: { children: ReactNode }) {
           <IconFontsWarmup />
           <RealtimeBootstrap />
           <PushNotificationsBootstrap />
-          <TopToastHost />
-          {children}
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+            <TopToastHost />
+            {children}
+          </SafeAreaProvider>
         </AppDialogProvider>
       </AuthBootstrap>
     </QueryClientProvider>

@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
@@ -15,6 +15,9 @@ import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { Animated } from "react-native";
 
+const tabBarBottomPadding = Math.max(initialWindowMetrics!.insets.bottom, 10);
+const tabBarHeight = 58 + tabBarBottomPadding;
+
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => (
     <Ionicons name={name} size={size} color={color} />
@@ -23,15 +26,12 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
 
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const session = useSession();
   const hasUnsavedCreateDraft = useCreateListingDraftGuardStore((state) => state.hasUnsavedChanges);
   const resetCreateDraft = useCreateListingDraftGuardStore((state) => state.resetDraft);
   const tabBarVisible = useFeedScrollStore((state) => state.tabBarVisible);
   const dialog = useAppDialog();
   const createCheckInFlightRef = useRef(false);
-  const tabBarBottomPadding = Math.max(insets.bottom, 10);
-  const tabBarHeight = 58 + tabBarBottomPadding;
 
   const tabBarTranslateY = useRef(new Animated.Value(0)).current;
 
@@ -41,7 +41,7 @@ export default function AppTabsLayout() {
       duration: 100,
       useNativeDriver: true,
     }).start();
-  }, [tabBarVisible, tabBarHeight, tabBarTranslateY]);
+  }, [tabBarVisible, tabBarTranslateY]);
 
   return (
     <Tabs
@@ -146,7 +146,6 @@ export default function AppTabsLayout() {
           left: 0,
           right: 0,
         },
-        sceneStyle: { paddingBottom: tabBarHeight },
       }}
     >
       <Tabs.Screen

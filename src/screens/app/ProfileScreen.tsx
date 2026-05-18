@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics, } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
@@ -41,6 +41,8 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import { FloatingModal } from "@/components/ui/FloatingModal";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -476,7 +478,6 @@ type ProfilePicturePickMode = "deferred" | "direct";
 // ProfileScreen
 // ---------------------------------------------------------------------------
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
   const status = useAuthStatus();
   const session = useSession();
   const profileQuery = useProfileQuery(status === "authenticated");
@@ -718,22 +719,16 @@ export default function ProfileScreen() {
 
   if (!session) {
     return (
-      <SafeAreaView
-        style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
-        edges={["top"]}
-      >
+      <ScreenSafeView>
         <View style={styles.center}>
           <Spinner />
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
-      edges={["top"]}
-    >
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <View style={styles.fixedTopContent}>
         <PageHeaderCard
@@ -744,7 +739,7 @@ export default function ProfileScreen() {
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
         keyboardVerticalOffset={12}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 78 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: 78 }]}
         scrollRef={scrollViewRef}
         refreshControl={
           <RefreshControl
@@ -1097,7 +1092,7 @@ export default function ProfileScreen() {
           theme={theme}
         />
       ) : null}
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

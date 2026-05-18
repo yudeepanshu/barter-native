@@ -32,6 +32,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { EmptyView } from "@/components/ui/EmptyView";
 import { RequestItem } from "./RequestItem";
 import { ErrorView } from "@/components/ui/ErrorView";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -460,7 +461,7 @@ export default function RequestsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <View style={styles.screen}>
         <View style={styles.fixedTopContent}>
@@ -702,7 +703,7 @@ export default function RequestsScreen() {
           </Pressable>
         </Modal>
       </View>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

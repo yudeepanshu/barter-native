@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Input } from "@/components/ui/Input";
@@ -11,6 +10,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { mobileApiClient } from "@/lib/api/client";
 import { validateDisplayName } from "@/lib/auth/profileCompletion";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 export default function CompleteProfileScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -67,7 +67,7 @@ export default function CompleteProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
@@ -105,7 +105,7 @@ export default function CompleteProfileScreen() {
           </View>
         </AppCard>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

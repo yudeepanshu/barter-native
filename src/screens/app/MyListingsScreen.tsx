@@ -1,6 +1,5 @@
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState, memo, useCallback } from "react";
 import { useRouter } from "expo-router";
 import type { ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
@@ -28,6 +27,7 @@ import { ErrorView } from "@/components/ui/ErrorView";
 import { EmptyView } from "@/components/ui/EmptyView";
 // ↓ shared hook
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
@@ -362,14 +362,14 @@ export default function MyListingsScreen() {
 
   if (!session || products.query.isPending) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <ProductListLoadingState spinnerSize={30} />
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       {products.query.error ? (
         <ErrorView
           title="Could not load your listing"
@@ -588,7 +588,7 @@ export default function MyListingsScreen() {
         onClose={closeContextMenu}
         items={contextMenuItems}
       />
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

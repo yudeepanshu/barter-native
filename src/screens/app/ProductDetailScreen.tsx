@@ -7,7 +7,6 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState } from "react";
 import type { ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -47,6 +46,7 @@ import { ProductImageCarousel } from "@/components/products/ProductImageCarousel
 import { RequestItem } from "./RequestItem";
 import { TradeCardItem } from "./TradeCardItem";
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -169,17 +169,17 @@ export default function ProductDetailScreen() {
 
   if (query.isPending) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <View style={styles.center}>
           <Spinner size={30} />
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   if (query.error || !query.data) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <ErrorView
           title="Product not found"
           message="We could not load this listing."
@@ -195,7 +195,7 @@ export default function ProductDetailScreen() {
             },
           ]}
         />
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
@@ -223,7 +223,7 @@ export default function ProductDetailScreen() {
   const reported = isProductReportedAboveThreshold(product);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <ReportProductModal
         visible={reportModalVisible}
@@ -485,7 +485,7 @@ export default function ProductDetailScreen() {
           />
         ) : null}
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

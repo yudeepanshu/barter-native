@@ -1,6 +1,5 @@
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -50,6 +49,7 @@ import { ErrorView } from "@/components/ui/ErrorView";
 import { queryKeys } from "@/lib/query/queryKeys";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/currency";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -596,17 +596,17 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
 
   if (requestQuery.isPending) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <View style={styles.center}>
           <Spinner size={30} />
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   if (requestQuery.error || !requestQuery.data) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <ErrorView
           title="Request not found"
           message="We couldn't load this request. It may have been deleted or you don't have access to it."
@@ -622,7 +622,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             },
           ]}
         />
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
@@ -927,7 +927,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const hasConsiderationProducts = viewerPoolMap.size > 0 || counterpartyPoolMap.size > 0;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <MenuHeader
         onBack={() => router.back()}
@@ -1683,7 +1683,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           />
         </SwipeableBottomSheet>
       ) : null}
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

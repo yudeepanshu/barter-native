@@ -6,6 +6,7 @@ import { ProductFeed } from "@/components/products/ProductFeed";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AppCard } from "@/components/ui/AppCard";
 import { ProductListLoadingState } from "@/components/products/ProductListStates";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 export default function HomeScreen() {
   const status = useAuthStatus();
@@ -15,7 +16,7 @@ export default function HomeScreen() {
 
   if (status === "loading") {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <StatusBar style={statusBarStyle} />
         <View style={styles.bootstrapWrap}>
           <AppCard>
@@ -28,22 +29,22 @@ export default function HomeScreen() {
             <ProductListLoadingState spinnerSize={28} />
           </View>
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   if (!session) {
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} />;
+    return <ScreenSafeView />;
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <ProductFeed
         userId={session.user.id}
         userName={session.user.userName}
       />
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

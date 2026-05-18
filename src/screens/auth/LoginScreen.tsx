@@ -4,12 +4,13 @@ import { StatusBar } from "expo-status-bar";
 import { OtpLoginForm } from "@/components/auth/OtpLoginForm";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 export default function LoginScreen() {
   const { theme, statusBarStyle } = useAppTheme();
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <KeyboardAwareScrollView
         containerStyle={styles.keyboardWrap}
@@ -34,7 +35,7 @@ export default function LoginScreen() {
           <OtpLoginForm />
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

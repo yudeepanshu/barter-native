@@ -229,21 +229,6 @@ export function useListingContextMenuItems({
       });
     }
 
-    result.push({
-      key: "edit",
-      label: "Edit",
-      icon: "edit",
-      onPress: () => {
-        router.push({
-          pathname: "/(app)/listings/[id]/edit",
-          params: {
-            id: productId,
-            ...(returnTo ? { returnTo } : {}),
-          },
-        });
-      },
-    });
-
     if (!isReported) {
       result.push({
         key: "toggle-listing",
@@ -256,17 +241,28 @@ export function useListingContextMenuItems({
             onRelist(productId);
           }
         },
+      },{
+        key: "edit",
+        label: "Edit",
+        icon: "edit",
+        onPress: () => {
+          router.push({
+            pathname: "/(app)/listings/[id]/edit",
+            params: {
+              id: productId,
+              ...(returnTo ? { returnTo } : {}),
+            },
+          });
+        },
+      },{
+        key: "delete",
+        label: "Delete",
+        icon: "trash-2",
+        destructive: true,
+        dividerTop: true,
+        onPress: () => onDelete(productId),
       });
     }
-
-    result.push({
-      key: "delete",
-      label: "Delete",
-      icon: "trash-2",
-      destructive: true,
-      dividerTop: true,
-      onPress: () => onDelete(productId),
-    });
 
     return result;
   }, [

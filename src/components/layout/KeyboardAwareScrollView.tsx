@@ -3,7 +3,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  type MutableRefObject,
   type PropsWithChildren,
 } from "react";
 import {
@@ -179,7 +178,6 @@ export function KeyboardAwareScrollView({
         paddingBottom:
           basePaddingBottom +
           effectiveKeyboardInset +
-          insets.bottom +
           extraBottomPadding,
       },
     ];

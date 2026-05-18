@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +26,7 @@ import { useUnsavedChangesPrompt } from "@/hooks/useUnsavedChangesPrompt";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -269,7 +270,7 @@ export default function CreateListingScreen() {
   }, [form.state.fieldErrors.images]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <View style={styles.fixedTopContent}>
         <PageHeaderCard
@@ -498,7 +499,7 @@ export default function CreateListingScreen() {
           </>
         )}
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

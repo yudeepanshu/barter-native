@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { Feather } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Category, ProductSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,6 +28,7 @@ import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
+import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -47,17 +47,17 @@ export default function EditListingScreen() {
 
   if (productQuery.isPending) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <View style={styles.center}>
           <Spinner size={30} />
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   if (productQuery.error || !productQuery.data) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <ErrorView
           title='Listing not found'
           message='We could not load this listing.'
@@ -73,13 +73,13 @@ export default function EditListingScreen() {
             },
           ]}
         />
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
   if (productQuery.data.currentOwnerId !== session.user.id) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <ErrorView
           title='Not allowed'
           message='You can only edit your own listings.'
@@ -91,7 +91,7 @@ export default function EditListingScreen() {
             },
           ]}
         />
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
@@ -130,11 +130,11 @@ function EditListingFormSection({
 
   if (!form.state.hasInitialized) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <ScreenSafeView>
         <View style={styles.center}>
           <Spinner size={30} />
         </View>
-      </SafeAreaView>
+      </ScreenSafeView>
     );
   }
 
@@ -157,7 +157,7 @@ function EditListingFormSection({
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+    <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
       <View style={styles.fixedTopContent}>
         <PageHeaderCard
@@ -335,7 +335,7 @@ function EditListingFormSection({
           <Button label="Cancel" variant="ghost" onPress={form.actions.cancel} />
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </ScreenSafeView>
   );
 }
 

@@ -518,7 +518,7 @@ function RequestComposer({
 
   const { theme } = useAppTheme();
   const [includeMoney, setIncludeMoney] = useState(false);
-  const [includeProduct, setIncludeProduct] = useState(true);
+  const [includeProduct, setIncludeProduct] = useState(false);
   const [offeredProductIds, setOfferedProductIds] = useState<string[]>(() =>
     initialOfferedProductId ? [initialOfferedProductId] : [],
   );
@@ -675,7 +675,7 @@ function RequestComposer({
         <InfoTooltip
           text={
             product.isFree
-              ? "This listing is marked as free. You can only send a request without offering money or a product for trade. Deselect both if you'd like."
+              ? "This listing is marked as free. You can also send request offering money or a product for trade. Select both if you'd like."
               : supportOnlyMoneyOffers
                 ? "This listing only accepts cash offers. Enter the amount you'd like to offer"
                 : supportsMixedOffers

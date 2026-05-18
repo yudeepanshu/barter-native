@@ -17,6 +17,7 @@ import {
   invalidateTransactionForRequest,
   syncRequestMutationResult,
 } from "@/lib/query/mutationSync";
+import { queryKeys } from "@/lib/query/queryKeys";
 import { useAppStore } from "@/lib/store/appStore";
 
 function isDuplicateIdempotencyError(error: unknown) {
@@ -53,7 +54,27 @@ export function useCreateRequestMutation() {
     },
     onSuccess: (result) => {
       syncRequestMutationResult(queryClient, result);
-      void invalidateRequestCollectionByScope(queryClient, "sent");
+
+      const invalidations: Promise<unknown>[] = [];
+      invalidations.push(invalidateRequestCollectionByScope(queryClient, "sent"));
+      invalidations.push(invalidateProductCollections(queryClient));
+
+      if (result?.request) {
+        const req = result.request;
+        if (req.productId) {
+          invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(req.productId) }));
+        }
+
+        for (const offer of req.offers ?? []) {
+          if ((offer as any)?.productId) {
+            invalidations.push(
+              queryClient.invalidateQueries({ queryKey: queryKeys.products.detail((offer as any).productId) }),
+            );
+          }
+        }
+      }
+
+      void Promise.all(invalidations);
     },
   });
 }
@@ -243,12 +264,32 @@ export function useCreateCounterOfferMutation() {
           : null;
 
       syncRequestMutationResult(queryClient, result);
-      void Promise.all([
+
+      const invalidations: Promise<unknown>[] = [];
+      invalidations.push(
         invalidateScope
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
-        invalidateTransactionForRequest(queryClient, variables.requestId),
-      ]);
+      );
+      invalidations.push(invalidateTransactionForRequest(queryClient, variables.requestId));
+      invalidations.push(invalidateProductCollections(queryClient));
+
+      if (result?.request) {
+        const req = result.request;
+        if (req.productId) {
+          invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(req.productId) }));
+        }
+
+        for (const offer of req.offers ?? []) {
+          if ((offer as any)?.productId) {
+            invalidations.push(
+              queryClient.invalidateQueries({ queryKey: queryKeys.products.detail((offer as any).productId) }),
+            );
+          }
+        }
+      }
+
+      void Promise.all(invalidations);
     },
   });
 }

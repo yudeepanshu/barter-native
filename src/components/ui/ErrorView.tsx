@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1,
+    // borderRadius: 16,
+    // borderWidth: 1,
     padding: 24,
     gap: 6,
   },

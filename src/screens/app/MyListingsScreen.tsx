@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState, memo, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ProductSummary, RequestStatus } from "@barter/types";
+import type { ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
 import { useSession } from "@/hooks/useSession";
 import { useProductsListController } from "@/hooks/queries/useProductsListController";
 import { REQUESTS_SHARED_LIMIT, useRequestsQuery } from "@/hooks/queries/useRequestsQuery";
@@ -85,6 +85,7 @@ const ListingItem = memo(
     theme,
     styles,
     openRequestCount,
+    reservedRequest,
     isPreparing,
     isActivating,
     hasUploadFailure,
@@ -97,6 +98,7 @@ const ListingItem = memo(
     theme: any; // AppTheme colors object
     styles: any; // StyleSheet
     openRequestCount: number;
+    reservedRequest?: RequestSummary | null;
     isPreparing: boolean;
     isActivating: boolean;
     hasUploadFailure: boolean;
@@ -153,7 +155,36 @@ const ListingItem = memo(
           ) : null}
         </Pressable>
 
-        {openRequestCount > 0 ? (
+        {item.status === "RESERVED" && reservedRequest ? (
+          <View
+            style={[
+              styles.openRequestCard,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <View style={styles.openRequestInfoWrap}>
+              <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Reserved</Text>
+              <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted }]}> 
+                {reservedRequest.buyer?.userName ? `${reservedRequest.buyer.userName} reserved this listing.` : "Reserved by a buyer."}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => router.push(`/(app)/requests/${reservedRequest.id}`)}
+              style={[
+                styles.openRequestViewButton,
+                {
+                  borderColor: "#111827",
+                  backgroundColor: "#111827",
+                },
+              ]}
+            >
+              <Text style={[styles.openRequestViewButtonText, { color: "#ffffff" }]}>View</Text>
+            </Pressable>
+          </View>
+        ) : openRequestCount > 0 ? (
           <View
             style={[
               styles.openRequestCard,
@@ -347,6 +378,19 @@ export default function MyListingsScreen() {
       }
 
       map.set(request.productId, (map.get(request.productId) ?? 0) + 1);
+    }
+
+    return map;
+  }, [receivedRequestsQuery.data]);
+
+  const reservedRequestByProductId = useMemo(() => {
+    const requests = receivedRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const map = new Map<string, RequestSummary>();
+
+    for (const request of requests) {
+      if (request.status === "ACCEPTED") {
+        map.set(request.productId, request);
+      }
     }
 
     return map;
@@ -742,6 +786,7 @@ export default function MyListingsScreen() {
                   theme={theme}
                   styles={styles}
                   openRequestCount={openRequestCountByProductId.get(item.id) ?? 0}
+                  reservedRequest={reservedRequestByProductId.get(item.id) ?? null}
                   isPreparing={isPreparing}
                   isActivating={isActivating}
                   hasUploadFailure={hasUploadFailure}

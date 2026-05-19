@@ -230,18 +230,8 @@ export function useListingContextMenuItems({
     }
 
     if (!isReported) {
-      result.push({
-        key: "toggle-listing",
-        label: product.status === "ACTIVE" ? "Unlist" : "Relist",
-        icon: product.status === "ACTIVE" ? "eye-off" : "eye",
-        onPress: () => {
-          if (product.status === "ACTIVE") {
-            onUnlist(productId);
-          } else {
-            onRelist(productId);
-          }
-        },
-      },{
+      result.push(
+        {
         key: "edit",
         label: "Edit",
         icon: "edit",
@@ -253,6 +243,17 @@ export function useListingContextMenuItems({
               ...(returnTo ? { returnTo } : {}),
             },
           });
+        },
+      },{
+        key: "toggle-listing",
+        label: product.status === "ACTIVE" ? "Unlist" : "Relist",
+        icon: product.status === "ACTIVE" ? "eye-off" : "eye",
+        onPress: () => {
+          if (product.status === "ACTIVE") {
+            onUnlist(productId);
+          } else {
+            onRelist(productId);
+          }
         },
       },{
         key: "delete",

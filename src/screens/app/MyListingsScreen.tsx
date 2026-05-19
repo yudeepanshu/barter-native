@@ -28,6 +28,7 @@ import { EmptyView } from "@/components/ui/EmptyView";
 // ↓ shared hook
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
@@ -76,6 +77,7 @@ const ListingItem = memo(
     onContextMenuOpen: (productId: string, anchor: { left: number; top: number; bottom: number }) => void;
   }) {
     const displayOpenRequestCount = openRequestCount > OPEN_REQUEST_DISPLAY_CAP ? "10+" : `${openRequestCount}`;
+    const isReported = isProductReportedAboveThreshold(item);
 
     return (
       <View style={[styles.itemCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
@@ -99,8 +101,9 @@ const ListingItem = memo(
             hasUploadFailure={hasUploadFailure}
             hasMissingImageLock={hasMissingImageLock}
             localPreviewUri={localPreviewUri}
+            isReported={isReported}
           />
-          {item.status === "ACTIVE" || item.status === "EXCHANGED" || item.status === "INACTIVE" ? (
+          {!isReported && (item.status === "ACTIVE" || item.status === "EXCHANGED" || item.status === "INACTIVE") ? (
             <Pressable
               style={[
                 styles.editIconButton,
@@ -132,7 +135,7 @@ const ListingItem = memo(
             ]}
           >
             <View style={styles.openRequestInfoWrap}>
-              <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Reserved</Text>
+              {/* <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Reserved</Text> */}
               <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted }]}>
                 {reservedRequest.buyer?.userName
                   ? `${reservedRequest.buyer.userName} reserved this listing.`
@@ -601,6 +604,7 @@ function ListingPreview({
   hasUploadFailure = false,
   hasMissingImageLock = false,
   localPreviewUri = null,
+  isReported = false,
 }: {
   product: ProductSummary;
   isPreparing?: boolean;
@@ -608,11 +612,12 @@ function ListingPreview({
   hasUploadFailure?: boolean;
   hasMissingImageLock?: boolean;
   localPreviewUri?: string | null;
+  isReported?: boolean;
 }) {
   const { theme } = useAppTheme();
   const primaryImage = product.productImages?.find((img) => img.isPrimary) || product.productImages?.[0];
   const displayImageUri = primaryImage?.url ?? localPreviewUri;
-  const isLive = product.status === "ACTIVE";
+  const isLive = isReported ? false : product.status === "ACTIVE";
 
   return (
     <View style={styles.previewWrap}>
@@ -669,7 +674,7 @@ function ListingPreview({
             ]}
           >
             <Text style={[styles.statusPillText, { color: isLive ? "#15803d" : theme.colors.textMuted }]}>
-              {product.status}
+              {isReported ? "REPORTED" : product.status}
             </Text>
           </View>
         </View>

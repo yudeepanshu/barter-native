@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { initialWindowMetrics, } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";

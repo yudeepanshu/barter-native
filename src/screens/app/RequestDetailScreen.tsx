@@ -191,12 +191,16 @@ const OfferCard = memo(
         }}
         maxHeight={600}
       >
-        {offer.type !== "NONE" && (
+        {offer.type !== "NONE" ? (
           <View style={passedStyles.detailRow}>
             <Text style={[passedStyles.label, { color: theme.colors.textMuted }]}>Type</Text>
             <Text style={[passedStyles.value, { color: theme.colors.textPrimary }]}>
               {getOfferTypeLabel(offer.type)}
             </Text>
+          </View>
+        ): (
+          <View style={styles.detailRow}>
+            <Text style={[styles.value, { color: theme.colors.textPrimary }]}>Nothing Offered</Text>
           </View>
         )}
 
@@ -967,6 +971,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             label: "Cancel Request",
             key: "cancel",
             icon: 'x',
+            destructive: true,
+            iconOffset: 2,
             onPress: () =>
               dialog
                 .confirm("Cancel Request", "Are you sure you want to cancel this request?")

@@ -200,8 +200,9 @@ export default function ProductDetailScreen() {
   }
 
   const product = productData as ProductSummary;
+  const reported = isProductReportedAboveThreshold(product);
   const canEditListing =
-    isOwner &&
+    isOwner && !reported &&
     (product.status === "ACTIVE" || product.status === "EXCHANGED" || product.status === "INACTIVE");
   const isRequested = Boolean(activeRequest);
   const typeTag = getTopTypeTag(product, 'sm');
@@ -219,8 +220,6 @@ export default function ProductDetailScreen() {
       year: "numeric",
     });
   })();
-
-  const reported = isProductReportedAboveThreshold(product);
 
   return (
     <ScreenSafeView>
@@ -357,7 +356,7 @@ export default function ProductDetailScreen() {
             </View>
           ) : null}
 
-          {isOwner && reported ? (
+          {reported ? (
             <View
               style={[
                 styles.inactiveWarningBanner,
@@ -382,14 +381,14 @@ export default function ProductDetailScreen() {
                 >
                   This listing has been reported and is under review.
                 </Text>
-                <Text
+                {isOwner && <Text
                   style={[
                     styles.inactiveWarningSubtext,
                     { color: theme.mode === "dark" ? "#ef4444" : "#991b1b" },
                   ]}
                 >
                   Reported listings cannot be relisted or made active.
-                </Text>
+                </Text>}
               </View>
             </View>
           ) : null}

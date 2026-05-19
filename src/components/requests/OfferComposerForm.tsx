@@ -286,7 +286,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      {(offerableProducts.length > 0 || (selectedRequestedProductIds?.length ?? 0) > 0 || showRequestedProductSelector) ?
+      {(offerableProducts.length > 0 || (selectedRequestedProductIds?.length ?? 0) > 0 || showRequestedProductSelector || includeMoney || supportOnlyMoneyOffers) ?
         <Input
           label={messageLabel}
           value={message}

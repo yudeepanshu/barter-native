@@ -54,6 +54,8 @@ export async function requestMediaLibraryPermission(): Promise<boolean> {
 export async function launchCamera(): Promise<ImagePicker.ImagePickerResult> {
   return ImagePicker.launchCameraAsync({
     mediaTypes: ["images"],
+    allowsEditing: true,
+    // aspect: [4, 3], // or whatever ratio suits listings
     quality: 1,
     cameraType: ImagePicker.CameraType.back,
   });

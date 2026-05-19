@@ -19,6 +19,7 @@ export interface AnchoredContextMenuItem {
   onPress: () => void;
   destructive?: boolean;
   dividerTop?: boolean;
+  iconOffset?: number;
 }
 
 interface AnchoredContextMenuProps {
@@ -102,6 +103,7 @@ export function AnchoredContextMenu({
                 name={item.icon}
                 size={16}
                 color={item.destructive ? "#dc2626" : theme.colors.textPrimary}
+                style={item.iconOffset ? { marginTop: item.iconOffset } : undefined}  
               />
               <Text
                 style={[

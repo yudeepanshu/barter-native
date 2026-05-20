@@ -15,6 +15,7 @@ export interface AppDialogAction {
 export interface AppDialogOptions {
   title: string;
   message?: string;
+  contentNode?: ReactNode;
   actions: AppDialogAction[];
   showCloseButton?: boolean;
   disableDismiss?: boolean;
@@ -160,6 +161,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 {pendingDialog.message ? (
                   <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{pendingDialog.message}</Text>
                 ) : null}
+                {pendingDialog.contentNode ? pendingDialog.contentNode : null}
                 {pendingDialog.iconLayout ? (
                   <View style={styles.iconActionsRow}>
                     {pendingDialog.actions.map((action) => (

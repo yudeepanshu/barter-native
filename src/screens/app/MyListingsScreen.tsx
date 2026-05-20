@@ -29,6 +29,7 @@ import { EmptyView } from "@/components/ui/EmptyView";
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
+import { getStatusPillStyle } from "@/components/products/ProductTags";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
@@ -136,10 +137,10 @@ const ListingItem = memo(
           >
             <View style={styles.openRequestInfoWrap}>
               {/* <Text style={[styles.openRequestCardTitle, { color: theme.colors.textPrimary }]}>Reserved</Text> */}
-              <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted }]}>
+              <Text style={[styles.openRequestCardSubtitle, { color: theme.colors.textMuted, fontWeight: "500" }]}>
                 {reservedRequest.buyer?.userName
-                  ? `${reservedRequest.buyer.userName} reserved this listing.`
-                  : "Reserved by a buyer."}
+                  ? `${reservedRequest.buyer.userName} reserved this listing`
+                  : "Reserved by a buyer"}
               </Text>
             </View>
             <Pressable
@@ -267,7 +268,7 @@ export default function MyListingsScreen() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<ProductSummary["status"], number> = {
-      ACTIVE: 0, INACTIVE: 0, RESERVED: 0, EXCHANGED: 0, REMOVED: 0,
+      ACTIVE: 0, INACTIVE: 0, RESERVED: 0, EXCHANGED: 0, REMOVED: 0, REPORTED: 0
     };
     for (const item of filteredWithoutType) counts[item.status] += 1;
     return counts;
@@ -618,6 +619,7 @@ function ListingPreview({
   const primaryImage = product.productImages?.find((img) => img.isPrimary) || product.productImages?.[0];
   const displayImageUri = primaryImage?.url ?? localPreviewUri;
   const isLive = isReported ? false : product.status === "ACTIVE";
+  const pillStyle = getStatusPillStyle({ status: product.status, isReported, isLive, theme });
 
   return (
     <View style={styles.previewWrap}>
@@ -668,12 +670,12 @@ function ListingPreview({
             style={[
               styles.statusPill,
               {
-                backgroundColor: isLive ? "#dcfce7" : theme.colors.surfaceMuted,
-                borderColor: isLive ? "#86efac" : theme.colors.border,
+                backgroundColor: pillStyle.bg,
+                borderColor: pillStyle.border,
               },
             ]}
           >
-            <Text style={[styles.statusPillText, { color: isLive ? "#15803d" : theme.colors.textMuted }]}>
+            <Text style={[styles.statusPillText, { color: pillStyle.text }]}>
               {isReported ? "REPORTED" : product.status}
             </Text>
           </View>

@@ -895,7 +895,10 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
     }
 
     offer.offeredProducts.forEach((offeredProduct) => {
-      counterpartyProductMap.set(offeredProduct.product.id, offeredProduct.product);
+      const productOwnerId = offeredProduct.product.owner?.id ?? offeredProduct.product.currentOwnerId;
+      if (productOwnerId === counterparty.id) {
+        counterpartyProductMap.set(offeredProduct.product.id, offeredProduct.product);
+      }
     });
   });
 
@@ -913,17 +916,29 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const counterpartyPoolMap = new Map<string, ProductSummary>();
 
   orderedOffers.forEach((offer) => {
-    const byViewer = offer.offeredById === session.user.id;
-    const targetMap = byViewer ? viewerPoolMap : counterpartyPoolMap;
     offer.offeredProducts.forEach((op) => {
-      if (!targetMap.has(op.product.id)) targetMap.set(op.product.id, op.product);
+      const productOwnerId = op.product.owner?.id ?? op.product.currentOwnerId;
+      if (productOwnerId !== session.user.id && productOwnerId !== counterparty.id) {
+        return;
+      }
+
+      const targetMap = productOwnerId === session.user.id ? viewerPoolMap : counterpartyPoolMap;
+      if (!targetMap.has(op.product.id)) {
+        targetMap.set(op.product.id, op.product);
+      }
     });
   });
 
   request.visibleProducts.forEach((vp) => {
-    const byViewer = (vp.product.owner?.id ?? vp.product.currentOwnerId) === session.user.id;
-    const targetMap = byViewer ? viewerPoolMap : counterpartyPoolMap;
-    if (!targetMap.has(vp.product.id)) targetMap.set(vp.product.id, vp.product);
+    const productOwnerId = vp.product.owner?.id ?? vp.product.currentOwnerId;
+    if (productOwnerId !== session.user.id && productOwnerId !== counterparty.id) {
+      return;
+    }
+
+    const targetMap = productOwnerId === session.user.id ? viewerPoolMap : counterpartyPoolMap;
+    if (!targetMap.has(vp.product.id)) {
+      targetMap.set(vp.product.id, vp.product);
+    }
   });
 
   const yourConsiderationProducts = Array.from(viewerPoolMap.values());

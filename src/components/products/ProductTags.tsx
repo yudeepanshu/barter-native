@@ -175,6 +175,36 @@ export function getContextTag(product: ProductSummary, isRequested: boolean): Pr
   }
 }
 
+export const getStatusPillStyle = ({ status, isReported, isLive, theme }: { status: ProductSummary["status"]; isReported: boolean; isLive: boolean; theme: any }) => {
+  if (isReported || status === "REPORTED") {
+    return {
+      bg: "#fee2e2",
+      border: "#fda4af",
+      text: "#b91c1c",
+    };
+  }
+  if (isLive || status === "RESERVED") {
+    return {
+      bg: "#dcfce7",
+      border: "#86efac",
+      text: "#15803d",
+    };
+  }
+  // if () {
+  //   return {
+  //     bg: "#dbeafe",
+  //     border: "#93c5fd",
+  //     text: "#1d4ed8",
+  //   };
+  // }
+  // INACTIVE and fallback
+  return {
+    bg: theme.colors.surfaceMuted,
+    border: theme.colors.border,
+    text: theme.colors.textMuted,
+  };
+};
+
 export function ProductTag({
   tag,
   variant,

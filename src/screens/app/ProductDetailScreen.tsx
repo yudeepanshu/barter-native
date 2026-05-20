@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useEffect, useMemo, useState } from "react";
-import type { ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
+import type { ApiErrorShape, ProductSummary, RequestStatus, RequestSummary } from "@barter/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useProductQuery } from "@/hooks/queries/useProductQuery";
@@ -47,6 +47,7 @@ import { RequestItem } from "./RequestItem";
 import { TradeCardItem } from "./TradeCardItem";
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { ApiClient } from "@barter/api-client";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -252,12 +253,13 @@ export default function ProductDetailScreen() {
         textColor={theme.colors.textPrimary}
         contextMenuItems={
           isOwner
-            ? ownerContextMenuItems
+            ? !reported && (product.status === "EXCHANGED" || product.status === "INACTIVE" || product.status === "ACTIVE") ? ownerContextMenuItems : []
             : [
                 {
                   key: "report-listing",
                   label: "Report listing",
                   icon: "flag",
+                  destructive: true,
                   onPress: handleReportListing,
                 },
               ]
@@ -500,6 +502,7 @@ function RequestComposer({
   initialOfferedProductId?: string;
 }) {
   const router = useRouter();
+  const dialog = useAppDialog();
   const createRequestMutation = useCreateRequestMutation();
   const ownProductsQuery = useProductsListController({
     ownerId: sessionUserId,
@@ -647,6 +650,95 @@ function RequestComposer({
 
       router.replace("/(app)/(tabs)/requests");
     } catch (error) {
+      const shaped = ApiClient.toApiError(error) as ApiErrorShape;
+
+    if (shaped.code === "REQUEST_LIMIT_REACHED") {
+      const data = shaped.details as {
+        limit: number;
+        windowHours: number;
+        retryAfter: number;
+        retryMessage: string;
+      } | undefined;
+
+      dialog.show({
+        title: "Request limit reached",
+        showCloseButton: true,
+        dismissOnBackdrop: true,
+        actions: [{ key: "ok", label: "Got it", role: "cancel" }],
+        contentNode: data ? (
+          <View style={{ gap: 12 }}>
+            {/* Single info card */}
+            <View style={{
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              borderRadius: 12,
+              overflow: "hidden",
+            }}>
+              {/* Usage row */}
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: 12,
+                backgroundColor: theme.colors.surfaceMuted,
+              }}>
+                <Text style={{ fontSize: 13, color: theme.colors.textMuted, fontWeight: "600" }}>
+                  Requests used
+                </Text>
+                <View style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: theme.colors.dangerSoft,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                }}>
+                  <Feather name="slash" size={11} color={theme.colors.danger} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.danger }}>
+                    {data.limit} / {data.limit}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View style={{ height: 1, backgroundColor: theme.colors.border }} />
+
+              {/* Reset row */}
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: 12,
+                backgroundColor: theme.colors.surfaceMuted,
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Feather name="clock" size={13} color={theme.colors.textMuted} />
+                  <Text style={{ fontSize: 13, color: theme.colors.textMuted, fontWeight: "600" }}>
+                    Resets at
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.textPrimary }}>
+                  {data.retryMessage}
+                </Text>
+              </View>
+            </View>
+
+            {/* Helper text */}
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted, lineHeight: 18 }}>
+              You can send up to {data.limit} request{data.limit === 1 ? "" : "s"} every {data.windowHours}h. New requests unlock when the window resets.
+            </Text>
+          </View>
+        ) : (
+          <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
+            You've reached your request limit. Please try again later.
+          </Text>
+        ),
+      });
+      return;
+    }
+
+      // all other errors stay inline
       setFeedback(toErrorMessage(error));
     }
   };

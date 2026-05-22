@@ -16,6 +16,7 @@ export type RequestsScope = "sent" | "received";
 
 interface UseRequestsQueryOptions {
   enabled?: boolean;
+  staleTime?: number;
 }
 
 export const REQUESTS_SHARED_LIMIT = 20;
@@ -27,7 +28,7 @@ export function useRequestsQuery(
   filters: Omit<RequestListQueryInput, "cursor">,
   options: UseRequestsQueryOptions = {},
 ): UseInfiniteQueryResult<InfiniteData<RequestsListResult, string | null>, Error> {
-  const { enabled = true } = options;
+  const { enabled = true, staleTime } = options;
   const session = useSession();
   const profileId = useAppDataStore((state) => state.profile?.id ?? null);
   const requestsById = useAppDataStore((state) => state.requestsById);
@@ -84,7 +85,7 @@ export function useRequestsQuery(
   >({
     queryKey,
     enabled,
-    staleTime: REQUESTS_STALE_TIME_MS,
+    staleTime: staleTime ?? REQUESTS_STALE_TIME_MS,
     initialData,
     initialDataUpdatedAt,
     queryFn: async ({ pageParam }) => {

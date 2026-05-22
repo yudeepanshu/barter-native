@@ -50,6 +50,12 @@ export function CollapsibleHeaderCard({
   }, [controlledExpanded]);
 
   return (
+    <Pressable
+      onPress={() => {
+        setExpanded((v)=> !v);
+        onExpandedChange?.(!expanded);
+      }}
+    >
     <View
       style={[
         styles.card,
@@ -94,6 +100,7 @@ export function CollapsibleHeaderCard({
       </SmoothCollapse>
       {footerSlot ? <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>{footerSlot}</View> : null}
     </View>
+    </Pressable>
   );
 }
 

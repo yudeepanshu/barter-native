@@ -50,6 +50,7 @@ import { queryKeys } from "@/lib/query/queryKeys";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/currency";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { CancelModalKey, CancelWithReasonModal } from "@/components/requests/CancelWithReasonModal ";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -485,6 +486,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const verifyOtpMutation = useVerifyTransactionOtpMutation();
 
   const [otpInput, setOtpInput] = useState("");
+  const [cancelModalKey, setCancelModalKey] = useState<CancelModalKey | null>(null);
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [generatedOtpExpiresAt, setGeneratedOtpExpiresAt] = useState<string | null>(null);
   const [isGeneratedOtpExpired, setIsGeneratedOtpExpired] = useState(false);
@@ -729,6 +731,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const showCondition = showPendingTurnDetails || showAcceptedTurnDetails || (request.status === "ACCEPTED" && canCancel);
 
   const showRequestDetailsSection = showCondition && (!isSeller || !isReservedProductUsedInOtherOffers);
+  const isRequestClosed = ["REJECTED", "CANCELLED", "EXPIRED", "COMPLETED"].includes(request.status);
   
   const showTransactionSection =
     request.status === "ACCEPTED" && !isRequestCompleted && !isReservedProductUsedInOtherOffers && (transactionQuery.isPending || Boolean(tx));
@@ -880,6 +883,25 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
     }
   };
 
+  const onCancelModalConfirm = (key: CancelModalKey, reason: string) => {
+    if (key === "cancelSingleRequest") {
+      void cancelMutation
+        .mutateAsync({ requestId: request.id, reason })
+        .then(() => setCancelModalKey(null))
+        .catch((error) => void dialog.alert("Error", toRequestErrorMessage(error)));
+    } else if (key === "rejectOffer") {
+      void rejectMutation
+        .mutateAsync({ requestId: request.id, reason })
+        .then(() => setCancelModalKey(null))
+        .catch((error) => void dialog.alert("Error", toRequestErrorMessage(error)));
+    } else {
+      void cancelAllRequestsForProductMutation
+        .mutateAsync({ requestId: request.id, reason })
+        .then(() => setCancelModalKey(null))
+        .catch((error) => void dialog.alert("Error", toRequestErrorMessage(error)));
+    }
+  };
+
   const counterpartyProductMap = new Map<string, ProductSummary>();
 
   request.visibleProducts.forEach((visible) => {
@@ -945,6 +967,24 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const theirConsiderationProducts = Array.from(counterpartyPoolMap.values());
   const hasConsiderationProducts = viewerPoolMap.size > 0 || counterpartyPoolMap.size > 0;
 
+  const SYSTEM_CANCEL_REASONS: string[] = ["USER_CANCELLED", "EXPIRED", "OVERRIDDEN", "REJECTED"];
+
+  const cancelReasonBanner = (() => {
+    if (request.status !== "CANCELLED" && request.status !== "REJECTED") return null;
+
+    const reason = request.cancelledReason;
+
+    if (reason === "EXCHANGED") {
+      return "This request was closed as the item has been exchanged.";
+    }
+
+    // If it's a system reason or empty, don't show anything
+    if (!reason || SYSTEM_CANCEL_REASONS.includes(reason)) return null;
+
+    // It's a user-provided reason string — show it
+    return reason;
+  })();
+
   return (
     <ScreenSafeView>
       <StatusBar style={statusBarStyle} />
@@ -988,18 +1028,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             icon: 'x',
             destructive: true,
             iconOffset: 2,
-            onPress: () =>
-              dialog
-                .confirm("Cancel Request", "Are you sure you want to cancel this request?")
-                .then((confirmed) => {
-                  if (confirmed) {
-                    void cancelMutation
-                      .mutateAsync({ requestId: request.id, reason: "Cancelled from app" })
-                      .catch((error) => {
-                        void dialog.alert("Error", toRequestErrorMessage(error));
-                      });
-                  }
-                }),
+            onPress: () => setCancelModalKey("cancelSingleRequest"),
           }] : []
         }
       />
@@ -1050,7 +1079,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           />
 
         {/* Listing Used in Other Outgoing Requests — shown only to the seller */}
-        {isReservedProductUsedInOtherOffers && isSeller ? (
+        {isReservedProductUsedInOtherOffers && isSeller && !isRequestClosed ? (
           <View
             style={[
               styles.card,
@@ -1075,7 +1104,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 Listing Used in Another Request
               </Text>
             </View>
-
             <Text
               style={[
                 styles.feedbackText,
@@ -1085,6 +1113,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                 },
               ]}
             >
+              Your listing {" "}
               <Text style={{ fontWeight: "700" }}>{request.product.title}</Text>
               {" "}is offered in another request. Cancel conflicts to proceed with this one.
             </Text>
@@ -1129,29 +1158,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                   }}
                   textColor={theme.colors.danger}
                   labelStyle={{ fontWeight: "700", fontSize: 13 }}
-                  onPress={() => {
-                    void (async () => {
-                      const confirmed = await dialog.confirm(
-                        "Cancel All Conflicting Requests",
-                        `Cancel all outgoing requests offering "${request.product.title}"? This cannot be undone.`,
-                        {
-                          confirmLabel: "Cancel All",
-                          cancelLabel: "Go Back",
-                        },
-                      );
-
-                      if (!confirmed) return;
-
-                      try {
-                        await cancelAllRequestsForProductMutation.mutateAsync({
-                          requestId: request.id,
-                          reason: "Cancelled conflicting outgoing requests",
-                        });
-                      } catch (error) {
-                        void dialog.alert("Error", toRequestErrorMessage(error));
-                      }
-                    })();
-                  }}
+                  onPress={() => setCancelModalKey("cancelAllRequests")}
                   loading={cancelAllRequestsForProductMutation.isPending}
                 />
               </View>
@@ -1280,11 +1287,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                       }}
                       textColor="#dc2626"
                       labelStyle={{ fontWeight: '600', fontSize: 14 }}
-                      onPress={() =>
-                          rejectMutation.mutateAsync(request.id).catch((error) => {
-                            void dialog.alert("Error", toRequestErrorMessage(error));
-                          })
-                        }
+                      onPress={() => setCancelModalKey("rejectOffer")}
                       loading={rejectMutation.isPending}
                       leftIcon={<Feather name="x" size={16} color="#dc2626" />}
                     />
@@ -1659,6 +1662,25 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           </View>
         )}
 
+        {cancelReasonBanner ? (
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, flexDirection: "row", alignItems: "flex-start", gap: 10 }]}>
+            <Feather
+              name="x-circle"
+              size={16}
+              color={theme.colors.danger}
+              style={{ marginTop: 2 }}
+            />
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.textMuted }}>
+                {request.status === "REJECTED" ? "Rejection reason" : "Cancellation reason"}
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: theme.colors.textPrimary, lineHeight: 20 }}>
+                {cancelReasonBanner}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* Offer History */}
         {
           <OfferHistorySection
@@ -1704,6 +1726,14 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           />
         </SwipeableBottomSheet>
       ) : null}
+
+    <CancelWithReasonModal
+      activeKey={cancelModalKey}
+      loading={cancelMutation.isPending || cancelAllRequestsForProductMutation.isPending || rejectMutation.isPending}
+      onConfirm={onCancelModalConfirm}
+      onClose={() => setCancelModalKey(null)}
+    />
+
     </ScreenSafeView>
   );
 }

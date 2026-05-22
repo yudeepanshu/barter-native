@@ -9,7 +9,7 @@ import type {
   RespondContactRevealInput,
 } from "@barter/types";
 import { mobileApiClient } from "@/lib/api/client";
-import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
+import { sanitizeMultiLineInput, sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import {
   invalidateProductCollections,
   invalidateRequestCollectionByScope,
@@ -121,9 +121,10 @@ export function useRejectRequestMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (requestId: string) => {
+    mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
       try {
-        const envelope = await mobileApiClient.rejectRequest(requestId);
+        const payload: CancelRequestInput = { reason: sanitizeMultiLineInput(reason, 500) ?? "" };
+        const envelope = await mobileApiClient.rejectRequest(requestId, payload);
         return envelope.data ?? null;
       } catch (error) {
         if (isDuplicateIdempotencyError(error)) {
@@ -132,7 +133,7 @@ export function useRejectRequestMutation() {
         throw error;
       }
     },
-    onSuccess: (result, requestId) => {
+    onSuccess: (result, variables) => {
       const viewerId = useAppStore.getState().profile?.id;
       const invalidateScope =
         viewerId && result?.request
@@ -148,7 +149,7 @@ export function useRejectRequestMutation() {
         invalidateScope
           ? invalidateRequestCollectionByScope(queryClient, invalidateScope)
           : invalidateRequestCollections(queryClient),
-        invalidateTransactionForRequest(queryClient, requestId),
+        invalidateTransactionForRequest(queryClient, variables.requestId),
         invalidateProductCollections(queryClient),
       ]);
     },
@@ -161,7 +162,7 @@ export function useCancelRequestMutation() {
   return useMutation({
     mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
       try {
-        const payload: CancelRequestInput = { reason: sanitizeOptionalText(reason, 500) ?? "" };
+        const payload: CancelRequestInput = { reason: sanitizeMultiLineInput(reason, 500) ?? "" };
         const envelope = await mobileApiClient.cancelRequest(requestId, payload);
         return envelope.data ?? null;
       } catch (error) {
@@ -200,7 +201,7 @@ export function useCancelAllRequestsForProductMutation() {
   return useMutation({
     mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
       try {
-        const payload: CancelRequestInput = { reason: sanitizeOptionalText(reason, 500) ?? "" };
+        const payload: CancelRequestInput = { reason: sanitizeMultiLineInput(reason, 500) ?? "" };
         const envelope = await mobileApiClient.cancelAllRequestsForProduct(requestId, payload);
         return envelope.data ?? null;
       } catch (error) {

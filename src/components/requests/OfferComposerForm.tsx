@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ToggleChip } from "@/components/ui/ToggleChip";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SelectableProductGrid } from "@/components/requests/SelectableProductGrid";
+import { Spinner } from "../ui/Spinner";
 
 interface OfferComposerFormProps {
   title: string;
@@ -257,7 +258,12 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
           ) : (
             noProductsContent ?? null
           )}
-          {loadingProductsText ? <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{loadingProductsText}</Text> : null}
+          {loadingProductsText ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Spinner size={14} />
+              <Text style={[styles.offerHint, { color: theme.colors.textMuted }]}>{loadingProductsText}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 

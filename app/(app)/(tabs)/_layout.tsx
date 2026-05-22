@@ -1,7 +1,8 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { initialWindowMetrics } from "react-native-safe-area-context";
+import { View, Animated } from "react-native";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
@@ -13,7 +14,7 @@ import {
 import { queryClient } from "@/lib/query/queryClient";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
-import { Animated } from "react-native";
+import { Spinner } from "@/components/ui/Spinner";
 
 const tabBarBottomPadding = Math.max(initialWindowMetrics!.insets.bottom, 10);
 const tabBarHeight = 58 + tabBarBottomPadding;
@@ -24,6 +25,27 @@ function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   );
 }
 
+function CreateTabIcon({
+  color,
+  size,
+  isChecking,
+}: {
+  color: string;
+  size: number;
+  isChecking: boolean;
+}) {
+  if (isChecking) {
+    // Wrap in a fixed-size View matching the icon frame so the tab layout
+    // doesn't shift when switching between icon and spinner.
+    return (
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Spinner size={size - 6} />
+      </View>
+    );
+  }
+  return <Ionicons name="add-circle-outline" size={size} color={color} />;
+}
+
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
   const session = useSession();
@@ -32,6 +54,7 @@ export default function AppTabsLayout() {
   const tabBarVisible = useFeedScrollStore((state) => state.tabBarVisible);
   const dialog = useAppDialog();
   const createCheckInFlightRef = useRef(false);
+  const [isCheckingCreateLimit, setIsCheckingCreateLimit] = useState(false);
 
   const tabBarTranslateY = useRef(new Animated.Value(0)).current;
 
@@ -55,22 +78,30 @@ export default function AppTabsLayout() {
           if (openingCreateTab) {
             event.preventDefault();
 
-            if (createCheckInFlightRef.current) {
-              return;
-            }
-
+            if (createCheckInFlightRef.current) return;
             createCheckInFlightRef.current = true;
+            setIsCheckingCreateLimit(true);
+            const routeAtTapTime = navigation.getState().routes[navigation.getState().index]?.name;
 
             void (async () => {
               try {
                 const userId = session?.user.id;
 
                 if (!userId) {
+                  setIsCheckingCreateLimit(false);
                   navigation.navigate("create");
                   return;
                 }
 
                 const atLimit = await checkProductCreationLimit(queryClient, userId);
+
+                // User navigated away while check was in flight — abort silently.
+                const currentRoute = navigation.getState().routes[navigation.getState().index]?.name;
+                if (currentRoute !== routeAtTapTime) return;
+
+                // Clear spinner immediately before any visible outcome so it doesn't
+                // linger while the create screen mounts or the dialog animates in.
+                setIsCheckingCreateLimit(false);
 
                 if (!atLimit) {
                   navigation.navigate("create");
@@ -88,9 +119,13 @@ export default function AppTabsLayout() {
                   navigation.navigate("my-listings");
                 }
               } catch {
-                navigation.navigate("create");
+                const currentRoute = navigation.getState().routes[navigation.getState().index]?.name;
+                if (currentRoute === routeAtTapTime) {
+                  navigation.navigate("create");
+                }
               } finally {
                 createCheckInFlightRef.current = false;
+                setIsCheckingCreateLimit(false);
               }
             })();
 
@@ -154,15 +189,29 @@ export default function AppTabsLayout() {
       />
       <Tabs.Screen
         name="requests"
-        options={{ title: "Requests", tabBarIcon: renderTabIcon("swap-horizontal-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
+        options={{
+          title: "Requests",
+          tabBarIcon: renderTabIcon("swap-horizontal-outline"),
+          sceneStyle: { paddingBottom: tabBarHeight },
+        }}
       />
       <Tabs.Screen
         name="create"
-        options={{ title: "Create", tabBarIcon: renderTabIcon("add-circle-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
+        options={{
+          title: "Create",
+          tabBarIcon: ({ color, size }) => (
+            <CreateTabIcon color={color} size={size} isChecking={isCheckingCreateLimit} />
+          ),
+          sceneStyle: { paddingBottom: tabBarHeight },
+        }}
       />
       <Tabs.Screen
         name="my-listings"
-        options={{ title: "My Listings", tabBarIcon: renderTabIcon("pricetag-outline"), sceneStyle: { paddingBottom: tabBarHeight }, }}
+        options={{
+          title: "My Listings",
+          tabBarIcon: renderTabIcon("pricetag-outline"),
+          sceneStyle: { paddingBottom: tabBarHeight },
+        }}
       />
       <Tabs.Screen
         name="profile"

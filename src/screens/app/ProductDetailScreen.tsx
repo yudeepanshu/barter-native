@@ -98,8 +98,15 @@ export default function ProductDetailScreen() {
   const sentRequestsQuery = useRequestsQuery(
     "sent",
     { limit: REQUESTS_SENT_MATCH_LIMIT },
-    { enabled: cachedSentRequests.length === 0 },
+    {
+      enabled: cachedSentRequests.length === 0 ||
+        cachedSentRequests.some(
+          (r) => r.productId === productId && ACTIVE_REQUEST_STATUSES.includes(r.status),
+        ),
+      staleTime: 30_000,
+    },
   );
+
   const { permission, lastKnown } = useDeviceLocation();
 
   const viewerLocation =
@@ -772,14 +779,16 @@ function RequestComposer({
       <View style={styles.requestTitleRow}>
         <Text style={[styles.requestTitle, { color: theme.colors.textPrimary }]}>Send Request</Text>
         <InfoTooltip
+          iconColor={theme.mode === "dark" ? "#8bbaf3" : "#467ffa"}
           text={
-            product.isFree
-              ? "This listing is marked as free. You can also send request offering money or a product for trade. Select both if you'd like."
+            (product.isFree
+              ? "This listing is marked as free. You can also send request offering cash or your listings for trade. Select both if you'd like."
               : supportOnlyMoneyOffers
-                ? "This listing only accepts cash offers. Enter the amount you'd like to offer"
+                ? "This listing only accepts cash offers. Enter the amount you'd like to offer."
                 : supportsMixedOffers
-                  ? "This listing accepts both money and trade offers. You can choose to include either or both in your request."
-                  : "This listing accepts a trade offer. You must include at least one of your listings in the request."
+                  ? "This listing accepts both cash and trade offers. You can choose to include either or both in your request."
+                  : "This listing accepts a trade offer. You must include at least one of your listings in the request.")
+            + ((product.isFree || supportOnlyMoneyOffers || supportsMixedOffers) ? "\n\nNo payments are processed in this app. Any cash amounts are agreed between parties and settled outside the app." : "")
           }
         />
       </View>

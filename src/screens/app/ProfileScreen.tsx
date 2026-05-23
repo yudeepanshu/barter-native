@@ -467,7 +467,7 @@ function hasExistingValue(value: string | null | undefined) {
 
 function getCurrentVersionLabel() {
   const fromConfig = Constants.expoConfig?.version?.trim();
-  if (fromConfig) return `Version ${fromConfig}`;
+  if (fromConfig) return `v${fromConfig}`;
   return "Version unavailable";
 }
 

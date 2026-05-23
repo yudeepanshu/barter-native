@@ -745,6 +745,15 @@ function RequestComposer({
       return;
     }
 
+    if (shaped.code === "MAX_ALLOWED_ACTIVE_REQUESTS_REACHED") {
+      await dialog.show({
+        title: "Too many requests",
+        message: "This product reached its max requests limit. Please try again later.",
+        actions: [{ key: "ok", label: "Got it" }],
+      });
+      return;
+    }
+
       // all other errors stay inline
       setFeedback(toErrorMessage(error));
     }

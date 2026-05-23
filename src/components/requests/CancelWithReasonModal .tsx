@@ -3,7 +3,7 @@ import { FloatingModal } from "@/components/ui/FloatingModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { sanitizeMultiLineInput } from "@/lib/utils/inputSanitizer";
 
 const MIN_REASON_LENGTH = 15;
@@ -99,26 +99,28 @@ export function CancelWithReasonModal({
         style={styles.textArea}
       />
 
-      <Button
-        label={config?.confirmLabel ?? "Confirm"}
-        style={[
-          styles.confirmButton,
-          { backgroundColor: theme.colors.danger, opacity: isConfirmDisabled ? 0.45 : 1 },
-        ]}
-        textColor="#ffffff"
-        labelStyle={styles.confirmLabel}
-        loading={loading}
-        disabled={isConfirmDisabled}
-        onPress={handleConfirm}
-      />
+      <View style={styles.buttonGroup}>
+        <Button
+          label={config?.confirmLabel ?? "Confirm"}
+          style={[
+            styles.confirmButton,
+            { backgroundColor: theme.colors.danger, opacity: isConfirmDisabled ? 0.45 : 1 },
+          ]}
+          textColor="#ffffff"
+          labelStyle={styles.confirmLabel}
+          loading={loading}
+          disabled={isConfirmDisabled}
+          onPress={handleConfirm}
+        />
 
-      <Button
-        label="Go Back"
-        variant="ghost"
-        style={styles.backButton}
-        textColor={theme.colors.textSecondary}
-        onPress={handleClose}
-      />
+        <Button
+          label="Go Back"
+          variant="ghost"
+          style={styles.backButton}
+          textColor={theme.colors.textSecondary}
+          onPress={handleClose}
+        />
+      </View>
     </FloatingModal>
   );
 }
@@ -141,5 +143,8 @@ const styles = StyleSheet.create({
   backButton: {
     minHeight: 44,
     borderRadius: 12,
+  },
+  buttonGroup: {
+    gap: 8,
   },
 });

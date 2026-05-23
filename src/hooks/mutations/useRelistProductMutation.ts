@@ -29,6 +29,7 @@ export function useRelistProductMutation() {
       syncProductEntity(queryClient, updated);
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(productId) }),
+        invalidateProductCollections(queryClient),
         invalidateRequestCollections(queryClient),
       ]);
     },

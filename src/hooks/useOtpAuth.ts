@@ -119,6 +119,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
   );
 
   const signOut = useCallback(async () => {
+    setBusy(true);
     try {
       const refreshToken = session?.tokens.refreshToken;
       if (refreshToken) {
@@ -141,6 +142,7 @@ export function useOtpAuth(): UseOtpAuthReturn {
     await clearSession();
     setStep("identifier");
     setError(null);
+    setBusy(false);
   }, [clearSession, session?.tokens.refreshToken]);
 
   const goToIdentifierStep = useCallback(() => {

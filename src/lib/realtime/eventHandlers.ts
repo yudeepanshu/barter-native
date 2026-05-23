@@ -59,6 +59,7 @@ function shouldRefetchProductCollections(action: DomainEvent<"product.updated">[
   return (
     action === "CREATED" ||
     action === "RELISTED" ||
+    action === "UNLISTED" ||
     action === "REMOVED" ||
     action === "RESERVED" ||
     action === "EXCHANGED" ||

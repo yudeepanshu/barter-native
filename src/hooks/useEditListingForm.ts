@@ -202,7 +202,11 @@ export function useEditListingForm(
     try {
       const snapshot = await requestLocation({ maxAccuracyMeters: 50 });
       if (!snapshot) {
-        setFormError(LISTING_FORM_ERRORS.LOCATION_ACCURACY);
+        // setFormError(LISTING_FORM_ERRORS.LOCATION_ACCURACY);
+        await dialog.alert(
+          "Location required",
+          "Location permission not granted. Enable it to use this feature.",
+        );
         return false;
       }
 

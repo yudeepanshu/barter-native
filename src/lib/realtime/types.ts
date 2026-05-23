@@ -13,6 +13,7 @@ export type ProductAction =
   | "CREATED"
   | "UPDATED"
   | "RELISTED"
+  | "UNLISTED"
   | "REMOVED"
   | "RESERVED"
   | "EXCHANGED"

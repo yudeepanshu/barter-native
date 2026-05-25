@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.shinichi.flippeapp",
-      "versionCode": 51,
+      "versionCode": 52,
       "googleServicesFile": "./google-services.json",
       "enableProguardInReleaseBuilds": true,
       "enableShrinkResourcesInReleaseBuilds": true,

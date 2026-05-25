@@ -120,6 +120,8 @@ const OfferCard = memo(
     theme,
     router,
     styles: passedStyles,
+    isExpanded,
+    onToggleExpand,
   }: {
     offer: any; // RequestOfferSummary
     index: number;
@@ -129,6 +131,8 @@ const OfferCard = memo(
     theme: any; // AppTheme
     router: ReturnType<typeof useRouter>;
     styles: any; // StyleSheet
+    isExpanded: boolean;
+    onToggleExpand: (offerId: string) => void;
   }) {
     const firstName = offer.offeredById === sessionUserId ? "You" : getFirstName(offer.offeredBy?.userName);
     const offeredByLabel = firstName || "User";
@@ -191,6 +195,8 @@ const OfferCard = memo(
           border: theme.colors.border,
         }}
         maxHeight={600}
+        isExpanded={isExpanded}
+        onToggleExpand={() => onToggleExpand(offer.id)}
       >
         {offer.type !== "NONE" ? (
           <View style={passedStyles.detailRow}>
@@ -376,32 +382,44 @@ const OfferHistorySection = memo(function OfferHistorySection({
   theme,
   passedStyles,
 }: {
-  offers: any[]; // RequestOfferSummary[]
+  offers: any[];
   sessionUserId: string;
   sessionProfilePicture: string | null;
   router: ReturnType<typeof useRouter>;
-  theme: any; // AppTheme
-  passedStyles: any; // StyleSheet
+  theme: any;
+  passedStyles: any;
 }) {
   const [visibleOffersCount, setVisibleOffersCount] = useState(OFFERS_PAGE_SIZE);
+  const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
+
   const visibleOffers = useMemo(() => offers.slice(0, visibleOffersCount), [offers, visibleOffersCount]);
   const hasMoreOffers = offers.length > visibleOffersCount;
 
-  if(offers.length === 0) {
-    return <View style={{ gap: 10 }}>
-    <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History</Text>
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+  const handleToggleExpand = useCallback((offerId: string) => {
+    setExpandedOfferId((prev) => (prev === offerId ? null : offerId));
+  }, []);
+
+  if (offers.length === 0) {
+    return (
+      <View style={{ gap: 10 }}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>
+          Offer History
+        </Text>
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No offers yet.</Text>
+        </View>
       </View>
-    </View>;
+    );
   }
 
   return (
     <View style={{ gap: 10 }}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>Offer History ({offers.length})</Text>
+      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, marginLeft: 4 }]}>
+        Offer History ({offers.length})
+      </Text>
       <View style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }}>
-        <ScrollView style={{maxHeight: OFFER_LIST_MAX_HEIGHT}} nestedScrollEnabled showsVerticalScrollIndicator>
-          <View style={{gap: 8}}>
+        <ScrollView style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }} nestedScrollEnabled showsVerticalScrollIndicator>
+          <View style={{ gap: 8 }}>
             {visibleOffers.map((offer, index) => (
               <OfferCard
                 key={offer.id}
@@ -413,24 +431,26 @@ const OfferHistorySection = memo(function OfferHistorySection({
                 router={router}
                 styles={passedStyles}
                 theme={theme}
+                isExpanded={expandedOfferId === offer.id}
+                onToggleExpand={handleToggleExpand}
               />
             ))}
             {hasMoreOffers ? (
-            <Pressable
-              onPress={() => setVisibleOffersCount((count) => count + OFFERS_PAGE_SIZE)}
-              style={{
-                paddingVertical: 12,
-                alignItems: "center",
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-                marginTop: 4,
-              }}
-            >
-              <Text style={{ color: theme.colors.textPrimary, fontWeight: "600" }}>Load more offers</Text>
-            </Pressable>
-          ) : null}
+              <Pressable
+                onPress={() => setVisibleOffersCount((count) => count + OFFERS_PAGE_SIZE)}
+                style={{
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                  marginTop: 4,
+                }}
+              >
+                <Text style={{ color: theme.colors.textPrimary, fontWeight: "600" }}>Load more offers</Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </View>

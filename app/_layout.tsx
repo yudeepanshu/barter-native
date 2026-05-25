@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as SplashScreen from "expo-splash-screen";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Providers } from "@/providers/Providers";
+import StartupBanners from "@/components/ui/StartupBanners";
 import { useAuthStatus } from "@/hooks/useSession";
 import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
@@ -157,6 +158,7 @@ function SplashScreenBootstrap() {
 export default function RootLayout() {
   return (
     <Providers>
+      <StartupBanners />
       <SplashScreenBootstrap />
       <NotificationNavigationBootstrap />
       <RouteGuard>

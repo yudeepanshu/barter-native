@@ -18,6 +18,9 @@ interface CollapsibleSectionProps {
   rightElement?: React.ReactNode;
   subtitle?: string;
   leftElement?: React.ReactNode;
+  // Controlled mode
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export function CollapsibleSection({
@@ -30,13 +33,21 @@ export function CollapsibleSection({
   rightElement,
   subtitle,
   leftElement,
+  isExpanded,
+  onToggleExpand,
 }: CollapsibleSectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+
+  const isControlled = isExpanded !== undefined;
+  const expanded = isControlled ? isExpanded : internalExpanded;
+  const toggle = isControlled
+    ? onToggleExpand!
+    : () => setInternalExpanded((c) => !c);
 
   return (
     <View style={[styles.container, { borderColor: themeColors.border, backgroundColor: themeColors.surface }]}>
       <Pressable
-        onPress={() => setExpanded((current) => !current)}
+        onPress={toggle}
         style={[styles.header, { borderBottomWidth: expanded ? 1 : 0, borderColor: themeColors.border }]}
         testID={testID}
       >

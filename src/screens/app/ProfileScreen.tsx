@@ -36,12 +36,12 @@ import { AppCard } from "@/components/ui/AppCard";
 import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import { FloatingModal } from "@/components/ui/FloatingModal";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
-
+import { useStartupBannersStore } from "@/lib/ui/startupBannersStore";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -436,8 +436,8 @@ const AutoChip = () => {
         },
       ]}
     >
-      <Feather
-        name={resolvedMode === "dark" ? "moon" : "sun"}
+      <MaterialCommunityIcons
+        name={resolvedMode === "dark" ? "weather-night" : "white-balance-sunny"}
         size={16}
         color={isAuto ? theme.colors.onPrimary : theme.colors.textMuted}
       />
@@ -492,6 +492,9 @@ export default function ProfileScreen() {
       ? queriedUser
       : sessionUser ?? queriedUser;
   const appVersionLabel = useMemo(() => getCurrentVersionLabel(), []);
+
+  // Open startup banners (use hook for stable single-tap behavior)
+  const openStartupBanners = useStartupBannersStore((s) => s.open);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -993,6 +996,39 @@ export default function ProfileScreen() {
             </View>
           </Pressable>
         ) : null}
+
+        {/* App tour / onboarding teaser */}
+        <Pressable
+          onPress={() => {
+            // Open banners from profile without persisting dismissal so users can re-open later
+            openStartupBanners({ persistOnClose: false });
+          }}
+          hitSlop={8}
+          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+          accessibilityRole="button"
+          accessibilityLabel="Open app tour"
+          style={[
+            styles.feedbackTeaser,
+            {
+              borderColor: theme.colors.border,
+              borderRadius: theme.roundness,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <View style={[styles.feedbackIconCircle, { backgroundColor: theme.colors.surfaceMuted ?? '#EEF2FF' }]}>
+            <MaterialCommunityIcons
+              name="information-outline"
+              size={22}
+              color={theme.colors.primary}
+            />
+          </View>
+
+          <View style={styles.feedbackTextGroup}>
+            <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>App tour</Text>
+            <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>See how selling and buying work</Text>
+          </View>
+        </Pressable>
 
         <View style={styles.versionFooter}>
           <Text style={[styles.versionText, { color: theme.colors.textMuted }]}>

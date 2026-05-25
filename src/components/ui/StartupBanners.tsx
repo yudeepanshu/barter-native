@@ -36,48 +36,76 @@ type Tab = "seller" | "buyer";
 const SELLER_SLIDES: Slide[] = [
   {
     title: "List in seconds",
-    subtitle: "Create a listing with photos, title, price or trade options — anyone can sell or buy.",
+    subtitle: "Snap photos, add a title and description, pick a category, and post. Your item goes live instantly to nearby buyers.",
     icon: "camera-plus-outline",
     accent: "#7C3AED",
     accentBg: "#EDE9FE",
   },
   {
-    title: "Flexible pricing",
-    subtitle: "Sellers choose cash, trade, both, or set the item free — you control offers.",
+    title: "You set the terms",
+    subtitle: "Accept cash, trade for other items, both, or give it away for free. Full control over how you want to deal.",
     icon: "tag-outline",
     accent: "#0EA5E9",
     accentBg: "#E0F2FE",
   },
   {
-    title: "Manage with ease",
-    subtitle: "Review incoming requests and accept, counter, or decline. Contact exchange only after accept.",
+    title: "Manage offers easily",
+    subtitle: "Review incoming requests, counter-offer, accept or decline. Contact details are only shared when you accept an offer, that also after approval.",
     icon: "check-decagram-outline",
     accent: "#10B981",
     accentBg: "#D1FAE5",
+  },
+  {
+    title: "Buyers can sell too",
+    subtitle: "Every account works both ways. Switch between buying and selling anytime — no separate accounts, no restrictions.",
+    icon: "swap-horizontal-circle-outline",
+    accent: "#6366F1",
+    accentBg: "#EEF2FF",
+  },
+  {
+    title: "Cash stays between you",
+    subtitle: "Flippe doesn't handle payments. Money, trades, or freebies. All settled directly between you and the other person, your way.",
+    icon: "hand-coin-outline",
+    accent: "#D97706",
+    accentBg: "#FEF3C7",
   },
 ];
 
 const BUYER_SLIDES: Slide[] = [
   {
-    title: "Find it nearby",
-    subtitle: "Browse local listings, filter by category and distance, and create requests for items you like.",
+    title: "Discover nearby",
+    subtitle: "Browse listings around you, filter by category and distance, find exactly what you need or just explore what's out there.",
     icon: "map-search-outline",
     accent: "#F59E0B",
     accentBg: "#FEF3C7",
   },
   {
     title: "Offer your way",
-    subtitle: "Make offers with cash, trade, or both. Negotiate and accept when you agree.",
+    subtitle: "Send cash offers, propose trades with your own items, or mix both. Negotiate with sellers until you strike the perfect deal.",
     icon: "handshake-outline",
     accent: "#EC4899",
     accentBg: "#FCE7F3",
   },
   {
-    title: "Safe exchange",
-    subtitle: "Items are reserved when accepted. Either party can request contact details to arrange exchange.",
+    title: "Safe & verified exchange",
+    subtitle: "Accepted items are reserved for you. Request contact details and verify the handoff in person with secure one time code.",
     icon: "shield-check-outline",
     accent: "#10B981",
     accentBg: "#D1FAE5",
+  },
+  {
+    title: "Sellers can buy too",
+    subtitle: "Your account works both ways. Browse and make offers as a buyer, list your own items as a seller — all from the same place.",
+    icon: "swap-horizontal-circle-outline",
+    accent: "#6366F1",
+    accentBg: "#EEF2FF",
+  },
+  {
+    title: "Cash stays between you",
+    subtitle: "Flippe doesn't handle payments. Money, trades, or freebies. All settled directly between you and the other person, your way.",
+    icon: "hand-coin-outline",
+    accent: "#D97706",
+    accentBg: "#FEF3C7",
   },
 ];
 
@@ -112,10 +140,12 @@ function SlideCard({
   slide,
   entering,
   direction,
+  mode = "sheet",
 }: {
   slide: Slide;
   entering: boolean;
   direction: "forward" | "back";
+  mode?: 'full' | 'sheet';
 }) {
   const translateX = useRef(
     new Animated.Value(direction === "forward" ? SLIDE_WIDTH : -SLIDE_WIDTH),
@@ -164,7 +194,7 @@ function SlideCard({
     <Animated.View
       style={[
         cardStyles.card,
-        { transform: [{ translateX }], opacity, backgroundColor: theme.colors.surface },
+        { transform: [{ translateX }], opacity, backgroundColor: mode === "sheet" ? theme.colors.surface : "transparent" },
       ]}
     >
       {/* Icon badge */}
@@ -277,12 +307,16 @@ export default function StartupBanners() {
   const [renderKey, setRenderKey] = useState(0); // forces remount on slide change
 
   const status = useAuthStatus();
-  const { visible, open, close, persistOnClose } = useStartupBannersStore();
+  const { visible, open, close, persistOnClose, mode, openId } = useStartupBannersStore();
   const { theme } = useAppTheme();
+
+  const prevOpenIdRef = useRef(openId);
 
   // Modal entrance animation
   const sheetY = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  const fullOpacity = useRef(new Animated.Value(0)).current;
 
   const slides = tab === "seller" ? SELLER_SLIDES : BUYER_SLIDES;
   const slide = slides[index];
@@ -291,62 +325,101 @@ export default function StartupBanners() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (visible) {
-        if (mounted) setVisibleLocal(true);
-        return;
-      }
+      if (visible) return;
       if (status !== "unauthenticated") return;
       try {
         const v = await SecureStore.getItemAsync(STORAGE_KEY);
-        if (mounted && v !== "1") open({ persistOnClose: true });
+        if (mounted && v !== "1") open({ persistOnClose: true, mode: "sheet" });
       } catch {
-        if (mounted) open({ persistOnClose: true });
+        if (mounted) open({ persistOnClose: true, mode: "sheet" });
       }
     })();
     return () => { mounted = false; };
   }, [status, visible, open]);
 
-  // ── Sync store → local ──
   useEffect(() => {
-    if (visible) {
+    if(openId !== prevOpenIdRef.current) {
+      prevOpenIdRef.current = openId;
+      setTab("seller");
+      setIndex(0);
+      setDirection("forward");
+      setRenderKey((k) => k + 1);
+    }
+  }, [openId]);
+
+  // ── Sync store → local visibility + animation ──
+useEffect(() => {
+  if (visible) {
+    sheetY.stopAnimation();
+    backdropOpacity.stopAnimation();
+    fullOpacity.stopAnimation();
+
+    if (mode === "sheet") {
+      sheetY.setValue(height);
+      backdropOpacity.setValue(0);
       setVisibleLocal(true);
-      // Slide sheet up
-      Animated.parallel([
-        Animated.spring(sheetY, {
-          toValue: 0,
-          useNativeDriver: true,
-          damping: 26,
-          stiffness: 300,
-          mass: 1,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 280,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(sheetY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 28,
+            stiffness: 280,
+            mass: 0.9,
+          }),
+          Animated.timing(backdropOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
     } else {
-      // Slide sheet down then hide — but only hide if store still says closed
-      Animated.parallel([
-        Animated.spring(sheetY, {
-          toValue: height,
+      fullOpacity.setValue(0);
+      setVisibleLocal(true);
+      requestAnimationFrame(() => {
+        Animated.timing(fullOpacity, {
+          toValue: 1,
+          duration: 300,
           useNativeDriver: true,
-          damping: 30,
-          stiffness: 340,
+        }).start();
+      });
+    }
+  } else {
+    sheetY.stopAnimation();
+    backdropOpacity.stopAnimation();
+    fullOpacity.stopAnimation();
+
+    if (mode === "sheet") {
+      Animated.parallel([
+        Animated.timing(sheetY, {
+          toValue: height,
+          duration: 250,
+          useNativeDriver: true,
         }),
         Animated.timing(backdropOpacity, {
           toValue: 0,
-          duration: 220,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // If the store was reopened while the close animation ran, keep visible
+        if (!useStartupBannersStore.getState().visible) {
+          setVisibleLocal(false);
+        }
+      });
+    } else {
+      Animated.timing(fullOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => {
         if (!useStartupBannersStore.getState().visible) {
           setVisibleLocal(false);
         }
       });
     }
-  }, [visible]);
+  }
+}, [visible]);
 
   const changeSlide = useCallback(
     (newIndex: number, dir: "forward" | "back") => {
@@ -389,53 +462,68 @@ export default function StartupBanners() {
 
   const accent = slide.accent;
   const isLast = index === slides.length - 1;
-  const mode = /* persistOnClose ? "full" : */ "sheet";
 
-//   if (mode === "full") {
-//     return (
-//       <Modal animationType="slide" visible={visibleLocal} transparent={false} statusBarTranslucent>
-//         <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: Platform.OS === 'android' ? 48 : 56 }}>
-//           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-//             <View style={{ width: 40 }} />
-//             <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.textPrimary }}>Welcome to Flippe</Text>
-//             <Pressable onPress={onDismiss} hitSlop={8}>
-//               <MaterialCommunityIcons name="close" size={22} color={theme.colors.textSecondary} />
-//             </Pressable>
-//           </View>
+  if (mode === "full") {
+    return (
+      <Modal animationType="none" visible={visibleLocal} transparent={true} statusBarTranslucent hardwareAccelerated>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background }]} />
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fullOpacity }]}>
+          <View style={[fullStyles.container, { backgroundColor: theme.colors.background }]}>
+            <View style={fullStyles.header}>
+              <View style={{ width: 40 }} />
+              <Text style={[fullStyles.headerTitle, { color: theme.colors.textPrimary }]}>Welcome to Flippe</Text>
+              <Pressable onPress={onDismiss} hitSlop={12} accessibilityLabel="Close">
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
 
-//           <View style={{ marginTop: 28, alignItems: 'center', flex: 1 }}>
-//             <View style={{ marginBottom: 8 }}>
-//               <TabPill label="For Sellers" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')} />
-//             </View>
-//             <View style={{ marginBottom: 12 }}>
-//               <TabPill label="For Buyers" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} />
-//             </View>
+            <View style={fullStyles.content}>
+              <View style={[fullStyles.tabRow, { backgroundColor: theme.colors.surfaceMuted }]}>
+                <TabPill label="For Sellers" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')} />
+                <TabPill label="For Buyers" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} />
+              </View>
 
-//             <View style={{ width: SLIDE_WIDTH, alignItems: 'center' }}>
-//               <SlideCard key={`${tab}-${index}-${renderKey}`} slide={slide} entering direction={direction} />
-//             </View>
+              <View style={fullStyles.slideWrap}>
+                <SlideCard key={`${tab}-${index}-${renderKey}`} slide={slide} entering direction={direction} mode="full" />
+              </View>
 
-//             <View style={{ marginTop: 18 }}>
-//               <Dots total={slides.length} active={index} accent={accent} />
-//             </View>
+              <View style={fullStyles.dotsWrap}>
+                <Dots total={slides.length} active={index} accent={accent} />
+              </View>
+            </View>
 
-//             <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginTop: 24 }}>
-//               <Pressable onPress={onBack} disabled={index === 0} style={({ pressed }) => [{ opacity: index === 0 ? 0.4 : pressed ? 0.7 : 1 }]}>
-//                 <Text style={{ color: theme.colors.textSecondary, fontSize: 16 }}>Back</Text>
-//               </Pressable>
-//               <Pressable onPress={onNext} style={({ pressed }) => [{ backgroundColor: accent, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, opacity: pressed ? 0.88 : 1 }]}>
-//                 <Text style={{ color: theme.colors.onPrimary, fontWeight: '700', fontSize: 16 }}>{isLast ? 'Get started' : 'Next'}</Text>
-//               </Pressable>
-//             </View>
+            <View style={fullStyles.footer}>
+              <View style={fullStyles.controls}>
+                <Pressable 
+                  onPress={onBack} disabled={index === 0} 
+                  style={({ pressed }) => [fullStyles.backBtn, { opacity: index === 0 ? 0 : pressed ? 0.6 : 1, backgroundColor: theme.colors.surfaceMuted }]}
+                  accessibilityLabel="Back"
+                >
+                  <MaterialCommunityIcons name="arrow-left" size={20} color={theme.colors.textSecondary} />
+                </Pressable>
+                <Pressable 
+                  onPress={onNext} 
+                  style={({ pressed }) => [fullStyles.nextBtn, { backgroundColor: accent, opacity: pressed ? 0.88 : 1 }]}
+                  accessibilityLabel={isLast ? "Get started" : "Next"}
+                >
+                  {isLast ? (
+                    <Text style={[fullStyles.nextLabel, { color: theme.colors.onPrimary }]}>Get started</Text>
+                  ) : (
+                    <>
+                      <Text style={[fullStyles.nextLabel, { color: theme.colors.onPrimary }]}>Next</Text>
+                      <MaterialCommunityIcons name="arrow-right" size={18} color={theme.colors.onPrimary} style={{ marginLeft: 6 }} />
+                    </>
+                  )}
+                </Pressable>
+              </View>
 
-//             <Pressable onPress={onDismiss} style={{ marginTop: 16 }}>
-//               <Text style={{ color: theme.colors.textMuted }}>Skip for now</Text>
-//             </Pressable>
-//           </View>
-//         </View>
-//       </Modal>
-//     );
-//   }
+              <View style={fullStyles.safeBottom} />
+            </View>
+          </View>
+        </Animated.View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal animationType="none" visible={visibleLocal} transparent statusBarTranslucent>
@@ -530,6 +618,89 @@ export default function StartupBanners() {
 // ─── Sheet & layout styles ────────────────────────────────────────────────────
 
 const SHEET_RADIUS = 28;
+
+const fullStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: Platform.OS === "android" ? 48 : 56,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabRow: {
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: 100,
+    padding: 4,
+    marginBottom: 40,
+  },
+  slideWrap: {
+    width: SLIDE_WIDTH,
+    minHeight: 220,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  dotsWrap: {
+    marginTop: 28,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+    alignItems: "center",
+    width: "100%",
+  },
+  controls: {
+    flexDirection: "row",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nextBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+  },
+  nextLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+  },
+  skip: {
+    paddingVertical: 8,  
+  },
+  skipLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  safeBottom: {
+    height: Platform.OS === "ios" ? 24 : 16,
+  },
+});
 
 const s = StyleSheet.create({
   backdrop: {

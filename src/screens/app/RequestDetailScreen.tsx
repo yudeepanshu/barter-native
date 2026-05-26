@@ -599,10 +599,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       hasShownSuccessModalRef.current = true;
       setShowExchangeSuccessModal(true);
     }
-
-    if (!completed) {
-      hasShownSuccessModalRef.current = false;
-    }
   }, [requestQuery.data, transactionQuery.data, transactionQuery.isPending, session]);
 
   const onRequestContactReveal = async () => {
@@ -938,7 +934,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       setTxFeedback("OTP verified. Transaction completed.");
       if (!hasShownSuccessModalRef.current) {
         hasShownSuccessModalRef.current = true;
-        setTimeout(() => setShowExchangeSuccessModal(true), 50);
+        setShowExchangeSuccessModal(true);
       }
     } catch (error) {
       setTxFeedback(toTransactionErrorMessage(error));
@@ -1755,6 +1751,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             passedStyles={styles}
           />
         }
+        {/* Back Button removed from bottom */}
+      </ScrollView>
 
         {/* Exchange success modal shown after OTP verification */}
         <ExchangeSuccessModal
@@ -1764,9 +1762,6 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           isSeller={isSeller}
           productTitle={request.product.title}
         />
-
-        {/* Back Button removed from bottom */}
-      </ScrollView>
 
       {showCounterOfferForm ? (
         <SwipeableBottomSheet

@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -36,6 +36,7 @@ interface ContentConfig {
   tip?: string;
   accentColor: string;
   accentBg: string;
+  accentColorDark: string;
   accentBgDark: string;
 }
 
@@ -53,8 +54,9 @@ function getContent(
             body: `Your listing "${productTitle}" has been exchanged. Make sure you've handed it over and received the agreed item in return.`,
             tip: "Head to My Listings to review or relist any products.",
             accentColor: "#0369a1",
+            accentColorDark: "#38bdf8",
             accentBg: "#e0f2fe",
-            accentBgDark: "#0c4a6e",
+            accentBgDark: "#0c3553",
           }
         : {
             emoji: "🔄",
@@ -62,8 +64,9 @@ function getContent(
             body: `You've successfully traded for "${productTitle}". Confirm you have the item in hand before leaving.`,
             tip: "Check My Listings to see your updated collection.",
             accentColor: "#0369a1",
+            accentColorDark: "#38bdf8",
             accentBg: "#e0f2fe",
-            accentBgDark: "#0c4a6e",
+            accentBgDark: "#0c3553",
           };
 
     case "MONEY":
@@ -74,8 +77,9 @@ function getContent(
             body: `The exchange for "${productTitle}" is confirmed. Make sure you've received the agreed payment from the buyer before handing over the item.`,
             tip: "Don't release the item until the payment is in your hands.",
             accentColor: "#15803d",
+            accentColorDark: "#4ade80",
             accentBg: "#dcfce7",
-            accentBgDark: "#14532d",
+            accentBgDark: "#052e16",
           }
         : {
             emoji: "💸",
@@ -83,8 +87,9 @@ function getContent(
             body: `The exchange for "${productTitle}" is confirmed. Pay the seller the agreed amount now and collect your item.`,
             tip: "Only pay through a method you both agreed on. Stay safe.",
             accentColor: "#15803d",
+            accentColorDark: "#4ade80",
             accentBg: "#dcfce7",
-            accentBgDark: "#14532d",
+            accentBgDark: "#052e16",
           };
 
     case "MIXED":
@@ -95,16 +100,18 @@ function getContent(
             body: `The mixed trade for "${productTitle}" is finalised. Verify you've received both the product(s) and the agreed cash before wrapping up.`,
             tip: "Head to My Listings to check your active items.",
             accentColor: "#7c3aed",
+            accentColorDark: "#a78bfa",
             accentBg: "#ede9fe",
-            accentBgDark: "#3b0764",
+            accentBgDark: "#1e1b4b",
           }
         : {
             emoji: "🤝",
             headline: "Exchange complete!",
             body: `Your mixed offer for "${productTitle}" was accepted and finalised. Make sure the seller has everything you agreed to exchange.`,
             accentColor: "#7c3aed",
+            accentColorDark: "#a78bfa",
             accentBg: "#ede9fe",
-            accentBgDark: "#3b0764",
+            accentBgDark: "#1e1b4b",
           };
 
     case "NONE":
@@ -116,16 +123,18 @@ function getContent(
             body: `You've gifted "${productTitle}" to someone who needed it. Generosity like yours makes this community great.`,
             tip: "Your contribution has been recorded. Why not list something else?",
             accentColor: "#b45309",
+            accentColorDark: "#fbbf24",
             accentBg: "#fef3c7",
-            accentBgDark: "#78350f",
+            accentBgDark: "#451a03",
           }
         : {
             emoji: "🎁",
             headline: "You got it for free!",
             body: `"${productTitle}" is now yours — given freely by a generous community member. Use it well and pay it forward someday!`,
             accentColor: "#b45309",
+            accentColorDark: "#fbbf24",
             accentBg: "#fef3c7",
-            accentBgDark: "#78350f",
+            accentBgDark: "#451a03",
           };
   }
 }
@@ -237,17 +246,13 @@ export function ExchangeSuccessModal({
   const { theme } = useAppTheme();
   const router = useRouter();
 
-  const sheetRef = useRef<View>(null);
-
   const scaleAnim = useRef(new Animated.Value(0.82)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
   const emojiScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
 
     scaleAnim.setValue(0.82);
-    opacityAnim.setValue(0);
     emojiScale.setValue(0);
 
     Animated.parallel([
@@ -255,11 +260,6 @@ export function ExchangeSuccessModal({
         toValue: 1,
         damping: 14,
         stiffness: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 220,
         useNativeDriver: true,
       }),
       Animated.sequence([
@@ -273,43 +273,38 @@ export function ExchangeSuccessModal({
       ]),
     ]).start();
 
-    setTimeout(() => {
-        sheetRef.current?.focus();
-    }, 50);
-
   }, [visible]);
 
   const content = getContent(offerType, isSeller, productTitle);
   const isDark = theme.mode === "dark";
 
   const accentBg = isDark ? content.accentBgDark : content.accentBg;
-  const accentText = content.accentColor;
+  const accentText = isDark ? content.accentColorDark : content.accentColor;
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable
-        style={styles.backdrop}
-        onPress={onClose}
-        accessible={false}
-      >
-        <Pressable onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          android_ripple={null}
+          accessible={false}
+        >
+        <Pressable android_ripple={null} onPress={() => {}}>
           <Animated.View
-            ref={sheetRef}
-            focusable
             accessible
+            accessibilityViewIsModal
             style={[
               styles.sheet,
               {
                 backgroundColor: theme.colors.surface,
                 borderColor: theme.colors.border,
                 transform: [{ scale: scaleAnim }],
-                opacity: opacityAnim,
               },
             ]}
           >
@@ -341,7 +336,7 @@ export function ExchangeSuccessModal({
 
               {/* Congratulations badge */}
               <View style={[styles.congrats, { backgroundColor: accentBg }]}>
-                <Text style={[styles.congratsText, { color: accentText }]}>
+                <Text style={[styles.congratsText, { color: isDark ? '#ffffff': accentText }]}>
                   🎉 Congratulations!
                 </Text>
               </View>
@@ -362,20 +357,18 @@ export function ExchangeSuccessModal({
                   style={[
                     styles.tipBox,
                     {
-                      backgroundColor: isDark
-                        ? theme.colors.surfaceMuted
-                        : theme.colors.surfaceMuted,
-                      borderColor: theme.colors.border,
+                      backgroundColor: accentBg,
+                      borderColor: isDark ? content.accentColor + "40" : content.accentColor + "30",
                     },
                   ]}
                 >
                   <Feather
                     name="info"
                     size={14}
-                    color={theme.colors.textMuted}
+                    color={accentText}
                     style={{ marginTop: 1 }}
                   />
-                  <Text style={[styles.tipText, { color: theme.colors.textMuted }]}>
+                  <Text style={[styles.tipText, { color: isDark ? '#e2e8f0': theme.colors.textPrimary }]}>
                     {content.tip}
                   </Text>
                 </View>
@@ -388,15 +381,15 @@ export function ExchangeSuccessModal({
                   <Pressable
                     style={[
                       styles.secondaryBtn,
-                      { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                      { borderColor: accentText + "30", backgroundColor: accentBg },
                     ]}
                     onPress={() => {
                       onClose();
                       router.push("/(app)/(tabs)/my-listings" as any);
                     }}
                   >
-                    <Feather name="list" size={15} color={theme.colors.textSecondary} />
-                    <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
+                    <Ionicons name="pricetag-outline" size={16} color={accentText} />
+                    <Text style={[styles.secondaryBtnText, { color: isDark ? '#e2e8f0': accentText }]}>
                       View My Listings
                     </Text>
                   </Pressable>

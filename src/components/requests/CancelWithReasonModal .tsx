@@ -6,7 +6,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { StyleSheet, View } from "react-native";
 import { sanitizeMultiLineInput } from "@/lib/utils/inputSanitizer";
 
-const MIN_REASON_LENGTH = 15;
+const MIN_REASON_LENGTH = 5;
 const MAX_REASON_LENGTH = 120;
 
 interface CancelModalStaticConfig {

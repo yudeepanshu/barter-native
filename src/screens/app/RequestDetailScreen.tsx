@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useRef, useMemo, useState } from "react";
@@ -40,6 +40,7 @@ import { useAppDialog } from "@/providers/AppDialogProvider";
 import { FloatingModal } from "@/components/ui/FloatingModal";
 import { useRequestRoom, useTransactionRoom } from "@/lib/realtime/rooms";
 import { useRealtimeToastScope } from "@/lib/realtime/useRealtimeToastScope";
+import { ExchangeSuccessModal, type ExchangeOfferType } from "@/screens/app/ExchangeSuccessModal";
 import {
   useUpdateProfileMutation,
   toErrorMessage as toProfileErrorMessage,
@@ -528,6 +529,9 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const [showContactDetailsModal, setShowContactDetailsModal] = useState(false);
   const [isApprovingContactReveal, setIsApprovingContactReveal] = useState(false);
   const [isDecliningContactReveal, setIsDecliningContactReveal] = useState(false);
+  const [showExchangeSuccessModal, setShowExchangeSuccessModal] = useState(false);
+
+  const hasShownSuccessModalRef = useRef(false);
 
   const [, rerender] = useState(0);
 
@@ -578,6 +582,28 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       setTxFeedback(null);
     }
   }, [sellerOtpActive]);
+
+  useEffect(() => {
+    const data = requestQuery.data;
+    if (!data || !session) return;
+
+    const buyerCheck = session.user.id === data.buyerId;
+    if (!buyerCheck) return;   // ← seller doesn't use this path at all
+
+    const exchangeFinalized = data.product.status === "EXCHANGED";
+    const completed =
+      data.status === "COMPLETED" ||
+      (data.status === "ACCEPTED" && (exchangeFinalized || (!transactionQuery.isPending && !transactionQuery.data)));
+
+    if (completed && !hasShownSuccessModalRef.current) {
+      hasShownSuccessModalRef.current = true;
+      setShowExchangeSuccessModal(true);
+    }
+
+    if (!completed) {
+      hasShownSuccessModalRef.current = false;
+    }
+  }, [requestQuery.data, transactionQuery.data, transactionQuery.isPending, session]);
 
   const onRequestContactReveal = async () => {
     if (viewerMissingContactInfo) {
@@ -709,6 +735,11 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       .filter((id): id is string => typeof id === "string")
   )).filter((id) => ownOfferableProducts.some((p) => p.id === id));
 
+  const acceptedOffer = orderedOffers.find((o) => o.status === "ACCEPTED");
+  
+  const exchangeOfferType: ExchangeOfferType = request.product.isFree
+  ? "NONE"
+  : ((acceptedOffer?.type ?? orderedOffers[0]?.type ?? "NONE") as ExchangeOfferType);
   
   const generatedOtpExpiresAtMs = generatedOtpExpiresAt ? new Date(generatedOtpExpiresAt).getTime() : null;
   const hasGeneratedOtpExpiredByClock =
@@ -905,6 +936,10 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       setGeneratedOtpExpiresAt(null);
       setIsGeneratedOtpExpired(false);
       setTxFeedback("OTP verified. Transaction completed.");
+      if (!hasShownSuccessModalRef.current) {
+        hasShownSuccessModalRef.current = true;
+        setTimeout(() => setShowExchangeSuccessModal(true), 50);
+      }
     } catch (error) {
       setTxFeedback(toTransactionErrorMessage(error));
     }
@@ -1720,6 +1755,15 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             passedStyles={styles}
           />
         }
+
+        {/* Exchange success modal shown after OTP verification */}
+        <ExchangeSuccessModal
+          visible={showExchangeSuccessModal}
+          onClose={() => setShowExchangeSuccessModal(false)}
+          offerType={exchangeOfferType}
+          isSeller={isSeller}
+          productTitle={request.product.title}
+        />
 
         {/* Back Button removed from bottom */}
       </ScrollView>

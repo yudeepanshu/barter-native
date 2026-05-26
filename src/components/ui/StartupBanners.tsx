@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   Platform,
+  PanResponder,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
@@ -111,7 +112,7 @@ const BUYER_SLIDES: Slide[] = [
 
 // ─── Dot indicator ────────────────────────────────────────────────────────────
 
-function Dots({ total, active, accent }: { total: number; active: number; accent: string }) {
+function Dots({ total, active, accent, inactiveColor }: { total: number; active: number; accent: string, inactiveColor?: string }) {
   return (
     <View style={dotStyles.row}>
       {Array.from({ length: total }).map((_, i) => (
@@ -121,7 +122,7 @@ function Dots({ total, active, accent }: { total: number; active: number; accent
             dotStyles.dot,
             i === active
               ? { backgroundColor: accent, width: 20 }
-              : { backgroundColor: "#D1D5DB", width: 8 },
+              : { backgroundColor: inactiveColor, width: 8 },
           ]}
         />
       ))}
@@ -247,11 +248,17 @@ function TabPill({
   active,
   accent,
   onPress,
+  inactiveBg,
+  inactiveText,
+  activeText,
 }: {
   label: string;
   active: boolean;
   accent: string;
   onPress: () => void;
+  inactiveBg: string;
+  inactiveText: string;
+  activeText: string;
 }) {
   const bg = useRef(new Animated.Value(active ? 1 : 0)).current;
 
@@ -265,12 +272,12 @@ function TabPill({
 
   const bgColor = bg.interpolate({
     inputRange: [0, 1],
-    outputRange: ["#F3F4F6", accent],
+    outputRange: [inactiveBg, accent],
   });
 
   const textColor = bg.interpolate({
     inputRange: [0, 1],
-    outputRange: ["#6B7280", "#FFFFFF"],
+    outputRange: [inactiveText, activeText],
   });
 
   return (
@@ -296,6 +303,28 @@ const tabStyles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 });
+
+// ─── Swipe hook ───────────────────────────────────────────────────────────────
+
+function useSwipePanResponder(
+  onSwipeLeft: () => void,
+  onSwipeRight: () => void,
+  threshold = 30,
+) {
+  return useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 4 && Math.abs(g.dx) > Math.abs(g.dy),
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderRelease: (_, g) => {
+        if (g.vx < -0.3 || g.dx < -threshold) onSwipeLeft();
+        else if (g.vx > 0.3 || g.dx > threshold) onSwipeRight();
+      },
+    }),
+  ).current;
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -458,6 +487,18 @@ useEffect(() => {
     close();
   }, [persistOnClose, close]);
 
+  const swipeHandlers = useSwipePanResponder(
+  // swipe left → next
+  useCallback(() => {
+    if (index < slides.length - 1) changeSlide(index + 1, "forward");
+    else onDismiss();
+  }, [index, slides.length, changeSlide, onDismiss]),
+    // swipe right → back
+    useCallback(() => {
+      if (index > 0) changeSlide(index - 1, "back");
+    }, [index, changeSlide]),
+  );
+
   if (!visibleLocal) return null;
 
   const accent = slide.accent;
@@ -479,16 +520,16 @@ useEffect(() => {
 
             <View style={fullStyles.content}>
               <View style={[fullStyles.tabRow, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <TabPill label="For Sellers" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')} />
-                <TabPill label="For Buyers" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} />
+                <TabPill label="For Sellers" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')}  inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
+                <TabPill label="For Buyers" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
               </View>
 
-              <View style={fullStyles.slideWrap}>
+              <View style={fullStyles.slideWrap}  {...swipeHandlers.panHandlers}>
                 <SlideCard key={`${tab}-${index}-${renderKey}`} slide={slide} entering direction={direction} mode="full" />
               </View>
 
               <View style={fullStyles.dotsWrap}>
-                <Dots total={slides.length} active={index} accent={accent} />
+                <Dots total={slides.length} active={index} accent={accent} inactiveColor={theme.colors.surfaceMuted}/>
               </View>
             </View>
 
@@ -546,17 +587,23 @@ useEffect(() => {
             active={tab === "seller"}
             accent={SELLER_SLIDES[0].accent}
             onPress={() => switchTab("seller")}
+            inactiveBg={theme.colors.surfaceMuted}
+            inactiveText={theme.colors.textMuted}
+            activeText={'#FFFFFF'}
           />
           <TabPill
             label="For Buyers"
             active={tab === "buyer"}
             accent={BUYER_SLIDES[0].accent}
             onPress={() => switchTab("buyer")}
+            inactiveBg={theme.colors.surfaceMuted}
+            inactiveText={theme.colors.textMuted}
+            activeText={'#FFFFFF'}
           />
         </View>
 
         {/* Slide */}
-        <View style={s.slideClip}>
+        <View style={s.slideClip}  {...swipeHandlers.panHandlers}>
           <SlideCard
             key={`${tab}-${index}-${renderKey}`}
             slide={slide}
@@ -566,7 +613,7 @@ useEffect(() => {
         </View>
 
         {/* Dots */}
-        <Dots total={slides.length} active={index} accent={accent} />
+        <Dots total={slides.length} active={index} accent={accent} inactiveColor={theme.colors.surfaceMuted}/>
 
         {/* Controls */}
         <View style={s.controls}>

@@ -1004,7 +1004,6 @@ export default function ProfileScreen() {
             openStartupBanners({ persistOnClose: false });
           }}
           hitSlop={8}
-          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           accessibilityRole="button"
           accessibilityLabel="Open app tour"
           style={[

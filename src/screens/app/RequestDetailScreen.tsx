@@ -526,6 +526,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
   const [contactUpdateMessage, setContactUpdateMessage] = useState<string | null>(null);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [showContactDetailsModal, setShowContactDetailsModal] = useState(false);
+  const [isApprovingContactReveal, setIsApprovingContactReveal] = useState(false);
+  const [isDecliningContactReveal, setIsDecliningContactReveal] = useState(false);
 
   const [, rerender] = useState(0);
 
@@ -833,6 +835,9 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       return;
     }
 
+    const setPending = approve ? setIsApprovingContactReveal : setIsDecliningContactReveal;
+    setPending(true);
+
     try {
       await respondContactRevealMutation.mutateAsync({
         requestId: request.id,
@@ -847,6 +852,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
       );
     } catch (error) {
       await dialog.alert("Action failed", toRequestErrorMessage(error));
+    } finally {
+      setPending(false);
     }
   };
 
@@ -1567,15 +1574,16 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                   </Text>
                   <Button
                     label="Approve Reveal"
-                    disabled={viewerMissingContactInfo}
+                    disabled={viewerMissingContactInfo || isDecliningContactReveal}
                     onPress={() => void onRespondContactReveal(true)}
-                    loading={respondContactRevealMutation.isPending}
+                    loading={isApprovingContactReveal}
                   />
                   <Button
                     label="Decline"
                     variant="ghost"
+                    disabled={isApprovingContactReveal}
                     onPress={() => void onRespondContactReveal(false)}
-                    loading={respondContactRevealMutation.isPending}
+                    loading={isDecliningContactReveal}
                   />
                 </View>
               ) : null}

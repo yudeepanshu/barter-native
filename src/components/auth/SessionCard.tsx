@@ -122,6 +122,7 @@ export function SessionCard({
         variant="ghost"
         disabled={isSigningOut}
         loading={isSigningOut}
+        leftIcon={<Feather name="log-out" size={16} color={theme.colors.textPrimary} />}
       />
     </View>
   );
@@ -184,7 +185,7 @@ function IconRow({ icon, value, placeholder, isPhone = false }: IconRowProps) {
 // Helpers
 // ---------------------------------------------------------------------------
 function formatActiveSince(createdAt?: string) {
-  const prefix = "Active since: ";
+  const prefix = "Joined: ";
   if (!createdAt) return `${prefix}Today`;
 
   const createdTime = new Date(createdAt).getTime();

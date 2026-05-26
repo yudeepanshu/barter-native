@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flippe",
     "slug": "flippe",
-    "version": "0.2.0-alpha.0",
+    "version": "0.2.1-alpha.0",
     "scheme": "flippe",
     "workspaceRoot": "../..",
     "projectRoot": "apps/mobile",
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.shinichi.flippeapp",
-      "versionCode": 52,
+      "versionCode": 53,
       "googleServicesFile": "./google-services.json",
       "enableProguardInReleaseBuilds": true,
       "enableShrinkResourcesInReleaseBuilds": true,

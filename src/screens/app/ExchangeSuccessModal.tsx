@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   Animated,
   Modal,
@@ -32,7 +32,7 @@ interface ExchangeSuccessModalProps {
 interface ContentConfig {
   emoji: string;
   headline: string;
-  body: string;
+  body: ReactNode;
   tip?: string;
   accentColor: string;
   accentBg: string;
@@ -51,7 +51,11 @@ function getContent(
         ? {
             emoji: "🔄",
             headline: "Trade complete!",
-            body: `Your listing "${productTitle}" has been exchanged. Make sure you've handed it over and received the agreed item in return.`,
+            body: (
+              <>
+                Your listing <Text style={styles.bodyBold}>{productTitle}</Text> has been exchanged. Make sure you've handed it over and received the agreed item in return.
+              </>
+            ),
             tip: "Head to My Listings to review or relist any products.",
             accentColor: "#0369a1",
             accentColorDark: "#38bdf8",
@@ -61,7 +65,11 @@ function getContent(
         : {
             emoji: "🔄",
             headline: "Trade complete!",
-            body: `You've successfully traded for "${productTitle}". Confirm you have the item in hand before leaving.`,
+            body: (
+              <>
+                You've successfully traded for <Text style={styles.bodyBold}>{productTitle}</Text>. Confirm you have the item in hand before leaving.
+              </>
+            ),
             tip: "Check My Listings to see your updated collection.",
             accentColor: "#0369a1",
             accentColorDark: "#38bdf8",
@@ -74,7 +82,11 @@ function getContent(
         ? {
             emoji: "💸",
             headline: "Collect your payment!",
-            body: `The exchange for "${productTitle}" is confirmed. Make sure you've received the agreed payment from the buyer before handing over the item.`,
+            body: (
+              <>
+                The exchange for <Text style={styles.bodyBold}>{productTitle}</Text> is confirmed. Make sure you've received the agreed payment from the buyer before handing over the item.
+              </>
+            ),
             tip: "Don't release the item until the payment is in your hands.",
             accentColor: "#15803d",
             accentColorDark: "#4ade80",
@@ -84,7 +96,11 @@ function getContent(
         : {
             emoji: "💸",
             headline: "Send your payment!",
-            body: `The exchange for "${productTitle}" is confirmed. Pay the seller the agreed amount now and collect your item.`,
+            body: (
+              <>
+                The exchange for <Text style={styles.bodyBold}>{productTitle}</Text> is confirmed. Pay the seller the agreed amount now and collect your item.
+              </>
+            ),
             tip: "Only pay through a method you both agreed on. Stay safe.",
             accentColor: "#15803d",
             accentColorDark: "#4ade80",
@@ -97,7 +113,11 @@ function getContent(
         ? {
             emoji: "🤝",
             headline: "Exchange complete!",
-            body: `The mixed trade for "${productTitle}" is finalised. Verify you've received both the product(s) and the agreed cash before wrapping up.`,
+            body: (
+              <>
+                The mixed trade for <Text style={styles.bodyBold}>{productTitle}</Text> is finalised. Verify you've received both the product(s) and the agreed cash before wrapping up.
+              </>
+            ),
             tip: "Head to My Listings to check your active items.",
             accentColor: "#7c3aed",
             accentColorDark: "#a78bfa",
@@ -107,7 +127,11 @@ function getContent(
         : {
             emoji: "🤝",
             headline: "Exchange complete!",
-            body: `Your mixed offer for "${productTitle}" was accepted and finalised. Make sure the seller has everything you agreed to exchange.`,
+            body: (
+              <>
+                Your mixed offer for <Text style={styles.bodyBold}>{productTitle}</Text> was accepted and finalised. Make sure the seller has everything you agreed to exchange.
+              </>
+            ),
             accentColor: "#7c3aed",
             accentColorDark: "#a78bfa",
             accentBg: "#ede9fe",
@@ -120,7 +144,11 @@ function getContent(
         ? {
             emoji: "🎁",
             headline: "Thank you for giving!",
-            body: `You've gifted "${productTitle}" to someone who needed it. Generosity like yours makes this community great.`,
+            body: (
+              <>
+                You've gifted <Text style={styles.bodyBold}>{productTitle}</Text> to someone who needed it. Generosity like yours makes this community great.
+              </>
+            ),
             tip: "Your contribution has been recorded. Why not list something else?",
             accentColor: "#b45309",
             accentColorDark: "#fbbf24",
@@ -130,7 +158,11 @@ function getContent(
         : {
             emoji: "🎁",
             headline: "You got it for free!",
-            body: `"${productTitle}" is now yours — given freely by a generous community member. Use it well and pay it forward someday!`,
+            body: (
+              <>
+                <Text style={styles.bodyBold}>{productTitle}</Text> is now yours — given freely by a generous community member. Use it well and pay it forward someday!
+              </>
+            ),
             accentColor: "#b45309",
             accentColorDark: "#fbbf24",
             accentBg: "#fef3c7",
@@ -295,7 +327,7 @@ export function ExchangeSuccessModal({
           android_ripple={null}
           accessible={false}
         >
-        <Pressable android_ripple={null} onPress={() => {}}>
+        <Pressable android_ripple={null} onPress={() => {}} style={{ width: "95%", maxWidth: 400 }}>
           <Animated.View
             accessible
             accessibilityViewIsModal
@@ -479,6 +511,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: "center",
+  },
+  bodyBold: {
+    fontWeight: "700",
   },
   tipBox: {
     flexDirection: "row",

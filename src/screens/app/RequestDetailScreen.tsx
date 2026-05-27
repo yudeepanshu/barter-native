@@ -583,22 +583,33 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
     }
   }, [sellerOtpActive]);
 
+  const wasCompletedRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     const data = requestQuery.data;
     if (!data || !session) return;
 
     const buyerCheck = session.user.id === data.buyerId;
-    if (!buyerCheck) return;   // ← seller doesn't use this path at all
+    if (!buyerCheck) return;
 
     const exchangeFinalized = data.product.status === "EXCHANGED";
     const completed =
       data.status === "COMPLETED" ||
       (data.status === "ACCEPTED" && (exchangeFinalized || (!transactionQuery.isPending && !transactionQuery.data)));
 
-    if (completed && !hasShownSuccessModalRef.current) {
+    if (wasCompletedRef.current === null) {
+      // First evaluation: record the initial state without showing modal
+      wasCompletedRef.current = completed;
+      return;
+    }
+
+    // Only show if it just transitioned to completed
+    if (completed && !wasCompletedRef.current && !hasShownSuccessModalRef.current) {
       hasShownSuccessModalRef.current = true;
       setShowExchangeSuccessModal(true);
     }
+
+    wasCompletedRef.current = completed;
   }, [requestQuery.data, transactionQuery.data, transactionQuery.isPending, session]);
 
   const onRequestContactReveal = async () => {

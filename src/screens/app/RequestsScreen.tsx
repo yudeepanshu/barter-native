@@ -482,7 +482,7 @@ export default function RequestsScreen() {
           ) : null}
 
           {isInitialLoading ? (
-            <View style={[styles.emptyCardGlobal, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <View style={[styles.emptyCardGlobal, /* { backgroundColor: theme.colors.surface, borderColor: theme.colors.border } */]}>
               <Spinner size={20} />
               <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Loading requests...</Text>
               <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Fetching latest received and sent requests.</Text>

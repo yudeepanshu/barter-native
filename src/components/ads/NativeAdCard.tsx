@@ -54,7 +54,9 @@ export function NativeAdCard() {
 
       {/* Media — skip video ads on emulator */}
       {!nativeAd.mediaContent?.hasVideoContent && (
-        <NativeMediaView style={styles.media} resizeMode="cover" />
+        <View style={styles.mediaWrapper}>
+          <NativeMediaView style={styles.media} resizeMode="cover" />
+        </View>
       )}
 
       {/* Body */}
@@ -126,13 +128,18 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  media: {
+  mediaWrapper: {
     width: "100%",
-    height: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  media: {
+    width: 160,    
+    height: 140,
   },
   body: {
-    padding: 16,
-    gap: 8,
+    padding: 12,
+    gap: 6,
     alignItems: "center",
   },
   headline: {
@@ -146,10 +153,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   ctaButton: {
-    marginTop: 4,
+    marginTop: 2,
     borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",

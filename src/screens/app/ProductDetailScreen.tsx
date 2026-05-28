@@ -48,6 +48,8 @@ import { TradeCardItem } from "./TradeCardItem";
 import { useListingContextMenuItems } from "@/hooks/useListingContextMenuItems";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { ApiClient } from "@barter/api-client";
+import { TradeCardAdItem } from "@/components/ads/TradeCardAdItem";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -476,6 +478,8 @@ export default function ProductDetailScreen() {
             />
           </View>
         ) : null}
+
+        {ADS_ENABLED ? <TradeCardAdItem /> : null}
 
         {/* ── Owner requests (my-listings view) ──────────────────────────────── */}
         {isOwner && session && (product.ownerRequests?.length ?? 0) > 0 ? (

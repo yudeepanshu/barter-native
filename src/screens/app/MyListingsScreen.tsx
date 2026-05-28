@@ -31,6 +31,10 @@ import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { isProductReportedAboveThreshold } from "@/lib/listings/productReportThreshold";
 import { getStatusPillStyle } from "@/components/products/ProductTags";
 
+import { injectAds, isAdPlaceholder } from "@/lib/ads/injectAds";
+import { NativeAdCard } from "@/components/ads/NativeAdCard";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
+
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
 
@@ -283,6 +287,11 @@ export default function MyListingsScreen() {
     });
   }, [filteredWithoutType, selectedFilter, sortBy]);
 
+  const feedItems = useMemo<any[]>(
+    () => ADS_ENABLED && filteredItems.length > 0 ? injectAds(filteredItems, 2) : filteredItems,
+    [filteredItems],
+  );
+
   const openRequestCountByProductId = useMemo(() => {
     const requests = receivedRequestsQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const map = new Map<string, number>();
@@ -427,7 +436,7 @@ export default function MyListingsScreen() {
           </View>
 
           <FlatList
-            data={filteredItems}
+            data={feedItems}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} />}
@@ -464,22 +473,26 @@ export default function MyListingsScreen() {
               ) : null
             }
             renderItem={({ item }) => {
-              const imagePreparation = pendingByProductId[item.id];
-              const hasNoServerImage = (item.productImages?.length ?? 0) === 0;
+              if (isAdPlaceholder(item)) return <NativeAdCard />;
+
+              // after this point TS knows item is ProductSummary
+              const product = item;
+              const imagePreparation = pendingByProductId[product.id];
+              const hasNoServerImage = (product.productImages?.length ?? 0) === 0;
               const isPreparing = imagePreparation?.phase === "uploading" && hasNoServerImage;
               const isActivating = imagePreparation?.phase === "activating";
               const hasUploadFailure = imagePreparation?.phase === "failed" && hasNoServerImage;
               const hasMissingImageLock =
-                item.status === "INACTIVE" && hasNoServerImage && !isPreparing && !hasUploadFailure;
+                product.status === "INACTIVE" && hasNoServerImage && !isPreparing && !hasUploadFailure;
 
               return (
                 <ListingItem
-                  item={item}
+                  item={product}
                   router={router}
                   theme={theme}
                   styles={styles}
-                  openRequestCount={openRequestCountByProductId.get(item.id) ?? 0}
-                  reservedRequest={reservedRequestByProductId.get(item.id) ?? null}
+                  openRequestCount={openRequestCountByProductId.get(product.id) ?? 0}
+                  reservedRequest={reservedRequestByProductId.get(product.id) ?? null}
                   isPreparing={isPreparing}
                   isActivating={isActivating}
                   hasUploadFailure={hasUploadFailure}

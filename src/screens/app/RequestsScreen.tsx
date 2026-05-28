@@ -894,8 +894,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyCardGlobal: {
-    borderWidth: 1,
-    borderRadius: 16,
+    // borderWidth: 1,
+    // borderRadius: 16,
     padding: 16,
     alignItems: "center",
     gap: 6,

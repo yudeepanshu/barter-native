@@ -42,6 +42,9 @@ import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
 import { FloatingModal } from "@/components/ui/FloatingModal";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { useStartupBannersStore } from "@/lib/ui/startupBannersStore";
+import { TeaserCard } from "@/components/ui/TeaserCard";
+import { TeaserAdCard } from "@/components/ads/TeaserAdCard";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -764,6 +767,8 @@ export default function ProfileScreen() {
           />
         </AppCard>
 
+        {ADS_ENABLED ? <TeaserAdCard /> : null}
+
         {profileQuery.isPending ? (
           <View style={styles.center}>
             <Spinner size={28} />
@@ -963,71 +968,23 @@ export default function ProfileScreen() {
             Shown at the bottom of the screen, above the version footer.
         ---------------------------------------------------------------- */}
         {FEEDBACK_ENABLED ? (
-          <Pressable
+          <TeaserCard
+            icon="message-text-outline"
+            title="Feedback"
+            subtitle="Tell us what you think of our App"
             onPress={() => setShowFeedbackModal(true)}
-            accessibilityRole="button"
             accessibilityLabel="Open feedback form"
-            style={[
-              styles.feedbackTeaser,
-              {
-                borderColor: theme.colors.border,
-                borderRadius: theme.roundness,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-          >
-            {/* Icon */}
-            <View style={[styles.feedbackIconCircle, { backgroundColor: theme.colors.surfaceMuted ?? '#EEF2FF' }]}>
-              <MaterialCommunityIcons
-                name="message-text-outline"
-                size={22}
-                color={theme.colors.primary}
-              />
-            </View>
-
-            {/* Texts */}
-            <View style={styles.feedbackTextGroup}>
-              <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>
-                Feedback
-              </Text>
-              <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>
-                Tell us what you think of our App
-              </Text>
-            </View>
-          </Pressable>
+          />
         ) : null}
 
         {/* App tour / onboarding teaser */}
-        <Pressable
-          onPress={() => {
-            // Open banners from profile without persisting dismissal so users can re-open later
-            openStartupBanners({ persistOnClose: false });
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
+        <TeaserCard
+          icon="information-outline"
+          title="App tour"
+          subtitle="See how selling and buying work"
+          onPress={() => openStartupBanners({ persistOnClose: false })}
           accessibilityLabel="Open app tour"
-          style={[
-            styles.feedbackTeaser,
-            {
-              borderColor: theme.colors.border,
-              borderRadius: theme.roundness,
-              backgroundColor: theme.colors.surface,
-            },
-          ]}
-        >
-          <View style={[styles.feedbackIconCircle, { backgroundColor: theme.colors.surfaceMuted ?? '#EEF2FF' }]}>
-            <MaterialCommunityIcons
-              name="information-outline"
-              size={22}
-              color={theme.colors.primary}
-            />
-          </View>
-
-          <View style={styles.feedbackTextGroup}>
-            <Text style={[styles.feedbackTeaserTitle, { color: theme.colors.textPrimary }]}>App tour</Text>
-            <Text style={[styles.feedbackTeaserBody, { color: theme.colors.textSecondary }]}>See how selling and buying work</Text>
-          </View>
-        </Pressable>
+        />
 
         <View style={styles.versionFooter}>
           <Text style={[styles.versionText, { color: theme.colors.textMuted }]}>

@@ -52,6 +52,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/currency";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { CancelModalKey, CancelWithReasonModal } from "@/components/requests/CancelWithReasonModal ";
+import { TradeCardAdItem } from "@/components/ads/TradeCardAdItem";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -1750,6 +1752,8 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
             </View>
           </View>
         ) : null}
+
+        {ADS_ENABLED ? <TradeCardAdItem /> : null}
 
         {/* Offer History */}
         {

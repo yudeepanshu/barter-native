@@ -8,27 +8,34 @@ import { getStatusBadgeStyle, getStatusLabel } from "./RequestItem";
 import { AppImage } from "@/components/ui/AppImage";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
- 
-const IMAGE_SIZE = 44; // same visual weight as the 30px avatar but square
- 
+
+const IMAGE_SIZE = 44;
+
 // ── Types ──────────────────────────────────────────────────────────────────────
- 
+
 export type TradeCardItemProps = {
   item: RequestSummary;
   router: ReturnType<typeof useRouter>;
-  actorTurn: RequestTurn;
+  actorTurn?: RequestTurn;
   sessionUserId: string;
   showTurnLabel?: boolean;
+  // ── Ad overrides ──
+  isAd?: boolean;
+  adSubtitle?: string;
+  adBadgeLabel?: string;
 };
- 
+
 // ── Component ──────────────────────────────────────────────────────────────────
- 
+
 export const TradeCardItem = memo(function TradeCardItem({
   item,
   router,
+  isAd,
+  adSubtitle,
+  adBadgeLabel,
 }: TradeCardItemProps) {
   const { theme } = useAppTheme();
- 
+
   const isExchangeFinalized = item.product?.status === "EXCHANGED";
   const isRequestCompleted =
     item.status === "COMPLETED" ||
@@ -36,7 +43,7 @@ export const TradeCardItem = memo(function TradeCardItem({
   const displayStatus: RequestSummary["status"] = isRequestCompleted
     ? "COMPLETED"
     : item.status;
- 
+
   const productTitle = item.product?.title?.trim() || "Untitled Product";
   const firstImage = item.product?.productImages?.[0];
   const imageUri =
@@ -45,28 +52,29 @@ export const TradeCardItem = memo(function TradeCardItem({
       : (firstImage as { uri?: string; url?: string } | undefined)?.uri ??
         (firstImage as { uri?: string; url?: string } | undefined)?.url ??
         null;
- 
+
   const timeLabel = formatTimeAgo(item.updatedAt ?? item.createdAt);
   const badgeStyle = getStatusBadgeStyle(displayStatus);
- 
+
   return (
     <Pressable
       style={styles.pressable}
-      onPress={() => router.push(`/(app)/requests/${item.id}`)}
+      onPress={isAd ? undefined : () => router.push(`/(app)/requests/${item.id}`)}
     >
       <View
         style={[
           styles.card,
           {
-            borderColor:
-              theme.mode === "dark"
-                ? "rgba(255,255,255,0.12)"
-                : "rgba(0,0,0,0.10)",
+            borderColor: isAd
+              ? theme.colors.border
+              : theme.mode === "dark"
+              ? "rgba(255,255,255,0.12)"
+              : "rgba(0,0,0,0.10)",
             backgroundColor: theme.colors.surfaceMuted,
           },
         ]}
       >
-        {/* ── Left: fixed-size square product thumbnail ── */}
+        {/* ── Left: product thumbnail or ad icon ── */}
         {imageUri ? (
           <AppImage
             uri={imageUri}
@@ -86,9 +94,16 @@ export const TradeCardItem = memo(function TradeCardItem({
             </Text>
           </View>
         )}
- 
-        {/* ── Middle: title + time ── */}
+
+        {/* ── Middle: title + subtitle/time ── */}
         <View style={styles.contentCol}>
+          {isAd ? (
+            <Text
+              style={[styles.adSponsoredLabel, { color: theme.colors.textMuted }]}
+            >
+              SPONSORED
+            </Text>
+          ) : null}
           <Text
             style={[styles.productTitle, { color: theme.colors.textPrimary }]}
             numberOfLines={1}
@@ -99,35 +114,43 @@ export const TradeCardItem = memo(function TradeCardItem({
             style={[styles.timeText, { color: theme.colors.textMuted }]}
             numberOfLines={1}
           >
-            {timeLabel}
+            {isAd ? adSubtitle : timeLabel}
           </Text>
         </View>
- 
-        {/* ── Right: badge — centered by card's alignItems: "center" ── */}
+
+        {/* ── Right: badge ── */}
         <View
           style={[
             styles.badgeWrap,
             {
-              backgroundColor: badgeStyle.bg,
-              borderWidth: displayStatus === "CANCELLED" ? 1 : 0,
-              borderColor:
-                displayStatus === "CANCELLED"
-                  ? theme.colors.border
-                  : "transparent",
+              backgroundColor: isAd
+                ? theme.colors.surface
+                : badgeStyle.bg,
+              borderWidth: isAd || displayStatus === "CANCELLED" ? 1 : 0,
+              borderColor: theme.colors.border,
             },
           ]}
         >
-          <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
-            {getStatusLabel(displayStatus)}
+          <Text
+            style={[
+              styles.badgeText,
+              {
+                color: isAd
+                  ? theme.colors.textSecondary
+                  : badgeStyle.text,
+              },
+            ]}
+          >
+            {isAd ? adBadgeLabel : getStatusLabel(displayStatus)}
           </Text>
         </View>
       </View>
     </Pressable>
   );
 });
- 
+
 // ── Styles ─────────────────────────────────────────────────────────────────────
- 
+
 const styles = StyleSheet.create({
   pressable: {
     opacity: 1,
@@ -157,18 +180,17 @@ const styles = StyleSheet.create({
   contentCol: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
+    gap: 2,
     justifyContent: "center",
+  },
+  adSponsoredLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.6,
   },
   productTitle: {
     fontSize: 13,
     fontWeight: "600",
-  },
-  bottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 6,
   },
   timeText: {
     fontSize: 11,
@@ -187,4 +209,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
- 

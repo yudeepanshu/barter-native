@@ -19,5 +19,5 @@ export const NATIVE_AD_UNIT_ID =
     ? IS_DEV ? ADMOB_NATIVE_IDS.ios.dev : ADMOB_NATIVE_IDS.ios.prod
     : IS_DEV ? ADMOB_NATIVE_IDS.android.dev : ADMOB_NATIVE_IDS.android.prod;
 
-export const AD_EVERY_N_ITEMS = 6;
+export const AD_EVERY_N_ITEMS = 5;
 export const ADS_ENABLED = process.env.EXPO_PUBLIC_ADS_ENABLED === "true";

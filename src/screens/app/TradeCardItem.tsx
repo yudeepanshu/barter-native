@@ -56,95 +56,95 @@ export const TradeCardItem = memo(function TradeCardItem({
   const timeLabel = formatTimeAgo(item.updatedAt ?? item.createdAt);
   const badgeStyle = getStatusBadgeStyle(displayStatus);
 
-  return (
-    <Pressable
-      style={styles.pressable}
-      onPress={isAd ? undefined : () => router.push(`/(app)/requests/${item.id}`)}
+  const cardContent = (
+    <View
+      style={[
+        styles.card,
+        {
+          borderColor: isAd
+            ? theme.colors.border
+            : theme.mode === "dark"
+            ? "rgba(255,255,255,0.12)"
+            : "rgba(0,0,0,0.10)",
+          backgroundColor: theme.colors.surfaceMuted,
+        },
+      ]}
     >
+      {imageUri ? (
+        <AppImage
+          uri={imageUri}
+          recyclingKey={`trade-thumb-${item.id}`}
+          style={styles.productImage}
+        />
+      ) : (
+        <View
+          style={[
+            styles.productImage,
+            styles.productImageFallback,
+            { backgroundColor: theme.colors.surface ?? "#e0e7ff" },
+          ]}
+        >
+          <Text style={[styles.fallbackText, { color: theme.colors.textMuted }]}>
+            {productTitle.slice(0, 2).toUpperCase()}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.contentCol}>
+        {isAd ? (
+          <Text style={[styles.adSponsoredLabel, { color: theme.colors.textMuted }]}>
+            SPONSORED
+          </Text>
+        ) : null}
+        <Text
+          style={[styles.productTitle, { color: theme.colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {productTitle}
+        </Text>
+        <Text
+          style={[styles.timeText, { color: theme.colors.textMuted }]}
+          numberOfLines={1}
+        >
+          {isAd ? adSubtitle : timeLabel}
+        </Text>
+      </View>
+
       <View
         style={[
-          styles.card,
+          styles.badgeWrap,
           {
-            borderColor: isAd
-              ? theme.colors.border
-              : theme.mode === "dark"
-              ? "rgba(255,255,255,0.12)"
-              : "rgba(0,0,0,0.10)",
-            backgroundColor: theme.colors.surfaceMuted,
+            backgroundColor: isAd ? theme.colors.surface : badgeStyle.bg,
+            borderWidth: isAd || displayStatus === "CANCELLED" ? 1 : 0,
+            borderColor: theme.colors.border,
           },
         ]}
       >
-        {/* ── Left: product thumbnail or ad icon ── */}
-        {imageUri ? (
-          <AppImage
-            uri={imageUri}
-            recyclingKey={`trade-thumb-${item.id}`}
-            style={styles.productImage}
-          />
-        ) : (
-          <View
-            style={[
-              styles.productImage,
-              styles.productImageFallback,
-              { backgroundColor: theme.colors.surface ?? "#e0e7ff" },
-            ]}
-          >
-            <Text style={[styles.fallbackText, { color: theme.colors.textMuted }]}>
-              {productTitle.slice(0, 2).toUpperCase()}
-            </Text>
-          </View>
-        )}
-
-        {/* ── Middle: title + subtitle/time ── */}
-        <View style={styles.contentCol}>
-          {isAd ? (
-            <Text
-              style={[styles.adSponsoredLabel, { color: theme.colors.textMuted }]}
-            >
-              SPONSORED
-            </Text>
-          ) : null}
-          <Text
-            style={[styles.productTitle, { color: theme.colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {productTitle}
-          </Text>
-          <Text
-            style={[styles.timeText, { color: theme.colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {isAd ? adSubtitle : timeLabel}
-          </Text>
-        </View>
-
-        {/* ── Right: badge ── */}
-        <View
+        <Text
           style={[
-            styles.badgeWrap,
+            styles.badgeText,
             {
-              backgroundColor: isAd
-                ? theme.colors.surface
-                : badgeStyle.bg,
-              borderWidth: isAd || displayStatus === "CANCELLED" ? 1 : 0,
-              borderColor: theme.colors.border,
+              color: isAd ? theme.colors.textSecondary : badgeStyle.text,
             },
           ]}
         >
-          <Text
-            style={[
-              styles.badgeText,
-              {
-                color: isAd
-                  ? theme.colors.textSecondary
-                  : badgeStyle.text,
-              },
-            ]}
-          >
-            {isAd ? adBadgeLabel : getStatusLabel(displayStatus)}
-          </Text>
-        </View>
+          {isAd ? adBadgeLabel : getStatusLabel(displayStatus)}
+        </Text>
       </View>
+    </View>
+  );
+
+  // NativeAdView handles touches for ads — Pressable would swallow them
+  if (isAd) {
+    return <View style={styles.pressable}>{cardContent}</View>;
+  }
+
+  return (
+    <Pressable
+      style={styles.pressable}
+      onPress={() => router.push(`/(app)/requests/${item.id}`)}
+    >
+      {cardContent}
     </Pressable>
   );
 });

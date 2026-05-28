@@ -26,6 +26,7 @@ export function TeaserAdCard() {
             title={nativeAd.headline ?? "Sponsored"}
             subtitle={nativeAd.advertiser ?? nativeAd.body ?? ""}
             badge="Sponsored"
+            isAd
             onPress={() => {}}
             accessibilityLabel={`Ad: ${nativeAd.headline}`}
         />

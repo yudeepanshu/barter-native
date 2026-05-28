@@ -9,10 +9,11 @@ interface TeaserCardProps {
   imageUri?: string;
   title: string;
   subtitle: string;
-  onPress: () => void;
+  onPress?: () => void;
   accessibilityLabel?: string;
   badge?: string;
   rightSlot?: React.ReactNode;
+  isAd?: boolean;
 }
 
 export function TeaserCard({
@@ -24,24 +25,21 @@ export function TeaserCard({
   accessibilityLabel,
   badge,
   rightSlot,
+  isAd,
 }: TeaserCardProps) {
   const { theme } = useAppTheme();
 
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? title}
-      style={({ pressed }) => [
-        styles.card,
-        {
-          borderColor: theme.colors.border,
-          borderRadius: theme.roundness,
-          backgroundColor: theme.colors.surface,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-    >
+  const cardStyle = [
+    styles.card,
+    {
+      borderColor: theme.colors.border,
+      borderRadius: theme.roundness,
+      backgroundColor: theme.colors.surface,
+    },
+  ];
+
+  const content = (
+    <>
       {badge ? (
         <Text style={[styles.badge, { color: theme.colors.textMuted }]}>
           {badge}
@@ -81,6 +79,25 @@ export function TeaserCard({
 
         {rightSlot ?? null}
       </View>
+    </>
+  );
+
+  // NativeAdView handles touches for ads — Pressable would swallow them
+  if (isAd) {
+    return <View style={cardStyle}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      style={({ pressed }) => [
+        ...cardStyle,
+        { opacity: pressed ? 0.85 : 1 },
+      ]}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -102,20 +119,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
   },
-    iconCircle: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        overflow: "hidden",
-    },
-    adImage: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-    },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    overflow: "hidden",
+  },
+  adImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
   textGroup: {
     flex: 1,
     gap: 3,

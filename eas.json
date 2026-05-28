@@ -8,27 +8,34 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "APP_ENV": "dev",
+        "EXPO_PUBLIC_APP_ENV": "dev",
+        "EXPO_PUBLIC_ADS_ENABLED": "false",
         "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
         "NPM_CONFIG_WORKSPACES": "true"
       }
     },
     "preview": {
-      "autoIncrement": true,
       "distribution": "internal",
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
+        "APP_ENV": "prod",
+        "EXPO_PUBLIC_APP_ENV": "prod",
+        "EXPO_PUBLIC_ADS_ENABLED": "true",
         "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
         "NPM_CONFIG_WORKSPACES": "true"
       }
     },
     "production": {
-      "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
+        "APP_ENV": "prod",
+        "EXPO_PUBLIC_APP_ENV": "prod",
+        "EXPO_PUBLIC_ADS_ENABLED": "true",
         "NPM_CONFIG_INSTALL_STRATEGY": "hoisted",
         "NPM_CONFIG_WORKSPACES": "true"
       }

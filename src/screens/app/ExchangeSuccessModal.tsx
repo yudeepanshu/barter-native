@@ -8,7 +8,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -29,8 +30,23 @@ interface ExchangeSuccessModalProps {
 
 // ─── Content helpers ──────────────────────────────────────────────────────────
 
+type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+
+interface IconConfig {
+  library: "feather";
+  name: FeatherIconName;
+  size?: number;
+}
+
+interface MaterialIconConfig {
+  library: "material";
+  name: MaterialIconName;
+  size?: number;
+}
+
 interface ContentConfig {
-  emoji: string;
+  icon: IconConfig | MaterialIconConfig;
   headline: string;
   body: ReactNode;
   tip?: string;
@@ -49,7 +65,7 @@ function getContent(
     case "PRODUCT":
       return isSeller
         ? {
-            emoji: "🔄",
+            icon: { library: "feather", name: "refresh-cw" },
             headline: "Trade complete!",
             body: (
               <>
@@ -57,13 +73,13 @@ function getContent(
               </>
             ),
             tip: "Head to My Listings to review or relist any products.",
-            accentColor: "#0369a1",
-            accentColorDark: "#38bdf8",
-            accentBg: "#e0f2fe",
-            accentBgDark: "#0c3553",
+            accentColor: "#7c3aed",
+            accentColorDark: "#a78bfa",
+            accentBg: "#ede9fe",
+            accentBgDark: "#1e1b4b",
           }
         : {
-            emoji: "🔄",
+            icon: { library: "feather", name: "refresh-cw" },
             headline: "Trade complete!",
             body: (
               <>
@@ -71,16 +87,16 @@ function getContent(
               </>
             ),
             tip: "Check My Listings to see your updated collection.",
-            accentColor: "#0369a1",
-            accentColorDark: "#38bdf8",
-            accentBg: "#e0f2fe",
-            accentBgDark: "#0c3553",
+            accentColor: "#7c3aed",
+            accentColorDark: "#a78bfa",
+            accentBg: "#ede9fe",
+            accentBgDark: "#1e1b4b",
           };
 
     case "MONEY":
       return isSeller
         ? {
-            emoji: "💸",
+            icon: { library: "material", name: "payments", size: 30 },
             headline: "Collect your payment!",
             body: (
               <>
@@ -94,7 +110,7 @@ function getContent(
             accentBgDark: "#052e16",
           }
         : {
-            emoji: "💸",
+            icon: { library: "material", name: "payments", size: 30 },
             headline: "Send your payment!",
             body: (
               <>
@@ -111,38 +127,38 @@ function getContent(
     case "MIXED":
       return isSeller
         ? {
-            emoji: "🤝",
+            icon: { library: "material", name: "handshake", size: 30 },
             headline: "Exchange complete!",
             body: (
               <>
                 The mixed trade for <Text style={styles.bodyBold}>{productTitle}</Text> is finalised. Verify you've received both the product(s) and the agreed cash before wrapping up.
               </>
             ),
-            tip: "Head to My Listings to check your active items.",
-            accentColor: "#7c3aed",
-            accentColorDark: "#a78bfa",
-            accentBg: "#ede9fe",
-            accentBgDark: "#1e1b4b",
+            // tip: "Head to My Listings to check your active items.",
+            accentColor: "#0369a1",
+            accentColorDark: "#38bdf8",
+            accentBg: "#e0f2fe",
+            accentBgDark: "#0c3553",
           }
         : {
-            emoji: "🤝",
+            icon: { library: "material", name: "handshake", size: 30 },
             headline: "Exchange complete!",
             body: (
               <>
                 Your mixed offer for <Text style={styles.bodyBold}>{productTitle}</Text> was accepted and finalised. Make sure the seller has everything you agreed to exchange.
               </>
             ),
-            accentColor: "#7c3aed",
-            accentColorDark: "#a78bfa",
-            accentBg: "#ede9fe",
-            accentBgDark: "#1e1b4b",
+            accentColor: "#0369a1",
+            accentColorDark: "#38bdf8",
+            accentBg: "#e0f2fe",
+            accentBgDark: "#0c3553",
           };
 
     case "NONE":
     default:
       return isSeller
         ? {
-            emoji: "🎁",
+            icon: { library: "feather", name: "gift" },
             headline: "Thank you for giving!",
             body: (
               <>
@@ -156,7 +172,7 @@ function getContent(
             accentBgDark: "#451a03",
           }
         : {
-            emoji: "🎁",
+            icon: { library: "feather", name: "gift" },
             headline: "You got it for free!",
             body: (
               <>
@@ -171,9 +187,46 @@ function getContent(
   }
 }
 
-// ─── Animated confetti dot ────────────────────────────────────────────────────
+// ─── Icon bubble ──────────────────────────────────────────────────────────────
 
-function ConfettiDot({
+function IconBubble({
+  icon,
+  accentBg,
+  accentText,
+  scaleAnim,
+}: {
+  icon: ContentConfig["icon"];
+  accentBg: string;
+  accentText: string;
+  scaleAnim: Animated.Value;
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.iconBubble,
+        { backgroundColor: accentBg, transform: [{ scale: scaleAnim }] },
+      ]}
+    >
+      {icon.library === "feather" ? (
+        <Feather
+          name={(icon as IconConfig).name}
+          size={icon.size ?? 28}
+          color={accentText}
+        />
+      ) : (
+        <MaterialIcons
+          name={(icon as MaterialIconConfig).name}
+          size={icon.size ?? 30}
+          color={accentText}
+        />
+      )}
+    </Animated.View>
+  );
+}
+
+// ─── Animated particle ────────────────────────────────────────────────────────
+
+function ParticleDot({
   color,
   delay,
   startX,
@@ -247,11 +300,11 @@ function ConfettiDot({
   );
 }
 
-const CONFETTI_COLORS = ["#f97316", "#8b5cf6", "#0ea5e9", "#22c55e", "#ec4899", "#eab308"];
+const PARTICLE_COLORS = ["#f97316", "#8b5cf6", "#0ea5e9", "#22c55e", "#ec4899", "#eab308"];
 
-function ConfettiBurst() {
+function ParticleBurst() {
   const dots = Array.from({ length: 18 }, (_, i) => ({
-    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    color: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
     delay: Math.random() * 400,
     startX: (Math.random() - 0.5) * 200,
     size: 6 + Math.random() * 6,
@@ -260,7 +313,7 @@ function ConfettiBurst() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {dots.map((dot, i) => (
-        <ConfettiDot key={i} {...dot} />
+        <ParticleDot key={i} {...dot} />
       ))}
     </View>
   );
@@ -279,13 +332,13 @@ export function ExchangeSuccessModal({
   const router = useRouter();
 
   const scaleAnim = useRef(new Animated.Value(0.82)).current;
-  const emojiScale = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
 
     scaleAnim.setValue(0.82);
-    emojiScale.setValue(0);
+    iconScale.setValue(0);
 
     Animated.parallel([
       Animated.spring(scaleAnim, {
@@ -296,7 +349,7 @@ export function ExchangeSuccessModal({
       }),
       Animated.sequence([
         Animated.delay(180),
-        Animated.spring(emojiScale, {
+        Animated.spring(iconScale, {
           toValue: 1,
           damping: 10,
           stiffness: 200,
@@ -304,7 +357,6 @@ export function ExchangeSuccessModal({
         }),
       ]),
     ]).start();
-
   }, [visible]);
 
   const content = getContent(offerType, isSeller, productTitle);
@@ -321,12 +373,12 @@ export function ExchangeSuccessModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-        <Pressable
-          style={styles.backdrop}
-          onPress={onClose}
-          android_ripple={null}
-          accessible={false}
-        >
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        android_ripple={null}
+        accessible={false}
+      >
         <Pressable android_ripple={null} onPress={() => {}} style={{ width: "95%", maxWidth: 400 }}>
           <Animated.View
             accessible
@@ -340,8 +392,8 @@ export function ExchangeSuccessModal({
               },
             ]}
           >
-            {/* Confetti */}
-            <ConfettiBurst />
+            {/* Particles */}
+            <ParticleBurst />
 
             {/* Close button */}
             <Pressable
@@ -356,20 +408,19 @@ export function ExchangeSuccessModal({
               contentContainerStyle={styles.inner}
               showsVerticalScrollIndicator={false}
             >
-              {/* Emoji bubble */}
-              <Animated.View
-                style={[
-                  styles.emojiBubble,
-                  { backgroundColor: accentBg, transform: [{ scale: emojiScale }] },
-                ]}
-              >
-                <Text style={styles.emojiText}>{content.emoji}</Text>
-              </Animated.View>
+              {/* Icon bubble */}
+              <IconBubble
+                icon={content.icon}
+                accentBg={accentBg}
+                accentText={accentText}
+                scaleAnim={iconScale}
+              />
 
               {/* Congratulations badge */}
               <View style={[styles.congrats, { backgroundColor: accentBg }]}>
-                <Text style={[styles.congratsText, { color: isDark ? '#ffffff': accentText }]}>
-                  🎉 Congratulations!
+                <Feather name="award" size={12} color={isDark ? "#ffffff" : accentText} />
+                <Text style={[styles.congratsText, { color: isDark ? "#ffffff" : accentText }]}>
+                  Congratulations!
                 </Text>
               </View>
 
@@ -400,7 +451,7 @@ export function ExchangeSuccessModal({
                     color={accentText}
                     style={{ marginTop: 1 }}
                   />
-                  <Text style={[styles.tipText, { color: isDark ? '#e2e8f0': theme.colors.textPrimary }]}>
+                  <Text style={[styles.tipText, { color: isDark ? "#e2e8f0" : theme.colors.textPrimary }]}>
                     {content.tip}
                   </Text>
                 </View>
@@ -408,29 +459,29 @@ export function ExchangeSuccessModal({
 
               {/* Actions */}
               <View style={styles.actions}>
-                {/* My Listings shortcut — relevant for trades/free */}
                 {(offerType === "PRODUCT" || offerType === "MIXED" || (offerType === "NONE" && isSeller)) ? (
                   <Pressable
-                    style={[
-                      styles.secondaryBtn,
-                      { borderColor: accentText + "30", backgroundColor: accentBg },
-                    ]}
+                    style={styles.textLink}
                     onPress={() => {
                       onClose();
                       router.push("/(app)/(tabs)/my-listings" as any);
                     }}
+                    hitSlop={8}
                   >
-                    <Ionicons name="pricetag-outline" size={16} color={accentText} />
-                    <Text style={[styles.secondaryBtnText, { color: isDark ? '#e2e8f0': accentText }]}>
+                    <Text style={[styles.textLinkLabel, { color: isDark ? "#e2e8f0" : accentText }]}>
                       View My Listings
                     </Text>
+                    <Feather name="arrow-right" size={14} color={isDark ? "#e2e8f0" : accentText} />
                   </Pressable>
                 ) : null}
 
                 {/* Primary close */}
                 <Pressable
                   style={[styles.primaryBtn, { backgroundColor: accentText }]}
-                  onPress={onClose}
+                  onPress={() => {
+                    onClose();
+                    router.push("/(app)/(tabs)/home" as any);
+                  }}
                 >
                   <Feather name="check" size={15} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>Done</Text>
@@ -480,7 +531,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  emojiBubble: {
+  iconBubble: {
     width: 72,
     height: 72,
     borderRadius: 36,
@@ -488,10 +539,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 2,
   },
-  emojiText: {
-    fontSize: 36,
-  },
   congrats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 999,
@@ -547,16 +598,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-  secondaryBtn: {
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
+  textLink: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
+    gap: 4,
+    paddingVertical: 4,
   },
-  secondaryBtnText: {
+  textLinkLabel: {
     fontSize: 14,
     fontWeight: "600",
   },

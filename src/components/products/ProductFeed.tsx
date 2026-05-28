@@ -42,6 +42,10 @@ import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { ErrorView } from "../ui/ErrorView";
 import { EmptyView } from "../ui/EmptyView";
 import { NotificationsPanel } from "@/components/products/NotificationsPanel";
+import { injectAds, isAdPlaceholder } from "@/lib/ads/injectAds";
+import type { FeedItem } from "@/lib/ads/injectAds";
+import { NativeAdCard } from "@/components/ads/NativeAdCard";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -337,6 +341,11 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     });
     return next;
   }, [freeOnly, products.items, selectedCategoryIds, selectedTradeType, sortBy, viewerLocation]);
+
+  const feedItems = useMemo<FeedItem[]>(
+    () => ADS_ENABLED ? injectAds(visibleProducts) : visibleProducts,
+    [visibleProducts],
+  );
 
   useEffect(() => {
     if (!lastKnown) {
@@ -638,17 +647,36 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
     [router, viewerLocation],
   );
 
-  const renderProductItem = useCallback(
-    ({ item }: { item: ProductSummary }) => (
-      <ProductCard
-        product={item}
-        onPressProduct={onOpenProduct}
-        showMeta
-        isRequested={requestedProductIds.has(item.id)}
-        viewerLocation={permission === "granted" ? viewerLocation : null}
-        canShowRelativeDistance={permission === "granted"}
-      />
-    ),
+  // const renderProductItem = useCallback(
+  //   ({ item }: { item: ProductSummary }) => (
+  //     <ProductCard
+  //       product={item}
+  //       onPressProduct={onOpenProduct}
+  //       showMeta
+  //       isRequested={requestedProductIds.has(item.id)}
+  //       viewerLocation={permission === "granted" ? viewerLocation : null}
+  //       canShowRelativeDistance={permission === "granted"}
+  //     />
+  //   ),
+  //   [onOpenProduct, permission, requestedProductIds, viewerLocation],
+  // );
+
+  const renderFeedItem = useCallback(
+    ({ item }: { item: FeedItem }) => {
+      if (isAdPlaceholder(item)) {
+        return <NativeAdCard />;
+      }
+      return (
+        <ProductCard
+          product={item}
+          onPressProduct={onOpenProduct}
+          showMeta
+          isRequested={requestedProductIds.has(item.id)}
+          viewerLocation={permission === "granted" ? viewerLocation : null}
+          canShowRelativeDistance={permission === "granted"}
+        />
+      );
+    },
     [onOpenProduct, permission, requestedProductIds, viewerLocation],
   );
 
@@ -677,7 +705,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
         </View>
 
         <FlatList
-          data={visibleProducts}
+          data={feedItems}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           initialNumToRender={6}
@@ -725,7 +753,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
               </View>
             ) : null
           }
-          renderItem={renderProductItem}
+          renderItem={renderFeedItem}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         />
       </View>

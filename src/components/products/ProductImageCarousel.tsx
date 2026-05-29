@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { View, ScrollView, Pressable, Text, StyleSheet } from "react-native";
+import { View, Pressable, Text, StyleSheet } from "react-native";
 import { AppImage } from "@/components/ui/AppImage";
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { ProductTagSpec } from "./ProductTags";
 import { ProductSummary } from "@barter/types";
+import { CustomScrollView } from "../ui/CustomScrollView";
 
 interface ProductImageCarouselProps {
   product: ProductSummary;
@@ -42,7 +43,7 @@ export function ProductImageCarousel({
     <>
       <View style={styles.imageSection}>
         <View style={[styles.carouselWrapper, { width: imageFrameSize }]}>
-          <ScrollView
+          <CustomScrollView
             horizontal
             snapToInterval={imageFrameSize}
             snapToAlignment="center"
@@ -95,7 +96,7 @@ export function ProductImageCarousel({
                 ) : null}
               </Pressable>
             ))}
-          </ScrollView>
+          </CustomScrollView>
    
           {product.productImages.length > 1 && (
             <View style={styles.imagePagerOverlay} pointerEvents="none">

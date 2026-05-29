@@ -25,6 +25,7 @@ import {
   KeyboardAwareContext,
   type KeyboardAwareContextValue,
 } from "@/components/layout/KeyboardAwareContext";
+import { CustomScrollView } from "../ui/CustomScrollView";
 
 interface KeyboardAwareScrollViewProps extends PropsWithChildren {
   containerStyle?: StyleProp<ViewStyle>;
@@ -192,7 +193,7 @@ export function KeyboardAwareScrollView({
           Platform.OS === "ios" ? keyboardVerticalOffset : 0
         }
       >
-        <ScrollView
+        <CustomScrollView
           ref={handleScrollRef}
           contentContainerStyle={resolvedContentContainerStyle}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}
@@ -206,7 +207,7 @@ export function KeyboardAwareScrollView({
           scrollEventThrottle={16}
         >
           {children}
-        </ScrollView>
+        </CustomScrollView>
       </KeyboardAvoidingView>
     </KeyboardAwareContext.Provider>
   );

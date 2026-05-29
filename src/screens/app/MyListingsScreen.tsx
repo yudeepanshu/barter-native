@@ -1,4 +1,4 @@
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useMemo, useState, memo, useCallback } from "react";
 import { useRouter } from "expo-router";
@@ -34,6 +34,7 @@ import { getStatusPillStyle } from "@/components/products/ProductTags";
 import { injectAds, isAdPlaceholder } from "@/lib/ads/injectAds";
 import { NativeAdCard } from "@/components/ads/NativeAdCard";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
+import { CustomFlatList } from "@/components/ui/CustomFlatList";
 
 type ListingFilter = "ALL" | ProductSummary["status"];
 type TradeTypeFilter = "ALL" | "BARTER_ONLY" | "OPEN_FOR_MONEY" | "MONEY_ONLY";
@@ -435,7 +436,7 @@ export default function MyListingsScreen() {
             </CollapsibleHeaderCard>
           </View>
 
-          <FlatList
+          <CustomFlatList
             data={feedItems}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}

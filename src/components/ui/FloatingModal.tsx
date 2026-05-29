@@ -1,9 +1,10 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { ReactNode } from "react";
 import { Feather } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ContextMenuAnchor } from "@/components/ui/AnchoredContextMenu";
 import { useEffect, useMemo, useState } from "react";
+import { CustomScrollView } from "./CustomScrollView";
 
 interface FloatingModalProps {
   visible: boolean;
@@ -91,7 +92,7 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
               </Pressable>
             </View>
           ) : null}
-          <ScrollView
+          <CustomScrollView
             bounces={false}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -99,7 +100,7 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
             contentContainerStyle={styles.content}
           >
             {children}
-          </ScrollView>
+          </CustomScrollView>
         </Pressable>
       </Pressable>
     </Modal>

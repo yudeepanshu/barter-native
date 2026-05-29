@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { initialWindowMetrics } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +26,7 @@ import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftG
 import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -353,7 +353,7 @@ export default function CreateListingScreen() {
             <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
               <View style={styles.categoryBlock}>
                 <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Category</Text>
-                <ScrollView
+                <CustomScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chips}
@@ -371,7 +371,7 @@ export default function CreateListingScreen() {
                       onPress={() => form.actions.setCategoryId(category.id)}
                     />
                   ))}
-                </ScrollView>
+                </CustomScrollView>
               </View>
             </View>
 
@@ -415,7 +415,7 @@ export default function CreateListingScreen() {
                     <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}>
                       {form.state.images.length} image(s) selected.
                     </Text>
-                    <ScrollView
+                    <CustomScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.imagePreviewList}
@@ -455,7 +455,7 @@ export default function CreateListingScreen() {
                           <Feather name="plus" size={20} color={theme.colors.textSecondary} />
                         </Pressable>
                       ) : null}
-                    </ScrollView>
+                    </CustomScrollView>
                     <Text style={[styles.imagePreviewHint, { color: theme.colors.textMuted }]}>
                       Tap an image to preview. Tap x to remove.
                     </Text>

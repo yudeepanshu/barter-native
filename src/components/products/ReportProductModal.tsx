@@ -1,4 +1,4 @@
-import { StyleSheet, Text, ScrollView, Pressable } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { useState } from "react";
 import { FloatingModal } from "@/components/ui/FloatingModal";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { OptionPillMenu, OptionPillMenuItem } from "@/components/filters/OptionPillMenu";
 import { Button } from "../ui/Button";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
+import { CustomScrollView } from "../ui/CustomScrollView";
 
 const REPORT_TYPE_OPTIONS: OptionPillMenuItem[] = [
   { key: "ABUSIVE_CONTENT", value: "ABUSIVE_CONTENT", label: "Abusive Content" },
@@ -56,7 +57,7 @@ export function ReportProductModal({
 
   return (
     <FloatingModal visible={visible} title="Report Listing" onClose={handleClose}>
-      <ScrollView
+      <CustomScrollView
         showsVerticalScrollIndicator={false}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -94,7 +95,7 @@ export function ReportProductModal({
         />
 
         <Button label={"Submit Report"} loading={isSubmitting} onPress={handleSubmit} disabled={!canSubmit} />
-      </ScrollView>
+      </CustomScrollView>
     </FloatingModal>
   );
 }

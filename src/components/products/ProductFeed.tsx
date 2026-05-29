@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -46,6 +45,7 @@ import { injectAds, isAdPlaceholder } from "@/lib/ads/injectAds";
 import type { FeedItem } from "@/lib/ads/injectAds";
 import { NativeAdCard } from "@/components/ads/NativeAdCard";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
+import { CustomFlatList } from "../ui/CustomFlatList";
 
 const REQUESTED_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
 const MIN_PROXIMITY_KM = 2;
@@ -704,7 +704,7 @@ export function ProductFeed({ userId, userName }: ProductFeedProps) {
           />
         </View>
 
-        <FlatList
+        <CustomFlatList
           data={feedItems}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}

@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   Animated,
-  FlatList,
   Modal,
   PanResponder,
   Pressable,
@@ -21,6 +20,7 @@ import {
 } from "@/hooks/mutations/useNotificationMutations";
 import { useNotificationsQuery } from "@/hooks/queries/useNotificationsQuery";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { CustomFlatList } from "../ui/CustomFlatList";
 
 const SWIPE_THRESHOLD = 80;
 const ITEM_HEIGHT = 80;
@@ -335,7 +335,7 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
               No updates yet.
             </Text>
           ) : (
-            <FlatList
+            <CustomFlatList
               data={visibleNotifications}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.notificationsList}

@@ -15,6 +15,7 @@ import {
   KeyboardAwareContext,
   type KeyboardAwareContextValue,
 } from "@/components/layout/KeyboardAwareContext";
+import { CustomFlatList } from "../ui/CustomFlatList";
 
 interface KeyboardAwareFlatListProps<ItemT> extends FlatListProps<ItemT> {
   extraBottomPadding?: number;
@@ -154,7 +155,7 @@ export function KeyboardAwareFlatList<ItemT>({
 
   return (
     <KeyboardAwareContext.Provider value={contextValue}>
-      <FlatList
+      <CustomFlatList
         ref={listRef}
         contentContainerStyle={resolvedContentContainerStyle}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}

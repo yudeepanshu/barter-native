@@ -4,7 +4,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,6 +12,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { CustomScrollView } from "./CustomScrollView";
 
 interface SwipeableBottomSheetProps {
   visible: boolean;
@@ -115,14 +115,14 @@ export function SwipeableBottomSheet({
               <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
             ) : null}
 
-            <ScrollView
+            <CustomScrollView
               showsVerticalScrollIndicator={false}
               bounces={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={[styles.content, contentContainerStyle]}
             >
               {children}
-            </ScrollView>
+            </CustomScrollView>
           </View>
         </View>
       </View>

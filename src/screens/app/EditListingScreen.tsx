@@ -1,6 +1,5 @@
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -29,6 +28,7 @@ import { useAppDialog } from "@/providers/AppDialogProvider";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -200,7 +200,7 @@ function EditListingFormSection({
                 <Text style={[styles.imageHint, { color: theme.colors.textMuted }]}> 
                   {form.state.existingImages.length + form.state.newImages.length} image(s).
                 </Text>
-                <ScrollView
+                <CustomScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.imagesRow}
@@ -244,7 +244,7 @@ function EditListingFormSection({
                       <Feather name="plus" size={24} color={theme.colors.textSecondary} />
                     </Pressable>
                   ) : null}
-                </ScrollView>
+                </CustomScrollView>
               </>
             ) : (
               <Pressable
@@ -271,7 +271,7 @@ function EditListingFormSection({
         <View style={[styles.sectionCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
           <View style={styles.categoryBlock}>
             <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Category</Text>
-            <ScrollView
+            <CustomScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chips}
@@ -289,7 +289,7 @@ function EditListingFormSection({
                   onPress={() => form.actions.setCategoryId(category.id)}
                 />
               ))}
-            </ScrollView>
+            </CustomScrollView>
           </View>
         </View>
 

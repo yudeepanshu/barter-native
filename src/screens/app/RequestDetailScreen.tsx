@@ -1,4 +1,4 @@
-import { Keyboard, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useRef, useMemo, useState } from "react";
@@ -54,6 +54,7 @@ import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { CancelModalKey, CancelWithReasonModal } from "@/components/requests/CancelWithReasonModal ";
 import { TradeCardAdItem } from "@/components/ads/TradeCardAdItem";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 const OPEN_STATUSES: RequestSummary["status"][] = ["PENDING", "NEGOTIATING"];
 
@@ -342,7 +343,7 @@ const ExpandableProductsSection = memo(function ExpandableProductsSection({
       </Pressable>
       <SmoothCollapse expanded={expanded} maxHeight={460}>
         {products.length > 2 ? (
-          <ScrollView style={{ maxHeight: 440 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+          <CustomScrollView style={{ maxHeight: 440 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
             <View style={styles.offeredProducts}>
               {products.map((product) => (
                 <View key={product.id} style={styles.considerationProductWrap}>
@@ -354,7 +355,7 @@ const ExpandableProductsSection = memo(function ExpandableProductsSection({
                 </View>
               ))}
             </View>
-          </ScrollView>
+          </CustomScrollView>
         ) : (
           <View style={styles.offeredProducts}>
             {products.map((product) => (
@@ -421,7 +422,7 @@ const OfferHistorySection = memo(function OfferHistorySection({
         Offer History ({offers.length})
       </Text>
       <View style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }}>
-        <ScrollView style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }} nestedScrollEnabled showsVerticalScrollIndicator>
+        <CustomScrollView style={{ maxHeight: OFFER_LIST_MAX_HEIGHT }} nestedScrollEnabled showsVerticalScrollIndicator>
           <View style={{ gap: 8 }}>
             {visibleOffers.map((offer, index) => (
               <OfferCard
@@ -455,7 +456,7 @@ const OfferHistorySection = memo(function OfferHistorySection({
               </Pressable>
             ) : null}
           </View>
-        </ScrollView>
+        </CustomScrollView>
       </View>
     </View>
   );
@@ -1103,7 +1104,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           }] : []
         }
       />
-      <ScrollView
+      <CustomScrollView
         contentContainerStyle={[styles.content, { paddingTop: 10 }]}
         refreshControl={
           <RefreshControl
@@ -1455,7 +1456,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                   onPressProduct={onPressConsiderationProduct}
                 />
               ) : activeProducts.length > 2 ? (
-                <ScrollView
+                <CustomScrollView
                   style={{ maxHeight: 440 }}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
@@ -1471,7 +1472,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
                       </View>
                     ))}
                   </View>
-                </ScrollView>
+                </CustomScrollView>
               ) : (
                 <View style={styles.offeredProducts}>
                   {activeProducts.map((product) => (
@@ -1767,7 +1768,7 @@ const transactionQuery = useActiveTransactionQuery(requestId, shouldCheckActiveT
           />
         }
         {/* Back Button removed from bottom */}
-      </ScrollView>
+      </CustomScrollView>
 
         {/* Exchange success modal shown after OTP verification */}
         <ExchangeSuccessModal

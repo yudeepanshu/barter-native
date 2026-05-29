@@ -72,7 +72,7 @@ export function TeaserCard({
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
             {title}
           </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]} numberOfLines={2}>
             {subtitle}
           </Text>
         </View>

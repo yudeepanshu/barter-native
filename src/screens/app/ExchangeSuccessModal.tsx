@@ -3,7 +3,6 @@ import {
   Animated,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,6 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -404,7 +404,7 @@ export function ExchangeSuccessModal({
               <Feather name="x" size={16} color={theme.colors.textSecondary} />
             </Pressable>
 
-            <ScrollView
+            <CustomScrollView
               contentContainerStyle={styles.inner}
               showsVerticalScrollIndicator={false}
             >
@@ -487,7 +487,7 @@ export function ExchangeSuccessModal({
                   <Text style={styles.primaryBtnText}>Done</Text>
                 </Pressable>
               </View>
-            </ScrollView>
+            </CustomScrollView>
           </Animated.View>
         </Pressable>
       </Pressable>

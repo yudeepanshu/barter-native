@@ -1,7 +1,6 @@
 import {
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -50,6 +49,7 @@ import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { ApiClient } from "@barter/api-client";
 import { TradeCardAdItem } from "@/components/ads/TradeCardAdItem";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -430,7 +430,7 @@ export default function ProductDetailScreen() {
 
           <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
-          <ScrollView
+          <CustomScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.metaSection}
@@ -445,7 +445,7 @@ export default function ProductDetailScreen() {
               fallbackDistanceLabel={previewLocationLabel}
               distanceOverrideKm={routeDistanceOverrideKm}
             />
-          </ScrollView>
+          </CustomScrollView>
         </View>
 
         {/* ── Active request card ─────────────────────────────────────────────── */}

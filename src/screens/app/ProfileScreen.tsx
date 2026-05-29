@@ -36,6 +36,8 @@ import { AppCard } from "@/components/ui/AppCard";
 import { AppImage } from "@/components/ui/AppImage";
 import { KeyboardAwareScrollView } from "@/components/layout/KeyboardAwareScrollView";
 import { useAppDialog } from "@/providers/AppDialogProvider";
+import { useSupportOptionsStore } from "@/lib/store/supportOptionsStore";
+import { SupportOptionsDialogContent } from "@/components/support/SupportOptionsDialogContent";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 import { sanitizeOptionalText } from "@/lib/utils/inputSanitizer";
@@ -45,6 +47,7 @@ import { useStartupBannersStore } from "@/lib/ui/startupBannersStore";
 import { TeaserCard } from "@/components/ui/TeaserCard";
 import { TeaserAdCard } from "@/components/ads/TeaserAdCard";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -299,7 +302,7 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
             </View>
           ) : (
             /* ── Form state ── */
-            <ScrollView
+            <CustomScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={feedbackStyles.scrollContent}
@@ -403,7 +406,7 @@ function FeedbackModal({ visible, onClose, theme }: FeedbackModalProps) {
                   disabled={isSubmitting}
                 />
               </View>
-            </ScrollView>
+            </CustomScrollView>
           )}
         </Pressable>
       </Pressable>
@@ -498,8 +501,29 @@ export default function ProfileScreen() {
 
   // Open startup banners (use hook for stable single-tap behavior)
   const openStartupBanners = useStartupBannersStore((s) => s.open);
+  const supportOptions = useSupportOptionsStore((state) => state.options);
+  const supportOptionsLoaded = useSupportOptionsStore((state) => state.loaded);
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const openSupportOptionsDialog = async () => {
+    if (!supportOptionsLoaded) {
+      await dialog.alert(
+        "Support options",
+        "Support options are still loading. Please try again in a moment.",
+      );
+      return;
+    }
+
+    await dialog.show({
+      title: "Support",
+      message: supportOptions.length > 0 ? "Tap a support channel to get help." : "",
+      contentNode: <SupportOptionsDialogContent options={supportOptions} />,
+      showCloseButton: true,
+      dismissOnBackdrop: true,
+      actions: [],
+    });
+  };
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
@@ -976,6 +1000,18 @@ export default function ProfileScreen() {
             accessibilityLabel="Open feedback form"
           />
         ) : null}
+
+        <TeaserCard
+          icon="face-agent"
+          title="Support"
+          subtitle={
+            supportOptionsLoaded
+              ? "Get help from the team"
+              : "Loading support options…"
+          }
+          onPress={() => void openSupportOptionsDialog()}
+          accessibilityLabel="Open support options"
+        />
 
         {/* App tour / onboarding teaser */}
         <TeaserCard

@@ -1,16 +1,13 @@
 import {
   Dimensions,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { RequestStatus, RequestSummary, RequestTurn } from "@barter/types";
@@ -33,6 +30,8 @@ import { EmptyView } from "@/components/ui/EmptyView";
 import { RequestItem } from "./RequestItem";
 import { ErrorView } from "@/components/ui/ErrorView";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
+import { CustomScrollView } from "@/components/ui/CustomScrollView";
+import { CustomFlatList } from "@/components/ui/CustomFlatList";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Fixed chrome inside the modal: header row + action buttons row + section titles + paddings + gaps
@@ -492,7 +491,7 @@ export default function RequestsScreen() {
 
         <View style={styles.scrollArea}>
           {!isInitialLoading && isEverythingEmpty ? (
-            <ScrollView
+            <CustomScrollView
               contentContainerStyle={styles.scrollAreaContent}
               refreshControl={
                 <RefreshControl refreshing={isManualRefreshing} onRefresh={onRefreshAll} />
@@ -503,7 +502,7 @@ export default function RequestsScreen() {
                 title="Nothing here yet"
                 message="Your sent and received requests will show up here once activity begins."
               />
-            </ScrollView>
+            </CustomScrollView>
           ) : null}
 
           {!isInitialLoading && !isEverythingEmpty && activeTab === "received" ? (
@@ -576,7 +575,7 @@ export default function RequestsScreen() {
               </View>
 
               <View style={[styles.filterScrollWrapper, { maxHeight: FILTER_SCROLL_MAX_HEIGHT }]}>
-                <ScrollView
+                <CustomScrollView
                   contentContainerStyle={styles.filterScrollContentContainer}
                   showsVerticalScrollIndicator={true}
                 >
@@ -675,7 +674,7 @@ export default function RequestsScreen() {
                       </View>
                     </>
                   ) : null}
-                </ScrollView>
+                </CustomScrollView>
               </View>
 
               {/* Action buttons */}
@@ -810,7 +809,7 @@ function RequestSection({
 
       {!isPending && !isError && groups.length > 0 ? (
         <View style={styles.listWrapFlatlist}>
-          <FlatList<typeof flattenedRows[0]>
+          <CustomFlatList<typeof flattenedRows[0]>
             style={styles.sectionScroll}
             contentContainerStyle={styles.sectionScrollContent}
             data={flattenedRows}

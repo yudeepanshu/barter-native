@@ -24,6 +24,7 @@ import {
 import { getExpoPushTokenForDevice } from "@/lib/notifications/pushRegistration";
 import { useRealtimeConnection } from "@/lib/realtime/useRealtimeConnection";
 import { useAppDataStore } from "@/lib/store/appDataStore";
+import { CACHE_TTL_MS, useSupportOptionsStore } from "@/lib/store/supportOptionsStore";
 import { TopToastHost } from "@/components/ui/TopToastHost";
 import { AppDialogProvider } from "@/providers/AppDialogProvider";
 import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
@@ -354,6 +355,40 @@ function PushNotificationsBootstrap() {
   return null;
 }
 
+function SupportOptionsBootstrap() {
+  const loaded = useSupportOptionsStore((state) => state.loaded);
+  const lastFetchedAt = useSupportOptionsStore((state) => state.lastFetchedAt);
+  const setSupportOptions = useSupportOptionsStore((state) => state.setSupportOptions);
+
+  useEffect(() => {
+    if (loaded && lastFetchedAt && Date.now() - lastFetchedAt < CACHE_TTL_MS) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadSupportOptions = async () => {
+      try {
+        const envelope = await mobileApiClient.getSupportOptions();
+        if (isCancelled) return;
+        setSupportOptions(envelope.data ?? []);
+      } catch (error) {
+        console.warn("Failed to load support options", error);
+        if (!isCancelled) setSupportOptions([]);
+      }
+    };
+
+    void loadSupportOptions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [loaded, lastFetchedAt, setSupportOptions]);
+
+  return null;
+}
+
+
 function RealtimeBootstrap() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
@@ -396,6 +431,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <AppDialogProvider>
           <AppUpdateProvider />
           <IconFontsWarmup />
+          <SupportOptionsBootstrap />
           <RealtimeBootstrap />
           <PushNotificationsBootstrap />
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>

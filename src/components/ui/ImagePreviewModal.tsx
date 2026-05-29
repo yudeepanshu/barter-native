@@ -10,6 +10,7 @@ import {
 import { useRef, useState, useEffect } from "react";
 import { AppImage } from "@/components/ui/AppImage";
 import { Feather } from "@expo/vector-icons";
+import { CustomScrollView } from "./CustomScrollView";
 
 interface ProductImage {
   id: string;
@@ -86,7 +87,7 @@ export function ImagePreviewModal({
         </Pressable>
 
         {/* Main image scroll */}
-        <ScrollView
+        <CustomScrollView
           ref={mainScrollRef}
           horizontal
           pagingEnabled
@@ -112,12 +113,12 @@ export function ImagePreviewModal({
               />
             </View>
           ))}
-        </ScrollView>
+        </CustomScrollView>
 
         {/* Thumbnail strip */}
         {images.length > 1 ? (
           <View style={styles.thumbBar}>
-            <ScrollView
+            <CustomScrollView
               ref={thumbScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -139,7 +140,7 @@ export function ImagePreviewModal({
                   />
                 </Pressable>
               ))}
-            </ScrollView>
+            </CustomScrollView>
           </View>
         ) : null}
       </View>

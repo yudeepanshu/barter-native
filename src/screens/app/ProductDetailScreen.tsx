@@ -819,6 +819,7 @@ function RequestComposer({
           supportOnlyMoneyOffers={supportOnlyMoneyOffers}
           includeMoney={includeMoney}
           includeProduct={includeProduct}
+          isFree={product.isFree}
           includeProductFirst
           onToggleIncludeMoney={() =>
             setIncludeMoney((prev) => {

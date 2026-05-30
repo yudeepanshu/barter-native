@@ -495,6 +495,7 @@ export const CounterOfferForm: React.FC<CounterOfferFormProps> = ({
       supportsMixedOffers={supportsMixedOffers}
       includeMoney={includeMoney}
       includeProduct={includeProduct}
+      isFree={product.isFree}
       moneyModeLabel="Money"
       productModeLabel="Product"
       includeProductFirst

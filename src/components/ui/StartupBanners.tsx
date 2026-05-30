@@ -520,8 +520,8 @@ useEffect(() => {
 
             <View style={fullStyles.content}>
               <View style={[fullStyles.tabRow, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <TabPill label="For Sellers" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')}  inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
-                <TabPill label="For Buyers" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
+                <TabPill label="For Selling" active={tab === 'seller'} accent={SELLER_SLIDES[0].accent} onPress={() => switchTab('seller')}  inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
+                <TabPill label="For Buying" active={tab === 'buyer'} accent={BUYER_SLIDES[0].accent} onPress={() => switchTab('buyer')} inactiveBg={theme.colors.surfaceMuted} inactiveText={theme.colors.textMuted} activeText={'#FFFFFF'} />
               </View>
 
               <View style={fullStyles.slideWrap}  {...swipeHandlers.panHandlers}>
@@ -583,7 +583,7 @@ useEffect(() => {
         {/* Tab switcher */}
         <View style={[s.tabRow, { backgroundColor: theme.colors.surfaceMuted }]}>
           <TabPill
-            label="For Sellers"
+            label="For Selling"
             active={tab === "seller"}
             accent={SELLER_SLIDES[0].accent}
             onPress={() => switchTab("seller")}
@@ -592,7 +592,7 @@ useEffect(() => {
             activeText={'#FFFFFF'}
           />
           <TabPill
-            label="For Buyers"
+            label="For Buying"
             active={tab === "buyer"}
             accent={BUYER_SLIDES[0].accent}
             onPress={() => switchTab("buyer")}

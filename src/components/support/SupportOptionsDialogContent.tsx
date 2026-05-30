@@ -51,11 +51,16 @@ export function SupportOptionsDialogContent({ options }: { options: SupportOptio
     }
 
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) throw new Error("Unable to open URL");
+      const isWebUrl = url.startsWith("http://") || url.startsWith("https://");
+
+      if (!isWebUrl) {
+        const canOpen = await Linking.canOpenURL(url);
+        if (!canOpen) throw new Error("Unable to open URL");
+      }
+
       await Linking.openURL(url);
     } catch {
-      await dialog.alert("Unable to open support option", "Please try again later.");
+      await dialog.alert("Unable to open", "Please try again later.");
     }
   };
 

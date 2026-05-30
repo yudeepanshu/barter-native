@@ -69,6 +69,7 @@ interface OfferComposerFormProps {
   onSubmit: () => void;
   onCancel?: () => void;
   cancelLabel?: string;
+  isFree?: boolean;
 }
 
 export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
@@ -131,6 +132,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
   onSubmit,
   onCancel,
   cancelLabel = "Cancel",
+  isFree = false,
 }) => {
   const { theme } = useAppTheme();
 
@@ -292,7 +294,7 @@ export const OfferComposerForm: React.FC<OfferComposerFormProps> = ({
         </View>
       ) : null}
 
-      {(offerableProducts.length > 0 || (selectedRequestedProductIds?.length ?? 0) > 0 || showRequestedProductSelector || includeMoney || supportOnlyMoneyOffers) ?
+      {(offerableProducts.length > 0 || (selectedRequestedProductIds?.length ?? 0) > 0 || showRequestedProductSelector || includeMoney || supportOnlyMoneyOffers || isFree) ?
         <Input
           label={messageLabel}
           value={message}

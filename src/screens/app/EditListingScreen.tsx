@@ -29,6 +29,7 @@ import { ErrorView } from "@/components/ui/ErrorView";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { CustomScrollView } from "@/components/ui/CustomScrollView";
+import { TeaserAdCard } from "@/components/ads/TeaserAdCard";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -323,6 +324,8 @@ function EditListingFormSection({
               minMoneyAmountError={form.state.fieldErrors.minMoneyAmount ?? null}
             /> : null}
           </View>
+
+          <TeaserAdCard />
 
         {form.state.formError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.formError}</Text> : null}
 

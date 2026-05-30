@@ -13,6 +13,9 @@
     "apk:standalone": "cd android && gradlew.bat assembleDebug -PembedDebugBundle=true",
     "apk:release": "cd android && gradlew.bat assembleRelease --rerun-tasks",
     "apk:clean": "cd android && gradlew.bat clean",
+    "eas:preview": "eas build --platform android --profile preview",
+    "eas:prod": "eas build --platform android --profile production",
+    "expo:pc": "npx expo prebuild --clean",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

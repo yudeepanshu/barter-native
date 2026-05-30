@@ -5,7 +5,7 @@ const IS_DEV = process.env.EXPO_PUBLIC_APP_ENV === "dev";
 export default (): ExpoConfig => ({
   name: "Flippe",
   slug: "flippe",
-  version: "0.2.3-alpha.0",
+  version: "1.0.0",
   scheme: "flippe",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -25,7 +25,7 @@ export default (): ExpoConfig => ({
   },
   android: {
     package: "com.shinichi.flippeapp",
-    versionCode: 60,
+    versionCode: 61,
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",

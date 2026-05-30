@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NativeAd, NativeAdView, NativeAsset, NativeAssetType } from "react-native-google-mobile-ads";
+import { NativeAd, NativeAdView } from "react-native-google-mobile-ads";
 import { NATIVE_AD_UNIT_ID } from "@/lib/ads/adConfig";
 import { TeaserCard } from "@/components/ui/TeaserCard";
 
@@ -20,7 +20,6 @@ export function TeaserAdCard() {
 
   return (
     <NativeAdView nativeAd={nativeAd}>
-      <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
         <TeaserCard
             imageUri={nativeAd.icon?.url}
             title={nativeAd.headline ?? "Sponsored"}
@@ -30,7 +29,6 @@ export function TeaserAdCard() {
             onPress={() => {}}
             accessibilityLabel={`Ad: ${nativeAd.headline}`}
         />
-      </NativeAsset>
     </NativeAdView>
   );
 }

@@ -1,6 +1,7 @@
 import { Pressable, View, Text, StyleSheet, Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { NativeAsset, NativeAssetType } from "react-native-google-mobile-ads";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -38,6 +39,39 @@ export function TeaserCard({
     },
   ];
 
+  // ── Icon / image slot ──
+  // For ads: NativeAsset must have the Image as a direct child — no wrapping View
+  const iconSlot = isAd && imageUri ? (
+    <NativeAsset assetType={NativeAssetType.ICON}>
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.adImage}
+        resizeMode="contain"
+      />
+    </NativeAsset>
+  ) : (
+    <View
+      style={[
+        styles.iconCircle,
+        { backgroundColor: theme.colors.surfaceMuted ?? "#EEF2FF" },
+      ]}
+    >
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.adImage}
+          resizeMode="contain"
+        />
+      ) : icon ? (
+        <MaterialCommunityIcons
+          name={icon}
+          size={22}
+          color={theme.colors.primary}
+        />
+      ) : null}
+    </View>
+  );
+
   const content = (
     <>
       {badge ? (
@@ -47,34 +81,39 @@ export function TeaserCard({
       ) : null}
 
       <View style={styles.row}>
-        <View
-          style={[
-            styles.iconCircle,
-            { backgroundColor: theme.colors.surfaceMuted ?? "#EEF2FF" },
-          ]}
-        >
-          {imageUri ? (
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.adImage}
-              resizeMode="contain"
-            />
-          ) : icon ? (
-            <MaterialCommunityIcons
-              name={icon}
-              size={22}
-              color={theme.colors.primary}
-            />
-          ) : null}
-        </View>
+        {iconSlot}
 
         <View style={styles.textGroup}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-            {title}
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-            {subtitle}
-          </Text>
+          {isAd ? (
+            // NativeAsset direct child — no wrapping View
+            <>
+              <NativeAsset assetType={NativeAssetType.HEADLINE}>
+                <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
+                  {title}
+                </Text>
+              </NativeAsset>
+              <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                <Text
+                  style={[styles.subtitle, { color: theme.colors.textSecondary }]}
+                  numberOfLines={2}
+                >
+                  {subtitle}
+                </Text>
+              </NativeAsset>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
+                {title}
+              </Text>
+              <Text
+                style={[styles.subtitle, { color: theme.colors.textSecondary }]}
+                numberOfLines={2}
+              >
+                {subtitle}
+              </Text>
+            </>
+          )}
         </View>
 
         {rightSlot ?? null}
@@ -82,7 +121,6 @@ export function TeaserCard({
     </>
   );
 
-  // NativeAdView handles touches for ads — Pressable would swallow them
   if (isAd) {
     return <View style={cardStyle}>{content}</View>;
   }

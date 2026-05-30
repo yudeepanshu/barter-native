@@ -42,7 +42,6 @@ export function TradeCardAdItem() {
 
   return (
     <NativeAdView nativeAd={nativeAd}>
-      <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
         <TradeCardItem
           item={fakeItem}
           router={router}
@@ -52,7 +51,6 @@ export function TradeCardAdItem() {
           adSubtitle={nativeAd.advertiser ?? nativeAd.body ?? ""}
           adBadgeLabel={nativeAd.callToAction ?? "Sponsored"}
         />
-      </NativeAsset>
     </NativeAdView>
   );
 }

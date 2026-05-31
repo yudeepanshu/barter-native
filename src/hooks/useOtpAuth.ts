@@ -8,11 +8,10 @@ import { useAuthStore } from "@/lib/auth/authStore";
 import { needsProfileCompletion } from "@/lib/auth/profileCompletion";
 import { sanitizeEmailIdentifierInput, sanitizeOtpInput } from "@/lib/utils/inputSanitizer";
 import { queryClient } from "@/lib/query/queryClient";
-import { queryKeys } from "@/lib/query/queryKeys";
 
-const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again.";
+const OTP_GENERIC_ERROR_MESSAGE = "Unable to verify OTP right now. Please try again later.";
 const OTP_INVALID_ERROR_MESSAGE = "Invalid OTP. Please try again.";
-const OTP_SEND_ERROR_MESSAGE = "Unable to send OTP right now. Please try again.";
+const OTP_SEND_ERROR_MESSAGE = "Unable to send OTP right now. Please try again later.";
 
 export type OtpStep = "identifier" | "sent" | "code";
 

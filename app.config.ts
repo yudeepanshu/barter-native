@@ -25,7 +25,7 @@ export default (): ExpoConfig => ({
   },
   android: {
     package: "com.shinichi.flippeapp",
-    versionCode: 61,
+    versionCode: 62,
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",

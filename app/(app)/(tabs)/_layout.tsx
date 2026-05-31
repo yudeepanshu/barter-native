@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
-import { initialWindowMetrics } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { View, Animated } from "react-native";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -15,9 +15,6 @@ import { queryClient } from "@/lib/query/queryClient";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { Spinner } from "@/components/ui/Spinner";
-
-const tabBarBottomPadding = Math.max(initialWindowMetrics!.insets.bottom, 10);
-const tabBarHeight = 58 + tabBarBottomPadding;
 
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => (
@@ -35,8 +32,6 @@ function CreateTabIcon({
   isChecking: boolean;
 }) {
   if (isChecking) {
-    // Wrap in a fixed-size View matching the icon frame so the tab layout
-    // doesn't shift when switching between icon and spinner.
     return (
       <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
         <Spinner size={size - 6} />
@@ -56,6 +51,12 @@ export default function AppTabsLayout() {
   const createCheckInFlightRef = useRef(false);
   const [isCheckingCreateLimit, setIsCheckingCreateLimit] = useState(false);
 
+  // Use live insets so the tab bar correctly clears the system nav bar
+  // regardless of whether the user has gesture nav or 3-button nav enabled.
+  const insets = useSafeAreaInsets();
+  const tabBarBottomPadding = Math.max(insets.bottom, 10);
+  const tabBarHeight = 58 + tabBarBottomPadding;
+
   const tabBarTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function AppTabsLayout() {
       duration: 100,
       useNativeDriver: true,
     }).start();
-  }, [tabBarVisible, tabBarTranslateY]);
+  }, [tabBarVisible, tabBarTranslateY, tabBarHeight]);
 
   return (
     <Tabs
@@ -95,12 +96,9 @@ export default function AppTabsLayout() {
 
                 const atLimit = await checkProductCreationLimit(queryClient, userId);
 
-                // User navigated away while check was in flight — abort silently.
                 const currentRoute = navigation.getState().routes[navigation.getState().index]?.name;
                 if (currentRoute !== routeAtTapTime) return;
 
-                // Clear spinner immediately before any visible outcome so it doesn't
-                // linger while the create screen mounts or the dialog animates in.
                 setIsCheckingCreateLimit(false);
 
                 if (!atLimit) {

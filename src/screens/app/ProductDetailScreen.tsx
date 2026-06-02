@@ -50,6 +50,8 @@ import { ApiClient } from "@barter/api-client";
 import { TradeCardAdItem } from "@/components/ads/TradeCardAdItem";
 import { ADS_ENABLED } from "@/lib/ads/adConfig";
 import { CustomScrollView } from "@/components/ui/CustomScrollView";
+import { TruncatedTooltipText } from "@/components/ui/TruncatedTooltipText";
+import { ExpandableText } from "@/components/ui/ExpandableText";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -81,6 +83,8 @@ export default function ProductDetailScreen() {
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const productData = query.data ?? null;
+
+  const titleMaxWidth = width - 44 - 44 - 32;
 
   const previewLocationLabel = formatLocationBadgeLabel(productData?.locationName);
   const isOwner = session?.user.id === productData?.currentOwnerId;
@@ -243,10 +247,12 @@ export default function ProductDetailScreen() {
       <MenuHeader
         centerNode={
           product.title ? (
-            <View style={styles.headerRow}>
-              <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
-                {product.title}
-              </Text>
+            <View style={[styles.headerRow]}>
+              <TruncatedTooltipText
+                text={product.title}
+                numberOfLines={1}
+                style={[styles.headerTitle, { color: theme.colors.textPrimary, maxWidth: titleMaxWidth }]}
+              />
               <View style={{ gap: 6, alignItems: "flex-end" }}>
                 <ProductTag
                   tag={typeTag.label === "Cash Only" ? { ...typeTag, label: formatCurrency(product.minMoneyAmount ?? 0) } : typeTag}
@@ -325,9 +331,11 @@ export default function ProductDetailScreen() {
           ) : null}
 
           {product.description ? (
-            <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={3}>
-              {product.description}
-            </Text>
+            <ExpandableText
+              text={product.description}
+              numberOfLines={3}
+              style={[styles.description, { color: theme.colors.textMuted }]}
+            />
           ) : null}
 
           {isOwner && !reported && getInactiveExpiryWarning(product) ? (
@@ -1003,7 +1011,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    flex: 1,
+    minWidth: 0,
     fontSize: 16,
     fontWeight: "700",
   },

@@ -30,6 +30,7 @@ import { OfferSegmentedControl } from "./OfferSegmentedControl";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { CustomScrollView } from "@/components/ui/CustomScrollView";
 import { TeaserAdCard } from "@/components/ads/TeaserAdCard";
+import { ADS_ENABLED } from "@/lib/ads/adConfig";
 
 export default function EditListingScreen() {
   const { theme } = useAppTheme();
@@ -325,7 +326,7 @@ function EditListingFormSection({
             /> : null}
           </View>
 
-          <TeaserAdCard />
+          {ADS_ENABLED ? <TeaserAdCard /> : null}
 
         {form.state.formError ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{form.state.formError}</Text> : null}
 

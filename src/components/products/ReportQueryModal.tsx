@@ -1,34 +1,35 @@
 import { OptionPillMenuItem } from "@/components/filters/OptionPillMenu";
 import { ReportModal } from "@/components/ui/ReportModal";
-import { ProductReportType } from "@barter/types";
+import { ProductQueryReportType } from "@barter/types";
 
-const PRODUCT_REPORT_OPTIONS: OptionPillMenuItem[] = [
+
+const QUERY_REPORT_OPTIONS: OptionPillMenuItem[] = [
   { key: "ABUSIVE_CONTENT", value: "ABUSIVE_CONTENT", label: "Abusive Content" },
   { key: "SPAM_SCAM", value: "SPAM_SCAM", label: "Spam or Scam" },
   { key: "INAPPROPRIATE", value: "INAPPROPRIATE", label: "Inappropriate" },
-  { key: "PROHIBITED_ITEM", value: "PROHIBITED_ITEM", label: "Prohibited Item" },
-  { key: "INACCURATE_LISTING", value: "INACCURATE_LISTING", label: "Inaccurate Listing" },
+  { key: "MISLEADING_QUESTION", value: "MISLEADING_QUESTION", label: "Misleading Question" },
+  { key: "OFFENSIVE_LANGUAGE", value: "OFFENSIVE_LANGUAGE", label: "Offensive Language" },
   { key: "OTHER", value: "OTHER", label: "Other" },
 ];
 
-interface ReportProductModalProps {
+interface ReportQueryModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (payload: {
-    reportType: ProductReportType;
+    reportType: ProductQueryReportType;
     reason?: string;
     description?: string;
   }) => void;
   isSubmitting?: boolean;
 }
 
-export function ReportProductModal(props: ReportProductModalProps) {
+export function ReportQueryModal(props: ReportQueryModalProps) {
   return (
-    <ReportModal<ProductReportType>
+    <ReportModal<ProductQueryReportType>
       {...props}
-      title="Report Listing"
-      subtitle="What's wrong with this listing?"
-      options={PRODUCT_REPORT_OPTIONS}
+      title="Report Question"
+      subtitle="Why are you reporting this question?"
+      options={QUERY_REPORT_OPTIONS}
     />
   );
 }

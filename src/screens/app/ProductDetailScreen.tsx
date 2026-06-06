@@ -52,6 +52,7 @@ import { ADS_ENABLED } from "@/lib/ads/adConfig";
 import { CustomScrollView } from "@/components/ui/CustomScrollView";
 import { TruncatedTooltipText } from "@/components/ui/TruncatedTooltipText";
 import { ExpandableText } from "@/components/ui/ExpandableText";
+import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 
 const MAX_REQUEST_OFFER_AMOUNT = 150000000;
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["PENDING", "NEGOTIATING", "ACCEPTED"];
@@ -504,6 +505,12 @@ export default function ProductDetailScreen() {
             initialOfferedProductId={offeredProductId}
           />
         ) : null}
+
+        <ProductDetailTabs
+          product={product}
+          isOwner={isOwner}
+          sessionUserId={session?.user.id}
+        />
       </KeyboardAwareScrollView>
     </ScreenSafeView>
   );

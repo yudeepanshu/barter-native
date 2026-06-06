@@ -73,4 +73,7 @@ export const queryKeys = {
     activeByProduct: (productId: string) =>
       ["transactions", "active", "product", productId] as const,
   },
+  productQueries: {
+    list: (productId: string) => ["productQueries", "list", productId] as const,
+  },
 };

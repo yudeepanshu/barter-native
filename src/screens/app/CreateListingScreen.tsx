@@ -27,6 +27,10 @@ import { ImagePreviewModal } from "@/components/ui/ImagePreviewModal";
 import { OfferSegmentedControl } from "./OfferSegmentedControl";
 import { ScreenSafeView } from "@/components/layout/ScreenSafeView";
 import { CustomScrollView } from "@/components/ui/CustomScrollView";
+import {
+  ProductQuestionsModal,
+  type ProductQuestionsPayload,
+} from "@/components/products/ProductQuestionsModal";
 
 export default function CreateListingScreen() {
   const { theme, statusBarStyle } = useAppTheme();
@@ -41,19 +45,16 @@ export default function CreateListingScreen() {
   // Two-step state
   const [step, setStep] = useState<1 | 2>(1);
 
-  // ── Local field error state ───────────────────────────────────────────────
-  // We manage errors locally so we can clear them precisely on each field
-  // change, rather than waiting for the form hook to decide when to clear them.
+  // Questions modal
+  const [questionsModalVisible, setQuestionsModalVisible] = useState(false);
 
+  // ── Local field error state ───────────────────────────────────────────────
   const [step1Errors, setStep1Errors] = useState<{
     title?: string;
     description?: string;
     locationName?: string;
   }>({});
 
-  // Step-2 errors mirror form.state.fieldErrors but are cleared on change.
-  // minMoneyAmount is the only user-editable validated field on step 2;
-  // images error is cleared when images are added/removed.
   const [step2Errors, setStep2Errors] = useState<{
     minMoneyAmount?: string;
     images?: string;
@@ -63,7 +64,6 @@ export default function CreateListingScreen() {
   const hasAttachedLocation = form.state.manualLatitude != null && form.state.manualLongitude != null;
   const previewImages = form.state.images.map((asset) => ({ id: asset.uri, url: asset.uri }));
 
-  // Block publish while any local errors remain unresolved.
   const hasUnresolvedErrors =
     step1Errors.title !== undefined ||
     step1Errors.description !== undefined ||
@@ -73,10 +73,7 @@ export default function CreateListingScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
-      // Scroll back to top.
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-      // Reset step and all local error state whenever the screen comes into
-      // focus — covers re-visiting the tab after a submit or navigation event.
       setStep(1);
       setStep1Errors({});
       setStep2Errors({});
@@ -144,7 +141,6 @@ export default function CreateListingScreen() {
     form.actions.setDescription(value);
   };
 
-  // Attaching a location resolves the error; removing it doesn't.
   const handleAttachCurrentLocation = () => {
     if (step1Errors.locationName !== undefined) {
       setStep1Errors((prev) => ({ ...prev, locationName: undefined }));
@@ -182,8 +178,6 @@ export default function CreateListingScreen() {
     }
   };
 
-  // Changing the offer mode (isFree / requestByMoney / allowTradeRequest)
-  // resets the minMoneyAmount error since the field may no longer apply.
   const handleSetIsFree = (value: boolean) => {
     if (step2Errors.minMoneyAmount !== undefined) {
       setStep2Errors((prev) => ({ ...prev, minMoneyAmount: undefined }));
@@ -206,7 +200,6 @@ export default function CreateListingScreen() {
       title: form.state.title,
       description: form.state.description,
       locationName: form.state.locationName,
-      // Dummy so the images rule doesn't fire on step 1.
       imageFileNames: ["placeholder.jpg"],
       categoryId: form.state.categoryId,
       isFree: form.state.isFree,
@@ -223,7 +216,6 @@ export default function CreateListingScreen() {
       locationName: result.fieldErrors.locationName,
     };
 
-    // validateCreateListingDraft doesn't require locationName, but we do.
     if (!hasAttachedLocation) {
       errors.locationName = "Please select a location for your listing";
     }
@@ -248,13 +240,30 @@ export default function CreateListingScreen() {
     setStep(1);
   };
 
+  // ── Publish flow ──────────────────────────────────────────────────────────
+
+  // Opens the questions modal instead of submitting directly.
   const handlePublish = () => {
     if (hasUnresolvedErrors) return;
-    void form.actions.submit();
+    setQuestionsModalVisible(true);
   };
 
-  // Sync form-level errors into local step-2 state after a failed submit,
-  // and clear them when the form resets (fieldErrors goes back to undefined).
+  // User filled some/all questions and clicked Save Details.
+  const handleQuestionsSubmit = (payload: ProductQuestionsPayload) => {
+    setQuestionsModalVisible(false);
+    const optionalQuestions = Object.entries(payload)
+      .filter(([, value]) => Boolean(value))
+      .map(([key, value]) => ({ key, value: value ?? null }));
+    void form.actions.submit(optionalQuestions);
+  };
+
+  // User clicked Skip or closed the modal — submit without questions.
+  const handleQuestionsSkipOrClose = () => {
+    setQuestionsModalVisible(false);
+    void form.actions.submit([]);
+  };
+
+  // Sync form-level errors into local step-2 state after a failed submit.
   useEffect(() => {
     setStep2Errors((prev) => ({
       ...prev,
@@ -281,7 +290,6 @@ export default function CreateListingScreen() {
               : "Add pricing, category, and photos."
           }
         />
-        {/* Step indicator row — back icon on left when on step 2, dots centered */}
         <View style={styles.stepIndicatorRow}>
           {step === 2 ? (
             <Pressable onPress={handleBack} hitSlop={12} style={styles.stepBackIcon}>
@@ -305,7 +313,6 @@ export default function CreateListingScreen() {
               ]}
             />
           </View>
-          {/* Spacer to keep dots visually centred */}
           <View style={styles.stepBackIcon} />
         </View>
       </View>
@@ -499,6 +506,13 @@ export default function CreateListingScreen() {
           </>
         )}
       </KeyboardAwareScrollView>
+
+      {/* Questions modal — rendered outside scroll so it overlays correctly */}
+      <ProductQuestionsModal
+        visible={questionsModalVisible}
+        onClose={handleQuestionsSkipOrClose}
+        onSubmit={handleQuestionsSubmit}
+      />
     </ScreenSafeView>
   );
 }
@@ -556,7 +570,6 @@ const styles = StyleSheet.create({
   },
   switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   switchLabel: { fontSize: 14, fontWeight: "500" },
-
   actions: { gap: 10, marginTop: 6 },
   errorText: { fontSize: 13, color: "#dc2626" },
   imageBlock: { gap: 6 },

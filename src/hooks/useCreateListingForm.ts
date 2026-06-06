@@ -103,7 +103,9 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
     setIsUploadingImages(false);
   };
 
-  const submit = async () => {
+  const submit = async (
+    optionalQuestions: Array<{ key: string; value?: string | null }> = [],
+  ) => {
     setFormError(null);
     setLocationWarning(null);
     setFieldErrors({});
@@ -151,6 +153,7 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
         ...validation.normalized,
         status: "INACTIVE",
         isListed: false,
+        ...(optionalQuestions.length ? { optionalQuestions } : {}),
       };
 
       // Location is mandatory for create listing at this stage.
@@ -207,11 +210,17 @@ export function useCreateListingForm(options?: UseCreateListingFormOptions) {
             // Do not block the listing while publish-to-active is in flight.
             const relistedEnvelope = await mobileApiClient.relistProduct(created.id);
             if (relistedEnvelope.data) {
-              syncProductEntity(queryClient, relistedEnvelope.data);
+              syncProductEntity(queryClient, {
+                ...relistedEnvelope.data,
+                optionalQuestions: created.optionalQuestions ?? {},
+              });
             } else {
               const refreshed = await mobileApiClient.getProductById(created.id);
               if (refreshed.data) {
-                syncProductEntity(queryClient, refreshed.data);
+                syncProductEntity(queryClient, {
+                  ...refreshed.data,
+                  optionalQuestions: refreshed.data.optionalQuestions ?? created.optionalQuestions ?? {},
+                });
               }
             }
 

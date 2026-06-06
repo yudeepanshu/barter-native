@@ -517,14 +517,13 @@ export default function MyListingsScreen() {
         animationType="fade"
         onRequestClose={() => setShowFilterModal(false)}
       >
-        <Pressable
+        <View
           style={[styles.sortBackdrop, { backgroundColor: theme.colors.overlay }]}
-          onPress={() => setShowFilterModal(false)}
         >
-          <Pressable
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFilterModal(false)} />
+          <View
             style={[styles.sortSheet, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            onPress={() => {/* keep sheet open */}}
-          >
+            >
             <View style={styles.sheetHeaderRow}>
               <Text style={[styles.sheetTitle, { color: theme.colors.textPrimary }]}>Filter listings</Text>
               <Pressable onPress={() => setShowFilterModal(false)}>
@@ -587,8 +586,8 @@ export default function MyListingsScreen() {
                 <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       <SortBottomSheet

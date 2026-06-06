@@ -510,6 +510,7 @@ export default function ProductDetailScreen() {
           product={product}
           isOwner={isOwner}
           sessionUserId={session?.user.id}
+          isLoading={query.isFetching && !query.data?.optionalQuestions}
         />
       </KeyboardAwareScrollView>
     </ScreenSafeView>

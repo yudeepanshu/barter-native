@@ -60,23 +60,22 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
+      <View
         style={[
           styles.backdrop,
           { backgroundColor: theme.colors.overlay },
           isAnchored ? styles.backdropAnchor : styles.backdropCenter,
         ]}
-        onPress={onClose}
       >
-        <Pressable
+        {/* Invisible close area behind the panel */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+        <View
           style={[
             styles.panel,
             { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
             position ? { position: "absolute", ...position } : { width: centeredPanelWidth },
           ]}
-          onPress={() => {
-            // Keep modal open when tapping inside.
-          }}
           onLayout={(event) => {
             if (panelLayout) return;
             const { width, height } = event.nativeEvent.layout;
@@ -101,8 +100,8 @@ export function FloatingModal({ visible, title, onClose, children, headerRight, 
           >
             {children}
           </CustomScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

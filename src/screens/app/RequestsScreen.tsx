@@ -555,16 +555,15 @@ export default function RequestsScreen() {
           animationType="fade"
           onRequestClose={() => setShowProductFilterModal(false)}
         >
-          <Pressable
+          <View
             style={[styles.filterModalBackdrop, { backgroundColor: theme.colors.overlay }]}
-            onPress={() => setShowProductFilterModal(false)}
           >
-            <Pressable
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowProductFilterModal(false)} />
+            <View
               style={[
                 styles.filterModalSheet,
                 { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
               ]}
-              onPress={() => {/* Keep modal open when tapping inside */}}
             >
               {/* Header */}
               <View style={styles.filterModalHeaderRow}>
@@ -698,8 +697,8 @@ export default function RequestsScreen() {
                   <Text style={[styles.filterActionText, { color: theme.colors.onPrimary }]}>Apply</Text>
                 </Pressable>
               </View>
-            </Pressable>
-          </Pressable>
+            </View>
+          </View>
         </Modal>
       </View>
     </ScreenSafeView>

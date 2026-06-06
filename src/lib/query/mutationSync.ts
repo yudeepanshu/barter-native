@@ -28,15 +28,14 @@ export function syncProductEntity(queryClient: QueryClient, product: ProductSumm
   const store = useAppStore.getState();
   store.upsertProduct(product);
 
-  queryClient.setQueryData(queryKeys.products.detail(product.id), product);
+  // Write to both key variants since includeOwnerRequests may or may not be appended
+  queryClient.setQueryData([...queryKeys.products.detail(product.id), false], product);
+  queryClient.setQueryData([...queryKeys.products.detail(product.id), true], product);
 
   queryClient.setQueriesData<InfiniteData<ProductPage>>(
     { queryKey: ["products", "infinite"] },
     (existing) => {
-      if (!existing) {
-        return existing;
-      }
-
+      if (!existing) return existing;
       return {
         ...existing,
         pages: existing.pages.map((page) => replaceProductInPage(page, product)),

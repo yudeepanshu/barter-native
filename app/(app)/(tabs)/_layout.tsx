@@ -2,7 +2,13 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { View, Animated } from "react-native";
+import {
+  View,
+  Animated,
+  Pressable,
+  StyleSheet,
+  GestureResponderEvent,
+} from "react-native";
 import { useSession } from "@/hooks/useSession";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCreateListingDraftGuardStore } from "@/lib/forms/createListingDraftGuardStore";
@@ -15,6 +21,13 @@ import { queryClient } from "@/lib/query/queryClient";
 import { useAppDialog } from "@/providers/AppDialogProvider";
 import { useFeedScrollStore } from "@/lib/store/feedScrollStore";
 import { Spinner } from "@/components/ui/Spinner";
+
+import type { ViewStyle, StyleProp } from "react-native";
+
+// 👇 adjust this to change how long the ripple animation takes
+const RIPPLE_DURATION_MS = 500;
+const RIPPLE_ORIGIN_Y_RATIO = 0.4;
+const RIPPLE_OVERFLOW_PADDING = 12;
 
 function renderTabIcon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => (
@@ -41,6 +54,120 @@ function CreateTabIcon({
   return <Ionicons name="add-circle-outline" size={size} color={color} />;
 }
 
+type RippleTabBarButtonProps = {
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: ((event: GestureResponderEvent) => void) | null;
+  onLongPress?: ((event: GestureResponderEvent) => void) | null;
+  rippleColor?: string;
+  rippleDuration?: number;
+} & Record<string, unknown>;
+
+function RippleTabBarButton({
+  children,
+  style,
+  onPress,
+  onLongPress,
+  rippleColor = "#000000",
+  rippleDuration = RIPPLE_DURATION_MS,
+  ...rest
+}: RippleTabBarButtonProps) {
+  const rippleAnim = useRef(new Animated.Value(0)).current;
+  const layoutRef = useRef({ width: 0, height: 0 });
+  const rippleKeyRef = useRef(0);
+  const [ripple, setRipple] = useState<{
+    x: number;
+    y: number;
+    size: number;
+    key: number;
+  } | null>(null);
+
+  const triggerRipple = (locationX: number, locationY: number) => {
+    const { width, height } = layoutRef.current;
+    // size the circle so it always covers the whole button from wherever it was tapped
+    const maxDistX = Math.max(locationX, width - locationX);
+    const maxDistY = Math.max(locationY, height - locationY);
+    const radius = Math.sqrt(maxDistX ** 2 + maxDistY ** 2) || 1;
+    const size = radius * 2;
+
+    rippleKeyRef.current += 1;
+    setRipple({ x: locationX - radius, y: locationY - radius, size, key: rippleKeyRef.current });
+
+    rippleAnim.setValue(0);
+    Animated.timing(rippleAnim, {
+      toValue: 1,
+      duration: rippleDuration,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setRipple(null);
+    });
+  };
+
+  const handlePressIn = () => {
+    const { width, height } = layoutRef.current;
+    const originX = width / 2;
+    const originY = height * RIPPLE_ORIGIN_Y_RATIO;
+    triggerRipple(originX, originY);
+  };
+
+  const scale = rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 1] });
+  const opacity = rippleAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.28, 0.16, 0] });
+
+return (
+  <Pressable
+    {...rest}
+    onPress={onPress}
+    onLongPress={onLongPress}
+    onPressIn={handlePressIn}
+    onLayout={(event) => {
+      const { width, height } = event.nativeEvent.layout;
+      layoutRef.current = { width, height };
+    }}
+    style={style}
+  >
+    <View
+      pointerEvents="none"
+      style={[
+        styles.rippleClipLayer,
+        { top: -RIPPLE_OVERFLOW_PADDING, bottom: -RIPPLE_OVERFLOW_PADDING },
+      ]}
+    >
+      {ripple && (
+        <Animated.View
+          key={ripple.key}
+          style={[
+            styles.ripple,
+            {
+              left: ripple.x,
+              top: ripple.y + RIPPLE_OVERFLOW_PADDING, // shift down to match the layer's offset
+              width: ripple.size,
+              height: ripple.size,
+              borderRadius: ripple.size / 2,
+              backgroundColor: rippleColor,
+              opacity,
+              transform: [{ scale }],
+            },
+          ]}
+        />
+      )}
+    </View>
+    {children}
+  </Pressable>
+);
+}
+
+const styles = StyleSheet.create({
+  rippleClipLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+  },
+  ripple: {
+    position: "absolute",
+  },
+});
+
 export default function AppTabsLayout() {
   const { theme } = useAppTheme();
   const session = useSession();
@@ -51,8 +178,6 @@ export default function AppTabsLayout() {
   const createCheckInFlightRef = useRef(false);
   const [isCheckingCreateLimit, setIsCheckingCreateLimit] = useState(false);
 
-  // Use live insets so the tab bar correctly clears the system nav bar
-  // regardless of whether the user has gesture nav or 3-button nav enabled.
   const insets = useSafeAreaInsets();
   const tabBarBottomPadding = Math.max(insets.bottom, 10);
   const tabBarHeight = 58 + tabBarBottomPadding;
@@ -166,6 +291,13 @@ export default function AppTabsLayout() {
           borderRadius: 12,
           marginHorizontal: 2,
         },
+        tabBarButton: (props) => (
+          <RippleTabBarButton
+            {...props}
+            rippleColor={theme.colors.textPrimary}
+            rippleDuration={RIPPLE_DURATION_MS}
+          />
+        ),
         tabBarStyle: {
           height: tabBarHeight,
           paddingTop: 8,
@@ -181,40 +313,40 @@ export default function AppTabsLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{ title: "Feed", tabBarIcon: renderTabIcon("home-outline") }}
-      />
-      <Tabs.Screen
-        name="requests"
-        options={{
-          title: "Requests",
-          tabBarIcon: renderTabIcon("swap-horizontal-outline"),
-          sceneStyle: { paddingBottom: tabBarHeight },
-        }}
-      />
-      <Tabs.Screen
-        name="create"
-        options={{
-          title: "Create",
-          tabBarIcon: ({ color, size }) => (
-            <CreateTabIcon color={color} size={size} isChecking={isCheckingCreateLimit} />
-          ),
-          sceneStyle: { paddingBottom: tabBarHeight },
-        }}
-      />
-      <Tabs.Screen
-        name="my-listings"
-        options={{
-          title: "My Listings",
-          tabBarIcon: renderTabIcon("pricetag-outline"),
-          sceneStyle: { paddingBottom: tabBarHeight },
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{ title: "Profile", tabBarIcon: renderTabIcon("person-outline") }}
-      />
+        <Tabs.Screen
+          name="home"
+          options={{ title: "Feed", tabBarIcon: renderTabIcon("home-outline") }}
+        />
+        <Tabs.Screen
+          name="requests"
+          options={{
+            title: "Requests",
+            tabBarIcon: renderTabIcon("swap-horizontal-outline"),
+            sceneStyle: { paddingBottom: tabBarHeight },
+          }}
+        />
+        <Tabs.Screen
+          name="create"
+          options={{
+            title: "Create",
+            tabBarIcon: ({ color, size }) => (
+              <CreateTabIcon color={color} size={size} isChecking={isCheckingCreateLimit} />
+            ),
+            sceneStyle: { paddingBottom: tabBarHeight },
+          }}
+        />
+        <Tabs.Screen
+          name="my-listings"
+          options={{
+            title: "My Listings",
+            tabBarIcon: renderTabIcon("pricetag-outline"),
+            sceneStyle: { paddingBottom: tabBarHeight },
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{ title: "Profile", tabBarIcon: renderTabIcon("person-outline") }}
+        />
     </Tabs>
   );
 }

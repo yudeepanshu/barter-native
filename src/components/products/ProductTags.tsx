@@ -13,6 +13,7 @@ export interface ProductTagSpec {
   tone: ProductTagTone;
   icon?: FeatherIconName;
   size?: 'sm' | 'md' | 'lg';
+  minWidth?: number;
 }
 
 export const TAG_TONES: Record<
@@ -226,10 +227,11 @@ export function ProductTag({
           styles.topTypeBadge,
           sz.badge,
           { borderColor: palette.border, backgroundColor: palette.bg },
+          tag.minWidth ? { minWidth: tag.minWidth } : undefined,
           style,
         ]}
       >
-        <Text style={[styles.topTypeText, sz.text, { color: palette.text }]} numberOfLines={1}>
+        <Text style={[styles.topTypeText, sz.text, { color: palette.text }, tag.minWidth ? { textAlign: "center" } : undefined,]} numberOfLines={1}>
           {tag.label}
         </Text>
       </View>

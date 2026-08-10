@@ -233,18 +233,17 @@ export function ProductMetadata({
         </View>
       )}
 
-      {/* Inline text row: category · (distance OR location) */}
-      {hasInlineItems && (
-        <View style={styles.inlineRow}>
-          {locationOrDistance && (
+    {/* Inline text row: category · (distance OR location) */}
+    {hasInlineItems && (
+      <View style={styles.inlineRow}>
+        {locationOrDistance && (
+          <View style={styles.inlineItem}>
             <Feather
               name="map-pin"
               size={variant === "compact" ? 11 : 12}
               color={theme.colors.textMuted}
               style={styles.inlineIcon}
             />
-          )}
-          {locationOrDistance && (
             <Text
               numberOfLines={isShowingDistance ? 1 : locationLines}
               style={[
@@ -255,21 +254,21 @@ export function ProductMetadata({
             >
               {locationOrDistance}
             </Text>
-          )}
+          </View>
+        )}
 
-          {includeCategory && locationOrDistance && (
-            <Text style={[styles.inlineSeparator, { color: theme.colors.textMuted }]}>·</Text>
-          )}
+        {includeCategory && locationOrDistance && (
+          <Text style={[styles.inlineSeparator, { color: theme.colors.textMuted }]}>·</Text>
+        )}
 
-          {includeCategory && (
+        {includeCategory && (
+          <View style={styles.inlineItem}>
             <Feather
               name="tag"
               size={variant === "compact" ? 11 : 12}
               color={theme.colors.textMuted}
               style={styles.inlineIcon}
             />
-          )}
-          {includeCategory && (
             <Text
               numberOfLines={1}
               style={[
@@ -280,10 +279,10 @@ export function ProductMetadata({
             >
               {getCategoryLabel(product)}
             </Text>
-          )}
-
-        </View>
-      )}
+          </View>
+        )}
+      </View>
+    )}
     </View>
   );
 }

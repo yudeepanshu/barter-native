@@ -256,7 +256,7 @@ export default function ProductDetailScreen() {
               />
               <View style={{ gap: 6, alignItems: "flex-end" }}>
                 <ProductTag
-                  tag={typeTag.label === "Cash Only" ? { ...typeTag, label: formatCurrency(product.minMoneyAmount ?? 0) } : typeTag}
+                  tag={typeTag.label === "Cash Only" ? { ...typeTag, label: formatCurrency(product.minMoneyAmount ?? 0), minWidth: 40 } : typeTag}
                   variant="top-text"
                   style={{ alignSelf: "center" }}
                 />
@@ -335,7 +335,7 @@ export default function ProductDetailScreen() {
             <ExpandableText
               text={product.description}
               numberOfLines={3}
-              style={[styles.description, { color: theme.colors.textMuted }]}
+              style={[styles.description, { color: theme.colors.textPrimary }]}
             />
           ) : null}
 

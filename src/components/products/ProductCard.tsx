@@ -100,7 +100,14 @@ export const ProductCard = memo(function ProductCard({
         <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={2}>
           {product.title}
         </Text>
-        <ProductTag tag={typeTag.label === 'Cash Only' ? {...typeTag, label:  formatCurrency(product.minMoneyAmount ?? 0)} : typeTag} variant="top-text" />
+        <ProductTag
+          tag={
+            typeTag.label === 'Cash Only'
+              ? { ...typeTag, label: formatCurrency(product.minMoneyAmount ?? 0), minWidth: 45 }
+              : typeTag
+          }
+          variant="top-text"
+        />
       </View>
       {showMeta ? (
         <View style={styles.metaWrap}>
